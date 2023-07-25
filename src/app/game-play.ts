@@ -4,7 +4,7 @@ import { Container } from "@thegraid/easeljs-module";
 import { EzPromise } from "@thegraid/ezpromise";
 import { CostIncCounter } from "./counters";
 import { GameSetup } from "./game-setup";
-import { Hex, Hex2, HexMap, IHex } from "./hex";
+import { Hex, Hex1, Hex2, HexMap, IHex } from "./hex";
 import { H } from "./hex-intfs";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
@@ -49,13 +49,13 @@ export class GamePlay0 {
   static gamePlay: GamePlay0;
   static gpid = 0
   readonly id = GamePlay0.gpid++
-  recycleHex: Hex;
+  recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
   readonly logWriter: LogWriter
 
   get allPlayers() { return Player.allPlayers; }
 
-  readonly hexMap: HexMap = new HexMap()
+  readonly hexMap = new HexMap<Hex2>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly gStats: GameStats             // 'readonly' (set once by clone constructor)
   readonly redoMoves = []
@@ -243,7 +243,7 @@ export class GamePlay0 {
   }
 
   /** after add Tile to hex: propagate its influence in each direction; maybe capture. */
-  incrInfluence(hex: Hex, infColor: PlayerColor) {
+  incrInfluence(hex: Hex1, infColor: PlayerColor) {
     H.infDirs.forEach(dn => {
       const inf = hex.getInf(infColor, dn);
       hex.propagateIncr(infColor, dn, inf); // use test to identify captured Criminals?
@@ -251,7 +251,7 @@ export class GamePlay0 {
   }
 
   /** after remove Tile [w/tileInf] from hex: propagate influence in each direction. */
-  decrInfluence(hex: Hex, tile: Tile, infColor: PlayerColor) {
+  decrInfluence(hex: Hex1, tile: Tile, infColor: PlayerColor) {
     H.infDirs.forEach(dn => {
       const inf = hex.getInf(infColor, dn);
       hex.propagateDecr(infColor, dn, inf, tile);       // because no-stone, hex gets (inf - 1)
@@ -349,7 +349,7 @@ export class GamePlay0 {
    * @param toHex tile.moveTo(toHex)
    * @param payCost commit and verify payment
    */
-  placeEither(tile: Tile, toHex: Hex, payCost = true) {
+  placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.hex;
     const info = { tile, fromHex, toHex, infStr: toHex?.infStr ?? '?', payCost };

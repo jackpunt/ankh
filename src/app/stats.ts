@@ -46,7 +46,7 @@ export class GameStats {
 
   /** extract the useful bits for maintaining stats. */
   constructor(
-    public readonly hexMap: HexM,
+    public readonly hexMap: HexM<Hex2>,
     public readonly pStats: Record<PlayerColor, PlayerStats> = playerColorRecordF(() => new PlayerStats()),
     public readonly inControl: PlayerColor[] = Array(TP.ftHexes(TP.mHexes))) {
     this.setupStatVector()           // use default wVector

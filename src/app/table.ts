@@ -2,7 +2,7 @@ import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContai
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { ButtonBox, CostIncCounter, DecimalCounter, NumCounter, NumCounterBox } from "./counters";
 import type { GamePlay } from "./game-play";
-import { BonusHex, DebtHex, EventHex, Hex, Hex2, HexMap, IHex, RecycleHex, ResaHex } from "./hex";
+import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { H, HexDir, XYWH } from "./hex-intfs";
 import { Criminal, Police } from "./meeple";
 import { Player } from "./player";
@@ -91,7 +91,7 @@ export class Table extends EventDispatcher  {
   stage: Stage;
   scaleCont: Container
   bgRect: Shape
-  hexMap: HexMap; // from gamePlay.hexMap
+  hexMap: HexMap<Hex2>; // from gamePlay.hexMap
 
   undoCont: Container = new Container()
   undoShape: Shape = new Shape();
@@ -262,7 +262,7 @@ export class Table extends EventDispatcher  {
     return hex
   }
 
-  noRowHex(name: string, crxy: { row: number, col: number }, claz: Constructor<Hex2> = BonusHex) {
+  noRowHex(name: string, crxy: { row: number, col: number }, claz?: Constructor<Hex2>) {
     const { row, col } = crxy;
     const hex = this.newHex2(row, col, name, claz);
     return hex;
@@ -286,8 +286,8 @@ export class Table extends EventDispatcher  {
 
   layoutTable(gamePlay: GamePlay) {
     this.gamePlay = gamePlay
-    const hexMap = this.hexMap = gamePlay.hexMap
-    hexMap.addToMapCont();               // addToMapCont; make Hex2
+    const hexMap = this.hexMap = gamePlay.hexMap as HexMap<Hex2>;
+    hexMap.addToMapCont(Hex2);               // addToMapCont; make Hex2
     hexMap.makeAllDistricts();           //
 
     const mapCont = hexMap.mapCont, hexCont = mapCont.hexCont; // local reference
@@ -341,15 +341,6 @@ export class Table extends EventDispatcher  {
     rHex.cont.addChild(image);
     rHex.cont.updateCache();
     return rHex;
-  }
-
-  makeEventHex() {
-    const eventHex = this.newHex2(0, this.col00, 'eventHex', EventHex, -1);
-    // show Mark and Tile enlarged: [note: we only make 1 EventHex]
-    const eventCont = eventHex.mapCont.eventCont;
-    eventCont.scaleX = eventCont.scaleY = TP.eventScale;
-    eventCont.x = eventHex.x; eventCont.y = eventHex.y;  // align EventCont with eventHex
-    return eventHex;
   }
 
   // col locations, left-right mirrored:

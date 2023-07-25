@@ -1,7 +1,7 @@
 import { C, Constructor, F, ImageLoader, S, className, stime } from "@thegraid/common-lib";
 import { Bitmap, Container, DisplayObject, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
 import { GP } from "./game-play";
-import { Hex, Hex2, HexMap } from "./hex";
+import { Hex, Hex1, Hex2, HexMap } from "./hex";
 import type { Player } from "./player";
 import { BalMark, C1, CapMark, CenterText, HexShape, InfRays, InfShape, Paintable, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
@@ -250,15 +250,15 @@ export class Tile extends Tile0 {
   get fR() { return 0; }
 
   /** location at start-of-game & after-Recycle; Meeple & Civic; Policy: sendHome -> sendToBag */
-  homeHex: Hex = undefined;
+  homeHex: Hex1 = undefined;
   /** location at start-of-drag */
   fromHex: Hex2;
 
-  _hex: Hex = undefined;
+  _hex: Hex1 = undefined;
   /** the map Hex on which this Tile sits. */
   get hex() { return this._hex; }
   /** only one Tile on a Hex, Tile on only one Hex */
-  set hex(hex: Hex) {
+  set hex(hex: Hex1) {
     if (this.hex?.tile === this) this.hex.tile = undefined;
     this._hex = hex;
     if (hex !== undefined) hex.tile = this;
@@ -421,13 +421,13 @@ export class Tile extends Tile0 {
 
   // Tile
   /** Post-condition: tile.hex == hex; low-level, physical move */
-  moveTo(hex: Hex) {
+  moveTo(hex: Hex1) {
     this.hex = hex;     // INCLUDES: hex.tile = tile
     return hex;
   }
 
   /** Tile.dropFunc() --> placeTile (to Map, reserve, ~>auction; not Recycle); semantic move/action. */
-  placeTile(toHex: Hex, payCost = true) {
+  placeTile(toHex: Hex1, payCost = true) {
     GP.gamePlay.placeEither(this, toHex, payCost);
   }
 
@@ -517,7 +517,7 @@ export class Tile extends Tile0 {
    * Override in AuctionTile, Civic, Meeple/Leader
    * @param toHex a potential targetHex (table.hexUnderObj(dragObj.xy))
    */
-  isLegalTarget(toHex: Hex, ctx?: DragContext) {
+  isLegalTarget(toHex: Hex1, ctx?: DragContext) {
     if (!toHex) return false;
     if (!!toHex.tile) return false; // note: from AuctionHexes to Reserve overrides this.
     if (toHex.meep && !(toHex.meep.player === GP.gamePlay.curPlayer)) return false; // QQQ: can place on non-player meep?
@@ -613,7 +613,7 @@ export class Civic extends MapTile {
     this.addImageBitmap(image);
   }
 
-  override isLegalTarget(hex: Hex, ctx?: DragContext) { // Civic
+  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Civic
     if (!super.isLegalTarget(hex, ctx)) return false; // check cost & influence (& balance)
     if (!hex.isOnMap) return false;
     return true;

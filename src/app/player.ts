@@ -1,7 +1,7 @@
 import { Constructor, stime } from "@thegraid/common-lib";
 import { DecimalCounter, NumCounter } from "./counters";
 import { GP, GamePlay, GamePlay0 } from "./game-play";
-import type { Hex } from "./hex";
+import type { Hex, Hex1 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import { Chancellor, Criminal, CriminalSource, Judge, Leader, Mayor, Meeple, Police, Priest } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";
@@ -47,8 +47,8 @@ export class Player {
   policeSource: UnitSource<Police>;
   criminalSource: CriminalSource;
 
-  readonly policyHexes: Hex[] = new Array<Hex>(TP.nPolicySlots).fill(undefined);
-  isPolicyHex(hex: Hex) {
+  readonly policyHexes: Hex1[] = new Array<Hex1>(TP.nPolicySlots).fill(undefined);
+  isPolicyHex(hex: Hex1) {
     return this.policyHexes.includes(hex);
   }
 

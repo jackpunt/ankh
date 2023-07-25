@@ -1,7 +1,7 @@
 import { C, F, S } from "@thegraid/common-lib";
 import { Shape, Text } from "@thegraid/easeljs-module";
 import { GP, NamedObject } from "./game-play";
-import type { Hex, Hex2 } from "./hex";
+import type { Hex, Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, InfRays, Paintable } from "./shapes";
 import type { DragContext, Table } from "./table";
@@ -76,7 +76,7 @@ export class Meeple extends Tile {
   /** the map Hex on which this Meeple sits. */
   override get hex() { return this._hex; }
   /** only one Meep on a Hex, Meep on only one Hex */
-  override set hex(hex: Hex) {
+  override set hex(hex: Hex1) {
     if (this.hex?.meep === this) this.hex.meep = undefined
     this._hex = hex
     if (hex !== undefined) hex.meep = this;
@@ -87,7 +87,7 @@ export class Meeple extends Tile {
   override makeShape(): Paintable { return new MeepleShape(this.player); }
 
   /** location at start-of-turn; for Meeples.unMove() */
-  startHex: Hex;
+  startHex: Hex1;
 
   // we need to unMove meeples in the proper order; lest we get 2 meeps on a hex.
   // meepA -> hexC, meepB -> hexA; undo: meepA -> hexA (collides with meepB), meepB -> hexB
@@ -111,7 +111,7 @@ export class Meeple extends Tile {
     if (this.hex?.isOnMap) GP.gamePlay.hexMap.update();
   }
 
-  override moveTo(hex: Hex): Hex {
+  override moveTo(hex: Hex1) {
     const destMeep = hex?.meep;
     if (destMeep && destMeep !== this) {
       destMeep.x += 10; // make double occupancy apparent [until this.unMove()]
@@ -162,7 +162,7 @@ export class Meeple extends Tile {
     return;
   }
 
-  override isLegalTarget(hex: Hex, ctx?: DragContext) {  // Meeple
+  override isLegalTarget(hex: Hex1, ctx?: DragContext) {  // Meeple
     if (!hex) return false;
     if (hex.meep) return false;    // no move onto meeple
     if (!hex.isOnMap) return false;
@@ -232,7 +232,7 @@ export class Leader extends Meeple {
     civic.paint();
   }
 
-  override isLegalTarget(hex: Hex, ctx?: DragContext) { // Leader
+  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Leader
     if (!super.isLegalTarget(hex, ctx)) return false;
     if (!this.hex.isOnMap && (hex !== this.civicTile.hex)) return false; // deploy ONLY to civicTile.
     return true
@@ -285,7 +285,7 @@ class SourcedMeeple extends Meeple {
     this.updateCache();
   }
 
-  override moveTo(hex: Hex) {
+  override moveTo(hex: Hex1) {
     const source = this.source;
     const fromHex = this.hex;
     const toHex = super.moveTo(hex);  // collides with source.hex.meep
@@ -318,7 +318,7 @@ export class Police extends SourcedMeeple {
     this.paintRings(colorn, C.briteGold, 4, 4);
   }
 
-  override isLegalTarget(hex: Hex, ctx?: DragContext) { // Police
+  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Police
     if (!super.isLegalTarget(hex, ctx)) return false;
     if (this.hex === this.source.hex && !(hex.tile.player === this.player)) return false;
     return true;
@@ -365,7 +365,7 @@ export class Criminal extends SourcedMeeple {
     this.paintRings(colorn, C.black, ...this.autoCrime ? [4, 4]: [2, 3]);
   }
 
-  override moveTo(hex: Hex) {
+  override moveTo(hex: Hex1) {
     if (this.hex === this.source.hex && this.autoCrime) this.paint();
     const toHex = super.moveTo(hex);
     const curPlayer = GP.gamePlay.curPlayer;
@@ -387,7 +387,7 @@ export class Criminal extends SourcedMeeple {
     return this.startAutoCrime ? true : super.isOnLine(hex);
   }
 
-  override isLegalTarget(hex: Hex, ctx?: DragContext): boolean { // Criminal
+  override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean { // Criminal
     if (!super.isLegalTarget(hex, ctx)) return false;
     const plyr = this.player ?? GP.gamePlay.curPlayer; // owner or soon-to-be owner
     // must NOT be on or adj to plyr's Tile:

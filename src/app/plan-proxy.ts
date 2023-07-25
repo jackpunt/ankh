@@ -1,5 +1,5 @@
 import { stime } from "@thegraid/common-lib";
-import type { HexMap } from "./hex";
+import type { Hex1, Hex2, HexMap } from "./hex";
 
 /** Local/Direct methods of Planner */
 export interface IPlanner extends IPlannerMethods {
@@ -45,7 +45,7 @@ export class Planner extends mockPlanner {
  * @param index player.index [0 -> 'b', 1 -> 'w']
  * @returns Planner or PlannerProxy
  */
-export function newPlanner(hexMap: HexMap, index: number): IPlanner {
+export function newPlanner(hexMap: HexMap<Hex1>, index: number): IPlanner {
   // let planner = TP.pWorker
   //   ? new PlannerProxy(hexMap.mh, hexMap.nh, index, logWriter)    // -> Remote Planner [no Parallel]
   //   : new Planner(hexMap.mh, hexMap.nh, index, logWriter) // -> Local ParallelPlanner *or* Planner

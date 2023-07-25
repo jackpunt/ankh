@@ -1,18 +1,19 @@
-import { C, F, RC, S } from "@thegraid/easeljs-lib";
+import { C, Constructor, F, RC, S } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, Point, Shape, Text } from "@thegraid/easeljs-module";
 import { EwDir, H, HexAxis, HexDir, InfDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { CapMark, HexShape, LegalMark, MeepCapMark } from "./shapes";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord, playerColorRecordF, playerColorsC } from "./table-params";
-import type { Tile } from "./tile";
+import type { MapTile, Tile } from "./tile";
 
 export const S_Resign = 'Hex@Resign'
 export const S_Skip = 'Hex@skip '
 export type IHex = { Aname: string, row: number, col: number }
 
+type HexConstructor<T extends Hex> = new (map: HexMap<T>, row: number, col: number) => T;
 // Note: graphics.drawPolyStar(x,y,radius, sides, pointSize, angle) will do a regular polygon
 
-type LINKS = { [key in InfDir]?: Hex }
+type LINKS<T extends Hex> = { [key in InfDir]?: T }
 type INF   = { [key in InfDir]?: number }
 type INFM   = { [key in HexAxis]?: InfMark }
 type DCR    = { [key in "dc" | "dr"]: number }  // Delta for Col & Row
@@ -67,17 +68,13 @@ class HexCont extends Container {
 /** Base Hex, has no connection to graphics.
  * topological links to adjacent hex objects.
  *
- * each Hex may contain a Planet [and?] or a Ship.
- *
- * non-Planet Hex is unexplored or contains a AfHex.
+ * each Hex may contain Tile and/or Meeple. (Planet, Ship)
  */
 export class Hex {
   /** return indicated Hex from otherMap */
-  static ofMap(ihex: IHex, otherMap: HexMap) {
+  static ofMap(ihex: IHex, otherMap: HexMap<Hex>) {
     try {
-      return (ihex.Aname === S_Skip) ? otherMap.skipHex
-        : (ihex.Aname === S_Resign) ? otherMap.resignHex
-          : otherMap[ihex.row][ihex.col]
+      return otherMap[ihex.row][ihex.col]
     } catch (err) {
       console.warn(`ofMap failed:`, err, { ihex, otherMap }) // eg: otherMap is different (mh,nh)
       throw err
@@ -86,7 +83,7 @@ export class Hex {
   static aname(row: number, col: number) {
     return (row >= 0) ? `Hex@[${row},${col}]` : col == -1 ? S_Skip : S_Resign
   }
-  constructor(map: HexMap, row: number, col: number, name = Hex.aname(row, col)) {
+  constructor(map: HexMap<Hex>, row: number, col: number, name = Hex.aname(row, col)) {
     this.Aname = name
     this.map = map
     this.row = row
@@ -114,26 +111,15 @@ export class Hex {
     }
   }
 
-  _tile: Tile;
-  get tile() { return this._tile; }
-  set tile(tile: Tile) { this._tile = tile; } // override in Hex2!
-  // Note: set hex.tile mostly invoked from: tile.hex = hex;
-
-  _meep: Meeple;
-  get meep() { return this._meep; }
-  set meep(meep: Meeple) { this._meep = meep }
-
-  get occupied(): [Tile, Meeple] { return (this.tile || this.meep) ? [this.tile, this.meep] : undefined; }
-
   readonly Aname: string
   /** reduce to serializable IHex (removes map, inf, links, etc) */
   get iHex(): IHex { return { Aname: this.Aname, row: this.row, col: this.col } }
   protected nf(n: number) { return `${n !== undefined ? (n === Math.floor(n)) ? n : n.toFixed(1) : ''}`; }
-  /** [row,col] OR S_Resign OR S_Skip */
+  /** [row,col] OR special name */
   get rcs(): string { return (this.row >= 0) ? `[${this.nf(this.row)},${this.nf(this.col)}]` : this.Aname.substring(4)}
   get rowsp() { return (this.nf(this.row ?? -1)).padStart(2) }
   get colsp() { return (this.nf(this.col ?? -1)).padStart(2) } // col== -1 ? S_Skip; -2 ? S_Resign
-  /** [row,col] OR S_Resign OR S_Skip */
+  /** [row,col] OR special name */
   get rcsp(): string { return (this.row >= 0) ? `[${this.rowsp},${this.colsp}]` : this.Aname.substring(4).padEnd(7)}
   /** compute ONCE, *after* HexMap is populated with all the Hex! */
   get rc_linear(): number { return this._rcLinear || (this._rcLinear = this.map.rcLinear(this.row, this.col))}
@@ -150,94 +136,23 @@ export class Hex {
   get isLegal() { return this._isLegal; }
   set isLegal(v: boolean) { this._isLegal = v; }
 
-  readonly map: HexMap;  // Note: this.parent == this.map.hexCont [cached]
+  readonly map: HexMap<Hex>;  // Note: this.parent == this.map.hexCont [cached] TODO: typify ??
   readonly row: number;
   readonly col: number;
   /** influence of color passing through this hex; see also getInfT() */
   readonly inf = playerColorRecord<INF>({},{},{})
   /** Link to neighbor in each H.dirs direction [NE, E, SE, SW, W, NW] */
-  readonly links: LINKS = {}
+  readonly links: LINKS<this> = {}
 
   /** colorScheme(playerColor)@rcs */
-  toString(sc = this.tile?.player?.color || this.meep?.player?.color) {
-    return `${TP.colorScheme[sc] || 'Empty'}@${this.rcs}` // hex.toString => COLOR@[r,c] | COLOR@Skip , COLOR@Resign
+  toString(sc?: PlayerColor) {
+    return `${TP.colorScheme[sc] ?? 'Empty'}@${this.rcs}` // hex.toString => COLOR@[r,c] | COLOR@Skip , COLOR@Resign
   }
   /** hex.rcspString => COLOR@[ r, c] | 'COLOR@Skip   ' , 'COLOR@Resign ' */
-  rcspString(sc = this.tile?.player.color || this.meep?.player?.color) {
-    return `${TP.colorScheme[sc] || 'Empty'}@${this.rcsp}`
+  rcspString(sc?: PlayerColor) {
+    return `${TP.colorScheme[sc] ?? 'Empty'}@${this.rcsp}`
   }
 
-  /**
-   * Is this Hex [already] influenced by color/dn? [for skipAndSet()]
-   * @param color PlayerColor
-   * @param dn dir of Influence: ds | revDir[ds]
-   * @returns true if Hex is PlayerColor or has InfMark(color, dn)
-   */
-  isInf(color: PlayerColor, dn: InfDir) { return this.inf[color][dn] > 0}
-  getInf(color: PlayerColor, dn: InfDir) { return this.inf[color] ? (this.inf[color][dn] ?? 0) : 0 }
-  setInf(color: PlayerColor, dn: InfDir, inf: number) { return this.inf[color][dn] = inf }
-
-  // Presence of Tile and/or Meeple may provide influence to adjacent cells
-  // that propagates along the axies, decrementing on non-presence cells,
-  // boosting on presence/occupied cells.
-  /** influence from presence of Tile/Meeple. */
-  getInfP(color: PlayerColor, xTile?: Tile | Meeple) {
-    const tileInf = (this.tile !== xTile && this.tile?.infColor === color) ? this.tile.inf : 0;
-    const meepInf = (this.meep !== xTile && this.meep?.infColor === color) ? this.meep.inf : 0;
-    return tileInf + meepInf;
-  }
-  /** Total external inf on this Hex. */
-  getInfX(color: PlayerColor) {
-    let tinf = 0;
-    H.infDirs.forEach(dn => tinf += this.getInf(color, dn));
-    return tinf;
-  }
-  /** Total inf on this Hex. */
-  getInfT(color: PlayerColor) {
-    const infP = this.getInfP(color);
-    return infP + this.getInfX(color);
-  }
-
-  get infStr() {
-    let infc = playerColorsC; // red, blue, criminal
-    let rv = infc.reduce((pv, cv, ci) => `${pv}${ci > 0 ? ':' : ''}${this.getInfT(cv as PlayerColor)}`, '');
-    return rv;
-  }
-
-  /**
-   * @param inf is influence *passed-in* to Hex; *next* gets [inf+infP or inc-1]
-   * @param test after hex.setInf(inf) and hex.propagateIncr(nxt), apply test(hex); [a visitor]
-   */
-  propagateIncr(color: PlayerColor, dn: InfDir, inf: number, test: ((hex: Hex) => void) = (hex) => hex.assessThreats()) {
-    const infP = this.getInfP(color);
-    this.setInf(color, dn, inf);
-    const nxt = inf + ((infP > 0) ? infP : (this.bonusInf(color) - 1));
-    if (nxt > 0) this.links[dn]?.propagateIncr(color, dn, nxt, test)
-    if (test) test(this);
-  }
-
-  private bonusInf(color: PlayerColor) { return this.tile?.bonusInf(color) ?? 0; }
-  /**
-   * Afer removing tileInf, set inf of this hex AND set inf of next in line to reduced value.
-   * Pass on based on *orig/current* inf, not the new/decremented inf.
-   * @param inf for hex, without infP
-   * @param test after hex.setInf(infn) and hex.propagateDecr(nxt), apply test(hex)
-   * @param tile whose infP has been removed.
-   */
-  propagateDecr(color: PlayerColor, dn: InfDir, inf: number, tile: Tile, test: ((hex: Hex) => void) = (hex) => hex.assessThreats()) {
-    // if *this* has inf, then next may also have propagated inf.
-    const infP = this.getInfP(color, tile);
-    const inf0 = this.getInf(color, dn) + infP + (tile?.infP ?? 0); // original, largest inf
-    this.setInf(color, dn, inf);
-    const nxt = (infP > 0) ? inf + infP : Math.max(0, inf - ((this.tile !== tile) && (this.bonusInf(color) === 1) ? 0 : 1));
-    if (inf0 > 0) this.links[dn]?.propagateDecr(color, dn, nxt, undefined, test) // pass-on a smaller number
-    if (test) test(this);
-  }
-
-  assessThreats() {
-    this.tile?.assessThreats();    // playerColorsC.forEach(pc => this.assessThreat(pc));
-    this.meep?.assessThreats();
-  }
   get linkDirs() { return Object.keys(this.links) as InfDir[];}
 
   /** convert LINKS object to Array */
@@ -248,7 +163,8 @@ export class Hex {
     if (inclCenter) func(this, undefined, this);
     this.linkDirs.forEach((dir: InfDir) => func(this.links[dir], dir, this));
   }
-  findLinkHex(pred: (hex: Hex, dir: InfDir, hex0: Hex) => boolean) {
+  /** search each Hex linked to this. */
+  findLinkHex(pred: (hex: this, dir: InfDir, hex0: this) => boolean) {
     return this.linkDirs.find((dir: InfDir) => pred(this.links[dir], dir, this));
   }
 
@@ -291,8 +207,102 @@ export class Hex {
   }
 }
 
+export class Hex1 extends Hex {
+
+  _tile: MapTile;
+  get tile() { return this._tile; }
+  set tile(tile: Tile) { this._tile = tile; } // override in Hex2!
+  // Note: set hex.tile mostly invoked from: tile.hex = hex;
+
+  _meep: Meeple;
+  get meep() { return this._meep; }
+  set meep(meep: Meeple) { this._meep = meep }
+
+  get occupied(): [Tile, Meeple] { return (this.tile || this.meep) ? [this.tile, this.meep] : undefined; }
+
+  /** colorScheme(playerColor)@rcs */
+  override toString(sc = this.tile?.player?.color || this.meep?.player?.color) {
+    return `${TP.colorScheme[sc] || 'Empty'}@${this.rcs}` // hex.toString => COLOR@[r,c] | COLOR@Skip , COLOR@Resign
+  }
+  /** hex.rcspString => COLOR@[ r, c] | 'COLOR@Skip   ' , 'COLOR@Resign ' */
+  override rcspString(sc = this.tile?.player.color || this.meep?.player?.color) {
+    return `${TP.colorScheme[sc] || 'Empty'}@${this.rcsp}`
+  }
+  /**
+   * Is this Hex [already] influenced by color/dn? [for skipAndSet()]
+   * @param color PlayerColor
+   * @param dn dir of Influence: ds | revDir[ds]
+   * @returns true if Hex is PlayerColor or has InfMark(color, dn)
+   */
+  isInf(color: PlayerColor, dn: InfDir) { return this.inf[color][dn] > 0}
+  getInf(color: PlayerColor, dn: InfDir) { return this.inf[color] ? (this.inf[color][dn] ?? 0) : 0 }
+  setInf(color: PlayerColor, dn: InfDir, inf: number) { return this.inf[color][dn] = inf }
+
+  // Presence of Tile and/or Meeple may provide influence to adjacent cells
+  // that propagates along the axies, decrementing on non-presence cells,
+  // boosting on presence/occupied cells.
+  /** influence from presence of Tile/Meeple. */
+  getInfP(color: PlayerColor, xTile?: Tile | Meeple) {
+    const tileInf = (this.tile !== xTile && this.tile?.infColor === color) ? this.tile.inf : 0;
+    const meepInf = (this.meep !== xTile && this.meep?.infColor === color) ? this.meep.inf : 0;
+    return tileInf + meepInf;
+  }
+  /** Total external inf on this Hex. */
+  getInfX(color: PlayerColor) {
+    let tinf = 0;
+    H.infDirs.forEach(dn => tinf += this.getInf(color, dn));
+    return tinf;
+  }
+  /** Total inf on this Hex. */
+  getInfT(color: PlayerColor) {
+    const infP = this.getInfP(color);
+    return infP + this.getInfX(color);
+  }
+
+  get infStr() {
+    let infc = playerColorsC; // red, blue, criminal
+    let rv = infc.reduce((pv, cv, ci) => `${pv}${ci > 0 ? ':' : ''}${this.getInfT(cv as PlayerColor)}`, '');
+    return rv;
+  }
+
+  /**
+   * @param inf is influence *passed-in* to Hex; *next* gets [inf+infP or inc-1]
+   * @param test after hex.setInf(inf) and hex.propagateIncr(nxt), apply test(hex); [a visitor]
+   */
+  propagateIncr(color: PlayerColor, dn: InfDir, inf: number, test: ((hex: Hex1) => void) = (hex) => hex.assessThreats()) {
+    const infP = this.getInfP(color);
+    this.setInf(color, dn, inf);
+    const nxt = inf + ((infP > 0) ? infP : (this.bonusInf(color) - 1));
+    if (nxt > 0) (this.links[dn] as Hex1)?.propagateIncr(color, dn, nxt, test)
+    if (test) test(this);
+  }
+
+  private bonusInf(color: PlayerColor) { return this.tile?.bonusInf(color) ?? 0; }
+  /**
+   * Afer removing tileInf, set inf of this hex AND set inf of next in line to reduced value.
+   * Pass on based on *orig/current* inf, not the new/decremented inf.
+   * @param inf for hex, without infP
+   * @param test after hex.setInf(infn) and hex.propagateDecr(nxt), apply test(hex)
+   * @param tile whose infP has been removed.
+   */
+  propagateDecr(color: PlayerColor, dn: InfDir, inf: number, tile: Tile, test: ((hex: Hex1) => void) = (hex) => hex.assessThreats()) {
+    // if *this* has inf, then next may also have propagated inf.
+    const infP = this.getInfP(color, tile);
+    const inf0 = this.getInf(color, dn) + infP + (tile?.infP ?? 0); // original, largest inf
+    this.setInf(color, dn, inf);
+    const nxt = (infP > 0) ? inf + infP : Math.max(0, inf - ((this.tile !== tile) && (this.bonusInf(color) === 1) ? 0 : 1));
+    if (inf0 > 0) (this.links[dn] as Hex1)?.propagateDecr(color, dn, nxt, undefined, test) // pass-on a smaller number
+    if (test) test(this);
+  }
+
+  assessThreats() {
+    this.tile?.assessThreats();    // playerColorsC.forEach(pc => this.assessThreat(pc));
+    this.meep?.assessThreats();
+  }
+
+}
 /** One Hex cell in the game, shown as a polyStar Shape */
-export class Hex2 extends Hex {
+export class Hex2 extends Hex1 {
   // cont holds hexShape(color), rcText, distText, capMark
   readonly cont: HexCont = new HexCont(this); // Hex IS-A Hex0, HAS-A HexCont Container
   readonly radius = TP.hexRad;                // determines width & height
@@ -348,7 +358,7 @@ export class Hex2 extends Hex {
    * - rcText (r,c)
    * - distText (d)
    */
-  constructor(map: HexMap, row: number, col: number, name?: string) {
+  constructor(map: HexMap<Hex2>, row: number, col: number, name?: string) {
     super(map, row, col, name);
     this.initCont(row, col);
     map?.mapCont.hexCont.addChild(this.cont);
@@ -460,55 +470,11 @@ export class Hex2 extends Hex {
 }
 
 export class RecycleHex extends Hex2 { }
-export class DebtHex extends Hex2 { }
-export class ResaHex extends Hex2 {
-  constructor(map: HexMap, row: number, col: number, name?: string) {
-    super(map, row, col, name);
-    this.showText(false);
-    this.setHexColor('transparent');
-  }
-  override get tile() { return super.tile; }
-  override set tile(tile: Tile) {
-    super.tile = tile  // this._tile = tile; tile.x/y = this.x/y;
-    // move from hexCont --> resaCont to stay above tileCont
-    tile?.parent.localToLocal(this.x, this.y, this.mapCont.resaCont, tile);
-    this.mapCont.resaCont.addChild(tile); // to top
-  }
-}
-export class EventHex extends Hex2 {
-  // EventHex.cont is on hexMap.mapCont.hexCont
-  // EventTile is *logically* on EventHex, but we display it on eventCont to scale:
-  // TODO: make showMark(eventHex) also scale
-  constructor(map: HexMap, row: number, col: number, name?: string) {
-    super(map, row, col, name);
-    this.showText(false);
-    this.setHexColor('transparent');
-  }
-  override get markCont() { return this.mapCont.eventCont; }
-  override get tile() { return super.tile; }
-  override set tile(tile: Tile) {
-    super.tile = tile  // this._tile = tile; tile.x/y = this.x/y;
-    // move from hexCont --> eventCont to scale Tile:
-    tile?.parent.localToLocal(this.x, this.y, this.mapCont.eventCont, tile);
-    this.mapCont.eventCont.addChild(tile); // to top
-  }
-}
-
-/** half-size hex, suitable source for HalfTile. */
-export class BonusHex extends Hex2 {
-  constructor(map: HexMap, row: number, col: number, name?: string) {
-    super(map, row, col, name);
-    this.distText.text = name;
-    this.showText(false);  // or true for debug...
-    this.y += .05 * this.radius; // adjust center
-    this.cont.scaleX = this.cont.scaleY = .5;
-  }
-}
 
 /** for contrast paint it black AND white, leave a hole in the middle unpainted. */
 class HexMark extends Shape {
   hex: Hex2;
-  constructor(public hexMap: HexMap, radius: number, radius0: number = 0) {
+  constructor(public hexMap: HexMap<Hex2>, radius: number, radius0: number = 0) {
     super();
     const mark = this, cb = "rgba(0,0,0,.3)", cw="rgba(255,255,255,.3)"
     mark.mouseEnabled = false
@@ -541,7 +507,7 @@ class HexMark extends Shape {
 }
 
 export class MapCont extends Container {
-  constructor(public hexMap: HexMap) {
+  constructor(public hexMap: HexMap<Hex2>) {
     super()
   }
   static cNames = ['hexCont', 'infCont', 'tileCont', 'resaCont', 'markCont', 'capCont', 'counterCont', 'eventCont'];
@@ -555,17 +521,14 @@ export class MapCont extends Container {
   eventCont: Container   // the eventHex & and whatever Tile is on it...
 }
 
-export interface HexM {
+export interface HexM<T extends Hex> {
   readonly allStones: HSC[]       // all the Hex with a Stone/Color
-  readonly district: Hex[][]      // all the Hex in a given district
+  readonly district: T[][]        // all the Hex in a given district
   readonly mapCont: MapCont
   rcLinear(row: number, col: number): number
-  forEachHex<K extends Hex>(fn: (hex: K) => void): void // stats forEachHex(incCounters(hex))
-  //used by GamePlay:
-  readonly skipHex: Hex
-  readonly resignHex: Hex
+  forEachHex<K extends T>(fn: (hex: K) => void): void // stats forEachHex(incCounters(hex))
   update(): void
-  showMark(hex: Hex): void
+  showMark(hex: T): void
 
 }
 /**
@@ -580,16 +543,15 @@ export interface HexM {
  * With a Mark and off-map: skipHex & resignHex
  *
  */
-export class HexMap extends Array<Array<Hex>> implements HexM {
+export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   // A color for each District: 'rgb(198,198,198)'
   static readonly distColor = ['lightgrey',"limegreen","deepskyblue","rgb(255,165,0)","violet","rgb(250,80,80)","yellow"]
 
+  get asHex2Map() { return this as any as HexMap<Hex2> }
   /** Each occupied Hex, with the occupying PlayerColor  */
   readonly allStones: HSC[] = []                    // aka hexStones in Board (readonly when we stop remove/filter)
-  readonly district: Array<Hex[]> = []
-  readonly mapCont: MapCont = new MapCont(this)   // if using Hex2
-  readonly skipHex: Hex;
-  readonly resignHex: Hex;
+  readonly district: Array<T[]> = []
+  readonly mapCont: MapCont = new MapCont(this.asHex2Map);   // if/when using Hex2
 
   //
   //                         |    //                         |    //                         |
@@ -618,7 +580,7 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
   get centerHex() {
     let cr = Math.floor((this.maxRow + this.minRow) / 2)
     let cc = Math.floor((this.minCol + this.maxCol) / 2);
-    return this[cr][cc] as Hex2
+    return this[cr][cc]; // as Hex2; as T;
   }
   getCornerHex(dn: HexDir) {
     return this.centerHex.lastHex(dn)
@@ -636,21 +598,24 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
    * Basic map is non-GUI, addToMapCont uses Hex2 elements to enable GUI interaction.
    * @param addToMapCont use Hex2 for Hex, make Containers: hexCont, infCont, markCont, stoneCont
    */
-  constructor(radius: number = TP.hexRad, addToMapCont = false) {
+  constructor(radius: number = TP.hexRad, addToMapCont = false, public hexC?: HexConstructor<T>) {
     super(); // Array<Array<Hex>>()
-    this.radius = radius
-    if (addToMapCont) this.addToMapCont()
+    this.radius = radius;
+    // ((...args: any[]) => new Hex(args[0], args[1], args[2]) as T);
+    this.hexC = hexC ?? (Hex as any as HexConstructor<T>);
+    if (addToMapCont) this.addToMapCont(hexC);
   }
 
   /** create/attach Graphical components for HexMap */
-  addToMapCont(): this {
-    this.mark = new HexMark(this, this.radius, this.radius/2.5)
-    let mapCont = this.mapCont
+  addToMapCont(hexC?: Constructor<T>): this {
+    if (hexC) this.hexC = hexC;
+    this.mark = new HexMark(this.asHex2Map, this.radius, this.radius/2.5)
+    const mapCont = this.mapCont;
     MapCont.cNames.forEach(cname => {
-      let cont = new Container()
-      mapCont[cname] = cont
+      const cont = new Container();
+      mapCont[cname] = cont;
       cont[S.Aname] = cont.name = cname;
-      mapCont.addChild(cont)
+      mapCont.addChild(cont);
     })
     return this
   }
@@ -662,12 +627,12 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
   }
 
   /** to build this HexMap: create Hex (or Hex2) and link it to neighbors. */
-  addHex(row: number, col: number, district: number ): Hex {
+  addHex(row: number, col: number, district: number, hexC?: Constructor<T> ): T {
     // If we have an on-screen Container, then use Hex2: (addToCont *before* makeAllDistricts)
-    let hex = !!this.mapCont.hexCont ? new Hex2(this, row, col) : new Hex(this, row, col)
+    const hex = new this.hexC(this, row, col);
     hex.district = district // and set Hex2.districtText
     if (this[row] === undefined) {  // create new row array
-      this[row] = new Array<Hex>()
+      this[row] = new Array<T>()
       if (this.minRow === undefined || row < this.minRow) this.minRow = row
       if (this.maxRow === undefined || row > this.maxRow) this.maxRow = row
     }
@@ -678,7 +643,7 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
     return hex
   }
   /** find first Hex matching the given predicate function */
-  findHex<K extends Hex>(fn: (hex: K) => boolean): K {
+  findHex<K extends T>(fn: (hex: K) => boolean): K {
     for (let hexRow of this) {
       if (hexRow === undefined) continue
       const found = hexRow.find((hex: K) => hex && fn(hex)) as K
@@ -687,7 +652,7 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
     return undefined;
   }
   /** Array.forEach does not use negative indices: ASSERT [row,col] is non-negative (so 'of' works) */
-  forEachHex<K extends Hex>(fn: (hex: K) => void) {
+  forEachHex<K extends T>(fn: (hex: K) => void) {
     // minRow generally [0 or 1] always <= 5, so not worth it
     //for (let ir = this.minRow || 0; ir < this.length; ir++) {
     for (let ir of this) {
@@ -696,14 +661,14 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
     }
   }
   /** return array of results of mapping fn over each Hex */
-  mapEachHex<K extends Hex,T>(fn: (hex: K) => T): T[] {
-    let rv: T[] = []
-    this.forEachHex<K>(hex => rv.push(fn(hex)))
+  mapEachHex<K extends T, R>(fn: (hex: K) => R): R[] {
+    const rv: R[] = [];
+    this.forEachHex<K>(hex => rv.push(fn(hex)));
     return rv
   }
   /** find all Hexes matching given predicate */
-  filterEachHex<K extends Hex>(fn: (hex: K) => boolean): K[] {
-    let rv: K[] = []
+  filterEachHex<K extends T>(fn: (hex: K) => boolean): K[] {
+    const rv: K[] = []
     this.forEachHex<K>(hex => fn(hex) && rv.push(hex))
     return rv
   }
@@ -745,7 +710,7 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
   }
 
   /** link hex to/from each extant neighor */
-  link(hex: Hex, rc: RC = hex, map: Hex[][] = this, nt: Topo = this.ewTopo(rc), lf: (hex: Hex) => LINKS = (hex) => hex.links) {
+  link(hex: T, rc: RC = hex, map: T[][] = this, nt: Topo = this.ewTopo(rc), lf: (hex: T) => LINKS<T> = (hex) => hex.links) {
     let topoDirs = Object.keys(nt) as Array<HexDir>
     topoDirs.forEach(dir => {
       let nr = rc.row + nt[dir].dr, nc = rc.col + nt[dir].dc //let {row, col} = this.nextRowCol(hex, dir, nt)
@@ -769,11 +734,11 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
   }
   /**
    *
-   * @param dbp Distance Between Planets; determines size of main map meta-hex (~4)
-   * @param dop Distance Outside Planets; extra hexes beyond planets (~2)
+   * @param nh number of hexes on on edge of metaHex
+   * @param mh order of metaHexes (greater than 0);
    */
   makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes) {
-    this.makeDistrict(nh, 0, 1, 0);    // dop hexes on outer ring; single meta-hex
+    this.makeDistrict(nh, 0, mh, 0);    // nh hexes on outer ring; single meta-hex
     this.mapCont.hexCont && this.centerOnContainer()
   }
   centerOnContainer() {
@@ -803,14 +768,14 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
    * @param mc make new district on meta-col
    */
   makeDistrict(nh: number, district: number, mr: number, mc: number): Hex[] {
-    let mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1
+    const mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1;
     // irow-icol define topology of MetaHex composed of HexDistrict
-    let irow = (mr: number, mc: number) => {
+    const irow = (mr: number, mc: number) => {
       let ir = mr * dia - nh * (mcp + 1) + 1
       ir -= Math.floor((mc) / 2)              // - half a row for each metaCol
       return ir
     }
-    let icol = (mr: number, mc: number, row: number) => {
+    const icol = (mr: number, mc: number, row: number) => {
       let np = Math.abs(nh % 2), rp = Math.abs(row % 2)
       let ic = Math.floor(mc * ((nh * 3 - 1) / 2))
       ic += (nh - 1)                        // from left edge to center
@@ -818,9 +783,10 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
       ic += Math.floor((mr - rp) / 2)       // 2-metaRow means +1 col
       return ic
     }
-    let row0 = irow(mr, mc), col0 = icol(mr, mc, row0), hex: Hex;
-    let hexAry = Array<Hex>(); hexAry['Mr'] = mr; hexAry['Mc'] = mc;
-    hexAry.push(hex = this.addHex(row0, col0, district)) // The *center* hex
+    const row0 = irow(mr, mc), col0 = icol(mr, mc, row0);
+    const hexAry = Array<T>(); hexAry['Mr'] = mr; hexAry['Mc'] = mc;
+    const hex = this.addHex(row0, col0, district);
+    hexAry.push(hex) // The *center* hex
     let rc: RC = { row: row0, col: col0 } // == {hex.row, hex.col}
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
@@ -830,10 +796,10 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
       H.infDirs.forEach(dir => rc = this.newHexesOnLine(ring, rc, dir, district, hexAry))
     }
     //console.groupEnd()
-    this.district[district] = hexAry
+    this.district[district] = hexAry;
     if (hexAry[0] instanceof Hex2) {
-      let hex2Ary = hexAry as Hex2[]
-      let dcolor = district == 0 ? HexMap.distColor[0] : this.pickColor(hex2Ary)
+      const hex2Ary = hexAry as any as Hex2[];
+      const dcolor = district == 0 ? HexMap.distColor[0] : this.pickColor(hex2Ary)
       hex2Ary.forEach(hex => hex.setHexColor(dcolor)) // makeDistrict: dcolor=lightgrey
     }
     return hexAry
@@ -859,12 +825,58 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
 }
 
 /** Marker class for HexMap used by GamePlayD */
-export class HexMapD extends HexMap {
+export class HexMapD extends HexMap<Hex> {
 
 }
 
-export class SquareMap extends HexMap {
+export class SquareMap<T extends Hex> extends HexMap<T> {
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
     super.makeAllDistricts();
+  }
+  /**
+   * Rectangle of hexes (comprising a metaRect)
+   * @param nr height
+   * @param nc width
+   * @param mr metaRow = 1
+   * @param mc metaCol = 1
+   * @returns
+   */
+  makeRect(nr: number, nc = 1, district = 0, mr = 1, mc = 1): Hex[] {
+    const nh = 1;
+    const mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1;
+    // irow-icol define topology of MetaHex composed of HexDistrict
+    const irow = (mr: number, mc: number) => {
+      let ir = mr * dia - nh * (mcp + 1) + 1
+      ir -= Math.floor((mc) / 2)              // - half a row for each metaCol
+      return ir
+    }
+    const icol = (mr: number, mc: number, row: number) => {
+      let np = Math.abs(nh % 2), rp = Math.abs(row % 2)
+      let ic = Math.floor(mc * ((nh * 3 - 1) / 2))
+      ic += (nh - 1)                        // from left edge to center
+      ic -= Math.floor((mc + (2 - np)) / 4) // 4-metaCol means 2-rows, mean 1-col
+      ic += Math.floor((mr - rp) / 2)       // 2-metaRow means +1 col
+      return ic
+    }
+    const row0 = irow(mr, mc), col0 = icol(mr, mc, row0);
+    const hexAry = Array<Hex>(); hexAry['Mr'] = mr; hexAry['Mc'] = mc;
+    const hex = this.addHex(row0, col0, district);
+    hexAry.push(hex) // The *center* hex
+    let rc: RC = { row: row0, col: col0 } // == {hex.row, hex.col}
+    //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
+    //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
+    for (let ring = 1; ring < nh; ring++) {
+      rc = this.nextRowCol(rc, 'W') // step West to start a ring
+      // place 'ring' hexes along each axis-line:
+      H.infDirs.forEach(dir => rc = this.newHexesOnLine(ring, rc, dir, district, hexAry))
+    }
+    //console.groupEnd()
+    this.district[district] = hexAry as T[];
+    if (hexAry[0] instanceof Hex2) {
+      const hex2Ary = hexAry as Hex2[]
+      const dcolor = district == 0 ? HexMap.distColor[0] : this.pickColor(hex2Ary)
+      hex2Ary.forEach(hex => hex.setHexColor(dcolor)) // makeDistrict: dcolor=lightgrey
+    }
+    return hexAry
   }
 }
