@@ -639,10 +639,6 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
   constructor(radius: number = TP.hexRad, addToMapCont = false) {
     super(); // Array<Array<Hex>>()
     this.radius = radius
-    //this.height = radius * H.sqrt3
-    //this.width = radius * 1.5
-    this.skipHex = new Hex(this, -1, -1, S_Skip)
-    this.resignHex = new Hex(this, -1, -2, S_Resign)
     if (addToMapCont) this.addToMapCont()
   }
 
@@ -776,8 +772,8 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
    * @param dbp Distance Between Planets; determines size of main map meta-hex (~4)
    * @param dop Distance Outside Planets; extra hexes beyond planets (~2)
    */
-  makeAllDistricts(dbp = TP.dbp, dop = TP.dop) {
-    this.makeDistrict(dbp + 2 + dop, 0, 1, 0);    // dop hexes on outer ring; single meta-hex
+  makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes) {
+    this.makeDistrict(nh, 0, 1, 0);    // dop hexes on outer ring; single meta-hex
     this.mapCont.hexCont && this.centerOnContainer()
   }
   centerOnContainer() {
@@ -865,4 +861,10 @@ export class HexMap extends Array<Array<Hex>> implements HexM {
 /** Marker class for HexMap used by GamePlayD */
 export class HexMapD extends HexMap {
 
+}
+
+export class SquareMap extends HexMap {
+  override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
+    super.makeAllDistricts();
+  }
 }
