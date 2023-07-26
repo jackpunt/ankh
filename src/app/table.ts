@@ -131,7 +131,7 @@ export class Table extends EventDispatcher  {
       const { x } = hex0.xywh(), y = hexC.y;
       this.hexMap.mapCont.hexCont.localToLocal(x - 3.5 * TP.hexRad, y + this.hexMap.rowHeight * 3.5, undoC.parent, undoC);
     }
-    const progressBg = new Shape(), bgw = 200, bgym = 240, y0 = 0;
+    const progressBg = new Shape(), bgw = 200, bgym = 140, y0 = 0; // bgym = 240
     const bgc = C.nameToRgbaString(TP.bgColor, .8);
     progressBg.graphics.f(bgc).r(-bgw / 2, y0, bgw, bgym - y0);
     undoC.addChildAt(progressBg, 0)
@@ -280,28 +280,21 @@ export class Table extends EventDispatcher  {
     hex.legalMark.setOnHex(hex);
     return hex;
   }
-  get col00() { return (15 - TP.auctionSlots) / 2 }
-  splitRowHex(name: string, ndx: number, claz?: Constructor<Hex2>) {
-    const nm = TP.auctionMerge, col0 = this.col00, row = 0;
-    return ndx < nm ? this.homeRowHex(name, { row, col: col0 + ndx }, -2, claz) :      // split: UP 2
-      ndx >= 2 * nm ? this.homeRowHex(name, { row, col: col0 + ndx - nm }, -1, claz) : // middle
-        /*ndx<2*nm */ this.homeRowHex(name, { row, col: col0 + ndx - nm }, 0, claz);   // split: DOWN 0
-  }
 
   layoutTable(gamePlay: GamePlay) {
     this.gamePlay = gamePlay
     const hexMap = this.hexMap = gamePlay.hexMap as HexMap<Hex2>;
     hexMap.addToMapCont(Hex2);               // addToMapCont; make Hex2
     hexMap.makeAllDistricts();               //
-
+    // hexCont is offset to be centered on mapCont (center of hexCont is at mapCont[0,0])
+    // mapCont is offset [0,0] to scaleCont
     const mapCont = hexMap.mapCont, hexCont = mapCont.hexCont; // local reference
     this.scaleCont.addChild(mapCont);
 
     // background sized for hexMap:
-    const { x: rx, y: ry, width: rw, height: rh } = hexCont.getBounds();
+    const { width: rw, height: rh } = hexCont.getBounds();
     const rowh = hexMap.rowHeight, colw = hexMap.colWidth;
-    const bgr: XYWH = { x: 0, y: -rowh * .6, w: rw + 5 * colw, h: rh + 4 * rowh }
-    // const bgr = { x: rw, y: ry, w: rw, h: rh};
+    const bgr: XYWH = { x: 0, y: 0, w: rw + 9 * colw, h: rh + 1 * rowh }
     // align center of mapCont(0,0) == hexMap(center) with center of background
     mapCont.x = (bgr.w - bgr.x) / 2;
     mapCont.y = (bgr.h - bgr.y) / 2;
@@ -309,19 +302,19 @@ export class Table extends EventDispatcher  {
     this.bgRect = this.setBackground(this.scaleCont, bgr); // bounded by bgr
     const p00 = this.scaleCont.localToLocal(bgr.x, bgr.y, hexCont);
     const pbr = this.scaleCont.localToLocal(bgr.w, bgr.h, hexCont);
-    hexCont.cache(p00.x, p00.y, pbr.x-p00.x, pbr.y-p00.y); // cache hexCont (bounded by bgr)
+    hexCont.cache(p00.x, p00.y, pbr.x - p00.x, pbr.y - p00.y); // cache hexCont (bounded by bgr)
 
     this.homeRowHexes.length = 0;
 
     this.makePerPlayer();
 
-    this.gamePlay.recycleHex = this.makeRecycleHex(5, -.5);
+    this.gamePlay.recycleHex = this.makeRecycleHex(5, -1.5);
     this.hexMap.update();
+    // position turnLog & turnText
     {
-      // position turnLog & turnText
       const parent = this.scaleCont, n = TP.nHexes;
-      const lhex = this.hexMap.getCornerHex('W');
-      let rhex = lhex.links['NE'] as Hex2;
+      const lhex = this.hexMap.getCornerHex('SW');
+      let rhex = lhex.links['N'] as Hex2;
       let rhpt = rhex.cont.parent.localToLocal(rhex.x - (n + 1) * this.hexMap.colWidth, rhex.y, parent)
       this.bagLog.x = rhpt.x; this.bagLog.y = rhpt.y - this.turnLog.height(1);;
       this.turnLog.x = rhpt.x; this.turnLog.y = rhpt.y;
@@ -351,7 +344,7 @@ export class Table extends EventDispatcher  {
 
   // col locations, left-right mirrored:
   colf(pIndex: number, icol: number, row: number) {
-    const dc = 14 - Math.abs(row) % 2;
+    const dc = 10 - Math.abs(row) % 2;
     const col = (pIndex == 0 ? (icol) : (dc - icol));
     return { row, col };
   }
@@ -363,7 +356,7 @@ export class Table extends EventDispatcher  {
       p.makePlayerBits();
       const colf = (col: number, row: number) => this.colf(pIndex, col, row);
 
-      let col0 = -2;
+      let col0 = -4;
       const leaderHexes = p.allLeaders.map((meep, ndx) => this.homeRowHex(meep.Aname, colf(ndx + col0, -1)));
       // place [civic/leader, academy/police] meepleHex on Table/Hex (but not on Map)
       this.leaderHexes[pIndex] = leaderHexes;
@@ -381,13 +374,6 @@ export class Table extends EventDispatcher  {
       const crimeHex = this.homeRowHex(`Barbs:${pIndex}`, colf(col0++, 0));
       this.addCostCounter(crimeHex, undefined, -1, false);
       p.criminalSource = Criminal.makeSource(p, crimeHex, TP.criminalPerPlayer);
-
-      const pRowCol = [[2, -1], [2, -2], [1, -2], [3, -2], [4, -2], [4, -1]];
-      TP.nPolicySlots; p.policyHexes.forEach((hex, ndx, ary) => {
-        const [r, c] = pRowCol[ndx];
-        const pHex = this.homeRowHex(`policy:${pIndex}-${ndx}`, colf(c, r), 0);
-        ary[ndx] = pHex;
-      });
 
       {
         // Win indicators:
@@ -425,14 +411,14 @@ export class Table extends EventDispatcher  {
   layoutButtonsAndCounters(player: Player) {
     const index = player.index;
     const cont = this.buttonsForPlayer[index] = this.contForPlayer(index);
-    const { w, h } = this.hexMap.centerHex.xywh();
+    const { w: hw, h } = this.hexMap.centerHex.xywh();
     const rowy = (i: number) => { return (i - .5) * h / 2}
     const align = (['left', 'right'] as const)[index], dir = [1, -1][index];
     const bLabels = [{l: 'resa', fs: .6, key: 'r'}, {l: 'Done', k: 'd'}]
-    let dw = 0;
+    let dw = 0, nc = 9;
     bLabels.forEach(({l: label, fs, key}, i) => {
       const b = new ButtonBox(label, label, 'lightgreen', TP.hexRad * (fs ?? .6));
-      b.attachToContainer(cont, { x: (3.6 * w + dw) * dir, y: rowy(0 - 1.1) }) // just a ['Done'] label/button
+      b.attachToContainer(cont, { x: (-nc * hw + dw) * dir, y: rowy(0 - 1.1) });
       b.boxAlign(align);
       b.on(S.click, () => this.doButton(label), this)[S.Aname] = `b:${label}`;
       dw += (b.wide + 2);
@@ -444,9 +430,9 @@ export class Table extends EventDispatcher  {
 
   layoutCounters(player: Player, cont: Container, rowy: (row: number) => number) {
     const counterCont = this.scaleCont;
-    const col0 = 2;
+    const col0 = -14;
     const index = player.index, dir = [1, -1][index]
-    const colx = (coff = 0) => dir * (col0 + coff) * TP.hexRad * H.sqrt3_2; // half-width column offset from col0
+    const colx = (coff = 0) => -60 + dir * (col0 + coff) * TP.hexRad * H.sqrt3_2; // half-width column offset from col0
     const layoutCounter = (name: string, color: string, rowy: number, coff = 0, incr: boolean | NumCounter = true,
       claz = NumCounterBox) => {
       //: new (name?: string, iv?: string | number, color?: string, fSize?: number) => NumCounter
@@ -730,7 +716,7 @@ export class Table extends EventDispatcher  {
       //this.scaleUp(Dragger.dragCont, 1.7); // Items being dragged appear larger!
     }
     if (bindKeys) {
-      this.bindKeysToScale("a", scaleC, 820, TP.hexRad);
+      this.bindKeysToScale("a", scaleC, 820, 10);
       KeyBinder.keyBinder.setKey('Space',   { thisArg: this, func: () => this.dragTarget() });
       KeyBinder.keyBinder.setKey('S-Space', { thisArg: this, func: () => this.dragTarget() });
     }

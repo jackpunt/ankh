@@ -47,11 +47,6 @@ export class Player {
   policeSource: UnitSource<Police>;
   criminalSource: CriminalSource;
 
-  readonly policyHexes: Hex1[] = new Array<Hex1>(TP.nPolicySlots).fill(undefined);
-  isPolicyHex(hex: Hex1) {
-    return this.policyHexes.includes(hex);
-  }
-
   actionCounter: NumCounter;
   get actions() { return this.actionCounter?.getValue(); }
   set actions(v: number) { this.actionCounter?.updateValue(v); }
@@ -84,7 +79,6 @@ export class Player {
         econ += hex.tile.econ;      // Note: Monument has negative econ
       }
     })
-    this.policyHexes.forEach(hex => econ += (hex.tile?.econ ?? 0));
     return econ;
   }
 
@@ -106,7 +100,6 @@ export class Player {
       const myTile = hex.tile?.player === this;
       //hex.tile && console.log(stime(this, `.vps`), hex.tile.Aname, hex.Aname, vp, dv, (hex.tile?.player == this && hex.tile.vp), (hex.meep?.player == this && hex.meep.vp));
     });
-    this.policyHexes.forEach(hex => vp += (hex.tile?.vp ?? 0));
     return vp;
   }
 

@@ -159,7 +159,7 @@ export class GameSetup {
     gui.y = y
     gui.makeLines()
     const gui2 = this.makeParamGUI2(parent, x - 320, y)
-    const gui3 = this.makeNetworkGUI(parent, x - 320, y + gui.ymax + 200 )
+    const gui3 = this.makeNetworkGUI(parent, x - 320, y + gui.ymax + 20 );
     gui.parent.addChild(gui) // bring to top
     gui.stage.update()
     restart = true // *after* makeLines has stablilized selectValue
@@ -209,7 +209,7 @@ export class GameSetup {
     this.showNetworkGroup()
     parent.addChild(gui)
     gui.makeLines()
-    gui.x = x; gui.y = y
+    gui.x = x; gui.y = y;
     parent.stage.update()
     return gui
   }
