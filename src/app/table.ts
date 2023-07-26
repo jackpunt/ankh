@@ -1,5 +1,5 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
-import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
+import { Container, DisplayObject, Event, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { ButtonBox, CostIncCounter, DecimalCounter, NumCounter, NumCounterBox } from "./counters";
 import type { GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
@@ -247,16 +247,6 @@ export class Table extends EventDispatcher  {
   readonly homeRowHexes: Hex2[] = [];
   leaderHexes: Hex2[][] = [[], []]; // per player
 
-  addCostCounter(hex: Hex2, name?: string, ndx = 0, repaint: boolean | Player = false) {
-    /** show cost in influence (and coins...) */
-    const infCounter = new CostIncCounter(hex, `${name ?? '?'}Inf`, ndx, repaint);
-    if (!name) {
-      infCounter.parent.removeChild(infCounter); // not used as DisplayObject
-    }
-    this.gamePlay.costIncHexCounters.set(hex, infCounter);
-    return hex;
-  }
-
   newHex2(row = 0, col = 0, name: string, claz: Constructor<Hex2> = Hex2, sy = 0) {
     const hex = new claz(this.hexMap, row, col, name);
     hex.distText.text = name;
@@ -306,6 +296,7 @@ export class Table extends EventDispatcher  {
 
     this.homeRowHexes.length = 0;
 
+    this.scaleCont.addChild(this.makeActionCont());
     this.makePerPlayer();
 
     this.gamePlay.recycleHex = this.makeRecycleHex(5, -1.5);
@@ -364,16 +355,7 @@ export class Table extends EventDispatcher  {
         const homeHex = meep.homeHex = meep.civicTile.homeHex = leaderHexes[i];
         meep.moveTo(homeHex);
         meep.civicTile.moveTo(homeHex);
-        this.addCostCounter(homeHex, `${meep.Aname}-c`, TP.auctionSlots - 3, p); // leaderHex[plyr]
       })
-
-      const policeHex = this.homeRowHex(`PHex:${pIndex}`, colf(col0++, 0));
-      this.addCostCounter(policeHex, undefined, -1, false); // academyHex[plyr]: no Counter, no incr, no repaint
-      p.policeSource = Police.makeSource(p, policeHex, TP.policePerPlayer);
-
-      const crimeHex = this.homeRowHex(`Barbs:${pIndex}`, colf(col0++, 0));
-      this.addCostCounter(crimeHex, undefined, -1, false);
-      p.criminalSource = Criminal.makeSource(p, crimeHex, TP.criminalPerPlayer);
 
       {
         // Win indicators:
@@ -411,85 +393,238 @@ export class Table extends EventDispatcher  {
   layoutButtonsAndCounters(player: Player) {
     const index = player.index;
     const cont = this.buttonsForPlayer[index] = this.contForPlayer(index);
-    const { w: hw, h } = this.hexMap.centerHex.xywh();
-    const rowy = (i: number) => { return (i - .5) * h / 2}
-    const align = (['left', 'right'] as const)[index], dir = [1, -1][index];
-    const bLabels = [{l: 'resa', fs: .6, key: 'r'}, {l: 'Done', k: 'd'}]
-    let dw = 0, nc = 9;
-    bLabels.forEach(({l: label, fs, key}, i) => {
-      const b = new ButtonBox(label, label, 'lightgreen', TP.hexRad * (fs ?? .6));
-      b.attachToContainer(cont, { x: (-nc * hw + dw) * dir, y: rowy(0 - 1.1) });
-      b.boxAlign(align);
-      b.on(S.click, () => this.doButton(label), this)[S.Aname] = `b:${label}`;
-      dw += (b.wide + 2);
-      const k = key ?? label.substring(0, 1).toLowerCase();
-      KeyBinder.keyBinder.setKey(k, { thisArg: this, func: this.doButton, argVal: label })
-    })
-    this.layoutCounters(player, cont, rowy);
+  }
+  makeButton(color = C.WHITE, rad = 20) {
+    const button = new Container();
+    const shape = new Shape();
+    button.addChild(shape);
+    shape.graphics.f(color).dc(0, 0, rad);
+    shape.mouseEnabled = true;
+    return button;
   }
 
-  layoutCounters(player: Player, cont: Container, rowy: (row: number) => number) {
-    const counterCont = this.scaleCont;
-    const col0 = -14;
-    const index = player.index, dir = [1, -1][index]
-    const colx = (coff = 0) => -60 + dir * (col0 + coff) * TP.hexRad * H.sqrt3_2; // half-width column offset from col0
-    const layoutCounter = (name: string, color: string, rowy: number, coff = 0, incr: boolean | NumCounter = true,
-      claz = NumCounterBox) => {
-      //: new (name?: string, iv?: string | number, color?: string, fSize?: number) => NumCounter
-      const cname = `${name}Counter`, fSize = TP.hexRad * .75;
-      const counter = player[cname] = new claz(`${cname}:${index}`, 0, color, fSize)
-      counter.setLabel(`${name}s`, { x: 0, y: fSize/2 }, 12);
-      const pt = cont.localToLocal(colx(coff), rowy, counterCont)
-      counter.attachToContainer(counterCont, pt);
-      counter.clickToInc(incr);
-      return counter
-    };
-    const adjC = (n: number) => (n * 1.2);
-    layoutCounter('action', C.YELLOW, rowy(0)); player.actionCounter;
-    layoutCounter('coin', C.coinGold, rowy(1)); player.coinCounter;                      // --> player.coins
-    layoutCounter('econ', C.GREEN, rowy(1), adjC(1 + index), false); player.econCounter; // --> player.econs
-    layoutCounter('expense', C.GREEN, rowy(1), adjC(2 - index), false); player.expenseCounter;
-    layoutCounter('Infl', 'grey', rowy(2)); player.InflCounter;
-    layoutCounter('Econ', 'white', rowy(3)); player.EconCounter;
-    layoutCounter('capture', 'lightblue', rowy(4), adjC(-2)); player.captureCounter;
-    layoutCounter('vp', C.briteGold, rowy(4), 0, false); player.vpCounter;
-    layoutCounter('vp0', C.briteGold, rowy(4), adjC(-1), player.vpCounter); player.vp0Counter;
-    layoutCounter('totalVp', C.briteGold, rowy(5), 0, false, DecimalCounter); player.totalVpCounter;
-    layoutCounter('tvp0', C.briteGold, rowy(5), adjC(-1), player.totalVpCounter); player.tvp0Counter;
+  actionPanels: { [index: string]: Container } = {};
+  makeActionCont(x = 40, y = 50) {
+    const np = Player.allPlayers.length, rad = 30, wide = (2 * rad + 5) * (np + 1), rh = 2 * rad + 5;
+    console.log(stime(this, `.makeActionCont`), np);
+    // TODO: class actionCont, with slots to hold button & each circle/state (number activated)
+    // or could use children[] and the color/visiblity of each shape/cont
+    const actionCont = new Container()
+    const actionRows = [{ id: 'Move' }, { id: 'Summon ' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
+    const selectAction = (id: string, button: Container) => {
+      this.gamePlay.selectedAction = id;
+      const ankh = this.gamePlay.curPlayer.god.getAnhkToken(rad);
+      button.addChild(ankh);
+      button.mouseEnabled = false;
+      button.stage.update();
+    }
+    for (let rn = 0; rn < actionRows.length; rn++) {
+      const action = actionRows[rn], nc = np + 2 + (action.dn ?? 0), dx = wide/(nc-1), id = action.id;
+      const rowCont = new Container();
+      rowCont.y = rn * rh;
+      actionCont.addChild(rowCont);
+      for (let cn = 0; cn < nc; cn++) {
+        const color = C.lightgrey;
+        const button = this.makeButton(color, rad);
+        button.x = cn * dx;
+        rowCont.addChild(button);
+        if (cn == nc - 1) { button['isEvent'] = true; }
+        button.on(S.click, (evt: Object) => selectAction(id, button));
+      }
+      this.actionPanels[action.id] = rowCont;
+    }
+    actionCont.x = x; actionCont.y = y;
+    return actionCont;
+  }
+
+  makeEventCont() {
+    const eventCont = new Container();
+
+    return eventCont;
+  }
+
+  makeScoreCont() {
+    const scoreCont = new Container();
+
+    return scoreCont;
   }
 
   /**
-  // Start: SetPlayer, RollForCrime, Shift Auction,
-  // Do Reserve (add to Reserve Hexes)
-  // Do Crime (place, move, attack/resolve)
-  // Do Police (place, move, attack/resolve, collateral, dismiss)
-  // Do Build (place, move, build)
-  // Done: enable other player buttons
-  */
+   *
+   */
   doButton(label: string) {
     const player = this.gamePlay.curPlayer, pIndex = player.index
     console.log(stime(this, `.doButton:`), label)
     switch (label) {
-      case 'Start': {
-        player.actions = 1;
+      case 'Begin': {
+        // phase(isBastet? Bastet : chooseAction(true))
         break;
       }
-      case 'Crime': {
+      case 'Bastet': {
+        // enable each Bastet-Cat
+        // on click: remove Cat; if '*' kill guesser & replace all Cats;
+        // Done(chooseAction(true))
         break;
       }
-      case 'Police': {
+      // chooseAction(value) { firstAction = value; phase(ChooseAction) };
+      case 'ChooseAction': {
+        // mouse enable & highlight next open spot on each of move, summon, gain, ankh
+        // Click: phase(action)
         break;
       }
-      case 'Build': {
+      case 'Move': {
+        // mouse enable moveable Meeples; (faceUp all Figures onMap)
+        // onClick/dragStart: mark legal hexes
+        // onDrop: meep.moveTo(hex)
+        // Done(phase('EndAction'))
         break;
       }
-      case 'Reserve': {
+      case 'Summon': {
+        // mouse enable summonable Meeples
+        // Mark legal hexes
+        // Drag & Drop;
+        // Done(phase('EndAction'))
         break;
       }
-      case 'resa': {
+      case 'Gain': {
+        // curPlayer.coins += filterHex( adjToMeep(curPlayer) ).length
+        // Done(phase('EndAction'))
         break;
       }
-      case 'Done': {
+      case 'Ankh': {
+        // mouse enable next Upgrades;
+        // on click: move Anhk to button (cover: now unclickable), set bit on Player.
+        // mouse disable button
+        // Done(phase('EndAction'))
+        break;
+      }
+      case 'EndActon': {
+        // second = firstAction; firstAction = false;
+        // if (Event marked) phase(Event);
+        // if (second) phase(ChooseAction);
+        // phase('EndTurn')
+        break;
+      }
+      case 'Event': {
+        // event = (Event marked)
+        // phase(event)
+        break;
+      }
+      case 'EventDone': {
+        // phase('EndTurn')
+        break;
+      }
+      case 'Camel': {
+        // mouse enable edges (of land tiles)
+        // disable edges of hexes in region of < 12 hexes!
+        // click each edge! to light
+        // validate(<= 6 selected; from board/water to board/water; 6 hexes per region )
+        // click Done(assign number, phase(Swap))
+        break;
+      }
+      case 'Swap': { // after Camel
+        // mark 'startRegion' of each marker
+        // mouse enable all region markers
+        // dragStart: mark legal (either of 2 split regions that contain new/old markers)
+        // click Done(phase(EventDone))
+        break;
+      }
+      case 'Claim': {
+        // x = isUnclaimedMonument() ?
+        // mouse enable Hex; with (x ? unclaimed : any monument) and adj(curPlayer))
+        // click: unmark & remark
+        // Done(phase(EventDone))
+        break;
+      }
+      case 'Conflict': {
+        // process Omnipresent
+        // phase(Horus ? 'Horus' : 'ConflictRegions')
+        break;
+      }
+      case 'Horus': {
+        // place enable Eyes, drag to each Region (to Region index marker...)
+        // Done(phase(ConflictRegions))
+        break;
+      }
+      case 'ConflictRegions': {
+        // region = region ? ++region  : 1;
+        // if (region > nRegions) phase(ConflictDone)
+        // phase('ConflictRegion')
+        break;
+      }
+      case 'ConflictRegion': {
+        // process Obelisk-attuned!
+        // phase(Card);
+        break;
+      }
+      case 'Card': { // for battleRegion
+        // Open all player card lists! (atop meeple 'stable' area)
+        // if (Horus) mark excluded card (GREEN to GREY)
+        // click card to select/play (GREEN to YELLOW)
+        // if Amun-power unused: allow click second card (set Amun-Power used)
+        // click 'Card-Done': close Player
+        // click 'Done': phase phase 'Toth' ?? 'Reveal'
+        break;
+      }
+      case 'Toth': {
+        // click 'Done(no guess)': phase 'Reveal'
+        // place Follower on Scales
+        // click a Card (on other players board)
+        // "reveal" all cards;
+        // Toth-correct: followers stay on Scales
+        // Toth-incorrect: followers from Scales to player
+        break;
+      }
+      case 'Reveal': {
+        // "reveal" all cards; (YELLOW)
+        // trigger Flood
+        // phase 'Build'
+        break;
+      }
+      case 'Build': { // for battleRegion
+        // for each build card in player-score order:
+        // mouse enable empty hex in region & monument sources (obelisk, temple, pyramid)
+        // drag & drop: place monument, set owner
+        // allow unMove
+        // click 'Done': phase Plague
+        break;
+      }
+      case 'Plague': {
+        // mouse enable plague big counters (max value: player.coins)
+        // on 'Done' --> process result: remove meeples, (process mummy cat, etc)
+        // phase Monuments
+        break;
+      }
+      case 'Monuments': {
+        // count valueInRegion[type][player] (for curRegion)
+        // for each type(incl 'strength'): valueInRegion[type] = 0;
+        // forEachHex(in region, with 'claimed' Monument: incr playerCount, record Max/Tie)
+        // note: claimed Temple may incr strength, account for Set effect, etc.
+        // assign Devotion (Monuments)
+        // phase: BattleResolution
+        break;
+      }
+      case 'BattleResolution': {
+        // add Temple to strength (if not done above)
+        // add Replendent to 'strength'
+        // add Cards to 'strength' (Plague, Drought, Chariots)
+        // add Bastet-Cats
+        //
+        // compute winner (and size of win for Glorious)
+        // remove losers (modulo Flood, Set); process Cat
+        // assign Devotion (for Miracle)
+        // assign Devotion (win & Drought)
+        // mark cards done (YELLOW to RED, GREP to GREEN)
+        // phase('ConflictRegions') do next region in list
+        break;
+      }
+      case 'ConflictDone': {
+        // coins from Scales to Toth, add Devotion(Scales)
+        // mark on Event panel
+        // phase 'TurnDone'
+        break;
+      }
+      case 'TurnDone': {
         this.gamePlay.endTurn();
         break;
       }
@@ -641,15 +776,12 @@ export class Table extends EventDispatcher  {
   logCurPlayer(plyr: Player) {
     const history = this.gamePlay.history
     const tn = this.gamePlay.turnNumber
-    const dice = this.gamePlay.dice.text.text;
     const lm = history[0]
     const prev = lm ? `${lm.Aname}${lm.ind}#${tn-1}` : ""
     const robo = plyr.useRobo ? AT.ansiText(['red','bold'],"robo") : "----";
-    const coins = plyr.coins, econs = plyr.econs, vps = plyr.vps, tvps = plyr.totalVps, vpr = plyr.vpsPerRound.toFixed(1);
-    const info = { turn: `#${tn}`, plyr: plyr.Aname, coins, econs, exp: plyr.expenses, vps, tvps, vpr, prev, gamePlay: this.gamePlay, curPlayer: plyr }
+    const info = { turn: `#${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
     console.log(stime(this, `.logCurPlayer --${robo}--`), info);
-    const inc = plyr.econs + plyr.expenses;
-    this.logTurn(`#${tn}: ${plyr.Aname} ${dice} \$${coins} ${inc >= 0 ? '+' : '-'}${inc} vp: ${vps} tvp: ${tvps}`);
+    this.logTurn(`#${tn}: ${plyr.Aname}`);
   }
   showRedoUndoCount() {
     this.undoText.text = `${this.gamePlay.undoRecs.length}`

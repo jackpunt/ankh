@@ -9,29 +9,24 @@ import { CenterText } from "./shapes";
 import { PlayerColor, TP } from "./table-params";
 import { Church, Civic, Courthouse, MapTile, Tile, TownRules, TownStart, University } from "./tile";
 import { UnitSource } from "./tile-source";
+import { God } from "./god";
 
 export class Player {
   static allPlayers: Player[] = [];
-  static playerStartDir: HexDir[] = ['NW', 'E', 'SW'];
-
-  setCounters(update = true) {
-    this.econCounter.setValue(this.econs)
-    this.expenseCounter.setValue(this.expenses)
-    this.vpCounter.setValue(this.vps)
-    //if (player && player !== curPlayer) player.totalVpCounter.setValue(player.totalVps)
-    update && GP.gamePlay.hexMap.update();
-  }
 
   readonly Aname: string;
+  god: God;
+  get color() { return this.god.color; }
 
   constructor(
     readonly index: number,
-    readonly color: PlayerColor,
+    readonly godName: string,
     readonly gamePlay: GamePlay0,
   ) {
-    this.Aname = `Player${index}-${this.colorn}`
+    this.god = God.gods.get(godName);
     Player.allPlayers[index] = this;
-    this.startDir = Player.playerStartDir[index];
+    this.Aname = `P${index}-${this.god.name}:${this.god.color}`;
+    console.log(stime(this, `.new:`), this.Aname);
   }
 
   allOf<T extends Tile>(claz: Constructor<T>) { return (Tile.allTiles as T[]).filter(t => t instanceof claz && t.player === this); }
@@ -44,72 +39,16 @@ export class Player {
   get allPolice() { return this.meeples.filter(m => m instanceof Police) as Police[] }
   get criminals() { return this.meeples.filter(meep => meep instanceof Criminal) };
 
+  /** Leader: God? */
+  /** Police: warriors? */
   policeSource: UnitSource<Police>;
+  /** Criminal: guardians? */
   criminalSource: CriminalSource;
-
-  actionCounter: NumCounter;
-  get actions() { return this.actionCounter?.getValue(); }
-  set actions(v: number) { this.actionCounter?.updateValue(v); }
-  useAction() { this.actions -= 1; }
 
   // Created in masse by Table.layoutCounter
   coinCounter: NumCounter; // set by layoutCounters: `${'Coin'}Counter`
   get coins() { return this.coinCounter?.getValue(); }
   set coins(v: number) { this.coinCounter?.updateValue(v); }
-
-  captureCounter: NumCounter;
-  get captures() { return this.captureCounter?.getValue(); }
-  set captures(v: number) { this.captureCounter?.updateValue(v); }
-
-  vp0Counter: NumCounter; // allow User to adjust VP for Event
-  get vp0() { return this.vp0Counter.getValue(); }
-
-  InflCounter: NumCounter; // TokenSource<InflToken>.counter C.grey counter
-  get infls() { return this.InflCounter?.getValue(); }       // for gamePlay.failToPayCost()
-  set infls(v: number) { this.InflCounter?.updateValue(v); }
-
-  // incremented via: player[`${BuyToken.counterNames['infl','econ']}`].incValue();
-  EconCounter: NumCounter; // TokenSource<EconToken>.counter C.white counter
-
-  econCounter: NumCounter;
-  get econs() {
-    let econ = 0;
-    this.gamePlay.hexMap.forEachHex(hex => {
-      if ((hex.tile?.player === this) && !(hex.meep instanceof Criminal)) {
-        econ += hex.tile.econ;      // Note: Monument has negative econ
-      }
-    })
-    return econ;
-  }
-
-  expenseCounter: NumCounter;
-  get expenses() {
-    let expense = 0;
-    this.gamePlay.hexMap.forEachHex(hex => {
-      if (hex.meep?.player == this) {
-        expense += hex.meep.econ     // meeples have negative econ
-      }
-    })
-    return expense
-  }
-
-  vpCounter: NumCounter;
-  get vps() {
-    let vp = this.vp0 + this.captures;
-    this.gamePlay.hexMap.forEachHex(hex => {
-      const myTile = hex.tile?.player === this;
-      //hex.tile && console.log(stime(this, `.vps`), hex.tile.Aname, hex.Aname, vp, dv, (hex.tile?.player == this && hex.tile.vp), (hex.meep?.player == this && hex.meep.vp));
-    });
-    return vp;
-  }
-
-  tvp0Counter: NumCounter;    // adjustment to TVP from Event/Policy
-  get tvp0() { return this.tvp0Counter.getValue(); }
-
-  totalVpCounter: DecimalCounter;
-  get totalVps() { return this.totalVpCounter.getValue(); }
-  set totalVps(v: number) { this.totalVpCounter.setValue(v); }
-  get vpsPerRound() { return this.totalVpCounter.perRound; }
 
   get otherPlayer() { return Player.allPlayers[1 - this.index] }
   get colorn(): string { return TP.colorScheme[this.color] }
@@ -120,14 +59,6 @@ export class Player {
 
   readonly startDir: HexDir;
 
-  // HexMap is populated AFTER Players are created!
-  get initialHex() {
-    let hex = this.gamePlay.hexMap.centerHex as Hex;
-    let path = [this.startDir, this.startDir, this.startDir];
-    path.forEach(dir => hex = hex.nextHex(dir));
-    return hex;
-  }
-
   /** make Civics, Leaders & Police; also makeLeaderHex() */
   makePlayerBits() {
   }
@@ -137,18 +68,6 @@ export class Player {
   }
   get isComplete() {
     return false;
-  }
-
-  /** deposit Infls & Actns with Player */
-  takeBonus(tile: Tile) {
-    if (tile?.bonus['actn']) {
-      this.actions += 1;              // triggers actionCounter.updateValue
-      tile.removeBonus('actn');
-    }
-    if (tile?.bonus['infl']) {
-      this.infls += 1;              // triggers inflCounter.updateValue
-      tile.removeBonus('infl');
-    }
   }
 
   endGame(): void {
@@ -171,9 +90,7 @@ export class Player {
 
   newTurn() {
     // faceUp and record start location:
-    this.meeples.forEach(meep => meep.faceUp());
-    this.coins += (this.econs + this.expenses); // expenses include P & I
-    this.actions = 1;
+    this.meeples.forEach(meep => meep.faceUp()); // set meep.startHex for unMove
   }
 
   stopMove() {

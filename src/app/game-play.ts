@@ -13,6 +13,7 @@ import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerColorRecord, playerColors, } from "./table-params";
 import { BagTile, MapTile, Tile } from "./tile";
+import { EzPromise } from "@thegraid/ezpromise";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -25,6 +26,7 @@ class Move{
 
 export class GP {
   static gamePlay: GamePlay;
+  static ankhC = '\u2625';
 }
 
 /** Implement game, enforce the rules, manage GameStats & hexMap; no GUI/Table required.
@@ -51,6 +53,7 @@ export class GamePlay0 {
   readonly logWriter: LogWriter
 
   get allPlayers() { return Player.allPlayers; }
+  selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
 
   readonly hexMap = new SquareMap<Hex2>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
@@ -72,59 +75,28 @@ export class GamePlay0 {
     return logWriter;
   }
 
-  constructor() {
+  constructor(godNames: string[]) {
     this.logWriter = this.logWriterLine0()
     this.hexMap.Aname = `mainMap`;
     this.hexMap.makeAllDistricts(); // may be re-created by Table, after addToMapCont()
 
-    this.gStats = new GameStats(this.hexMap) // AFTER allPlayers are defined so can set pStats
     // Create and Inject all the Players: (picking a townStart?)
     Player.allPlayers.length = 0;
-    playerColors.forEach((color, ndx) => new Player(ndx, color, this)); // make real Players...
-    this.playerByColor = playerColorRecord(...Player.allPlayers);
+    godNames.forEach((godName, ndx) => new Player(ndx, godName, this)); // make real Players...
     this.curPlayerNdx = 0;
     this.curPlayer = Player.allPlayers[this.curPlayerNdx];
-
-    const len = playerColors.length; // actual players
-    this.crimePlayer = new Player(len, criminalColor, this);  //
-    Player.allPlayers.length = len; // truncate allPlayers: exclude crimePlayer
-
-    this.dice = new Dice();
   }
 
-  crimePlayer: Player;
   turnNumber: number = 0    // = history.lenth + 1 [by this.setNextPlayer]
   curPlayerNdx: number = 0  // curPlayer defined in GamePlay extends GamePlay0
   curPlayer: Player;
   preGame = true;
   curPlayerMapTiles: Tile[] = [];
 
-  dice: Dice;
-
-  /**
-   * While curPlayer = *last* player.
-   * [so autoCrime() -> meep.player = curPlayer]
-   *
-   * - Shift Auction
-   * - Roll 2xD6, enable effects.
-   * - - 1+1: add Star
-   * - - 2+2: add Action
-   * - - 3+3: add Coin
-   * - - 6+4-6: add Criminal
-   */
-  rollDiceForBonus() {
-    let dice = this.dice.roll();
-    dice.sort(); // ascending
-    console.log(stime(this, `.endTurn2: Dice =`), dice)
-    this.hexMap.update()
+  nextPlayer(plyr: Player = this.curPlayer) {
+    const nxt = (plyr.index + 1) % Player.allPlayers.length;
+    return Player.allPlayers[nxt];
   }
-
-  /** allow curPlayer to place a Criminal [on empty hex] for free. Override in GamePlay. */
-  autoCrime() {
-  }
-
-  playerByColor: PlayerColorRecord<Player>
-  otherPlayer(plyr: Player = this.curPlayer) { return this.playerByColor[otherColor(plyr.color)]}
 
   forEachPlayer(f: (p:Player, index?: number, players?: Player[]) => void) {
     this.allPlayers.forEach((p, index, players) => f(p, index, players));
@@ -144,6 +116,27 @@ export class GamePlay0 {
     return stack;
   }
 
+  eventInProcess: EzPromise<void>;
+  async awaitEvent(init: () => void) {
+    this.eventInProcess = new EzPromise<void>();
+    init(); // tile0.moveTo(eventHex);
+    return this.eventInProcess;
+  }
+  /** when Player click's 'Done' ? */
+  finishEvent() {
+    this.eventInProcess.fulfill();
+  }
+
+  async processEventTile(tile0: Tile) {
+    // manually D&D event (to Player.Policies or RecycleHex)
+    // EventTile.dropFunc will: gamePlay.finishEvent();
+    await this.awaitEvent(() => {
+      // tile0.setPlayerAndPaint(this.curPlayer);
+      // tile0.moveTo(this.eventHex);
+      this.hexMap.update();
+    });
+  }
+
 
   /** when Player has completed their Action & maybe a hire.
    * { shiftAuction, processEvent }* -> endTurn2() { roll dice, set Bonus, NextPlayer }
@@ -153,7 +146,6 @@ export class GamePlay0 {
   endTurn2() {
     // this.rollDiceForBonus();
     // Jubilee if win condition:
-    const playerVps = this.curPlayer.isComplete ? 2 * this.curPlayer.vps : this.curPlayer.vps;
     if (this.isEndOfGame()) {
       this.endGame();
     } else {
@@ -164,54 +156,24 @@ export class GamePlay0 {
   endGame() {
     const scores: number[] = [];
     let topScore = -1, winner: Player;
-    console.log(stime(this, `.endGame: Game Over`), this.vca);
-    this.allPlayers.forEach(p => {
-      p.endGame();
-      // TODO: include TownRules bonuses
-      const score = p.totalVps;
-      scores.push(score);
-      console.log(stime(this, `.endGame: ${p.Aname} score =`), score);
-      if (topScore < score) {
-        topScore = score;
-        winner = p;
-      }
-    });
+    console.log(stime(this, `.endGame: Game Over`), );
+
     // console.log(stime(this, `.endGame: Winner = ${winner.Aname}`), scores);
   }
 
-  setNextPlayer(plyr = this.otherPlayer()): void {
+  setNextPlayer(plyr = this.nextPlayer()): void {
     this.preGame = false;
     this.turnNumber += 1 // this.history.length + 1
     this.curPlayer = plyr
     this.curPlayerNdx = plyr.index
-    this.curPlayer.actions = 0;
     this.curPlayerMapTiles = this.curPlayer.allOnMap(MapTile);
     this.curPlayer.newTurn();
   }
 
-  vca: { vc1: number, vc2: number }[] = [{ vc1: -3, vc2: -3 }, { vc1: -3, vc2: -3 }];
-  vTurn1(player: Player, n = 0) {
-    return this.vca[player.index]['vc1'] == (this.turnNumber - n) || this.vca[player.index]['vc2'] == (this.turnNumber - n);
-  }
-  /** true if curVal true, twice in a row... */
-  vTurn2(player: Player, vc: 'vc1' | 'vc2', curVal: boolean) {
-    const rv = curVal && this.vca[player.index][vc] == this.turnNumber - 2;
-    // console.log(stime(this, `.vc2: [${player.index}][${vc}] = ${rv}; curVal=`), curVal);
-    // last turn when curVal was true:
-    if (curVal) this.vca[player.index][vc] = this.turnNumber;
-    return rv;
-  }
-
-  isPlayerWin(player: Player) {
-    const end1 = this.vTurn2(player, 'vc1', player.otherPlayer.isDestroyed);
-    const end2 = this.vTurn2(player, 'vc2', player.isComplete);
-    return end1 || end2;
-  }
-
   isEndOfGame() {
     // can only win at the end of curPlayer's turn:
-    const endp = this.isPlayerWin(this.curPlayer)
-    if (endp) console.log(stime(this, `.isEndOfGame:`), this.vca.flatMap(v => v));
+    const endp = false;
+    if (endp) console.log(stime(this, `.isEndOfGame:`), );
     return endp;
   }
 
@@ -223,76 +185,6 @@ export class GamePlay0 {
   undoRecs: Undo = new Undo().enableUndo();
   addUndoRec(obj: NamedObject, name: string, value: any | Function = obj.name) {
     this.undoRecs.addUndoRec(obj, name, value);
-  }
-
-  playerBalanceString(player: Player, ivec = [0, 0, 0, 0]) {
-    const [nb, fb, nr, fr] = this.playerBalance(player, ivec);
-    return `${nb}+${fb}:${nr}+${fr}`;
-  }
-  playerBalance(player: Player, ivec = [0, 0, 0, 0]) {
-    let [nBusi, fBusi, nResi, fResi] = ivec;
-    this.hexMap.forEachHex(hex => {
-      const tile = hex.tile;
-      if (tile && tile.player == player) {
-        nBusi += tile.nB;
-        fBusi += tile.fB;
-        nResi += tile.nR;
-        fResi += tile.fR;
-      }
-    });
-    return [nBusi, fBusi, nResi, fResi];
-  }
-
-  failTurn: string | undefined = undefined;  // Don't repeat "Need Busi/Resi" message this turn.
-  failToBalance(tile: Tile) {
-    const player = this.curPlayer;
-    // tile on map during Test/Dev, OR: when demolishing...
-    const ivec = tile.hex?.isOnMap ? [0, 0, 0, 0] : [tile.nB, tile.fB, tile.nR, tile.fR];
-    const [nBusi, fBusi, nResi, fResi] = this.playerBalance(player, ivec);
-    const noBusi = nBusi > 1 * (nResi + fResi);
-    const noResi = nResi > 2 * (nBusi + fBusi);
-    const fail = (noBusi && (tile.nB > 0)) || (noResi && (tile.nR > 0));
-    const failText = noBusi ? 'Need Residential' : 'Need Business';
-    if (fail) {
-      const failTurn = `${this.turnNumber}:${failText}`;
-      if (this.failTurn != failTurn) {
-        this.failTurn = failTurn;
-        console.log(stime(this, `.failToBalance: ${failText} ${tile.Aname}`), [nBusi, fBusi, nResi, fResi], tile);
-        this.logText(failText, 'GamePlay.failToBalance');
-      }
-    }
-    return fail ? failText : undefined;
-  }
-
-  // Costinc [0] = curPlayer.civics.filter(civ => civ.hex.isOnMap).length + 1
-  // each succeeding is 1 less; to min of 1, except last slot is min of -1;
-  // costInc[nCivOnMap][slotN] => [0, 0, 0, -1], [1, 0, 0, -1], [2, 1, 0, -1], [3, 2, 1, 0], [4, 3, 2, 1]
-  costIncMatrix(maxCivics = TP.maxCivics, nSlots = TP.auctionSlots) {
-    const d3 = nSlots - 4;//nSlot=3:0, 4:1, 5:2 + mCivics
-    // nCivics = [0...maxCivics]
-    return new Array(maxCivics + 1).fill(1).map((civElt, nCivics) => {
-      // iSlot = [0...nSlots - 1]
-      return new Array(nSlots).fill(1).map((costIncElt, iSlot) => {
-        let minVal = (iSlot === (nSlots - 1)) ? -1 : 0;
-        return Math.max(minVal, nCivics + d3 - iSlot) // assert nSlots <= maxCivics; final slot always = 0
-      })
-    })
-  }
-  readonly costInc = this.costIncMatrix()
-
-  /** show player color and cost. */
-  readonly costIncHexCounters = new Map<Hex, CostIncCounter>()
-  private costNdxFromHex(hex: Hex) {
-    return this.costIncHexCounters.get(hex)?.ndx ?? -1; // Criminal/Police[constant cost]: no CostIncCounter, no ndx
-  }
-
-  updateCostCounter(cic: CostIncCounter) {
-    const plyr = (cic.repaint instanceof Player) ? cic.repaint : this.curPlayer;
-  }
-
-  /** update when Auction, Market or Civic Tiles are dropped. */
-  updateCostCounters() {
-    this.costIncHexCounters.forEach(cic => this.updateCostCounter(cic));
   }
 
   /** update Counters (econ, expense, vp) for ALL players. */
@@ -341,10 +233,8 @@ export class GamePlay0 {
     let verb = tile.recycleVerb ?? 'recycled';
     if (tile.fromHex?.isOnMap) {
       if (tile.player !== this.curPlayer) {
-        this.curPlayer.captures++;
-        verb = 'captured';
+        verb = 'defeated';
       } else if (tile instanceof Meeple) {
-        this.curPlayer.coins -= tile.econ;  // dismiss Meeple, claw-back salary.
       }
     }
     tile.logRecycle(verb);
@@ -354,10 +244,10 @@ export class GamePlay0 {
 /** GamePlayD has compatible hexMap(mh, nh) but does not share components. used by Planner */
 export class GamePlayD extends GamePlay0 {
   //override hexMap: HexMaps = new HexMap();
-  constructor(nh = TP.nHexes, mh = TP.mHexes) {
-    super();
+  constructor(gods: string[], nh = TP.nHexes, mh = TP.mHexes) {
+    super(gods);
     this.hexMap.Aname = `GamePlayD#${this.id}`;
-    // this.hexMap.makeAllDistricts(nh, mh); // included in GamePlay0
+    this.hexMap.makeAllDistricts(nh, mh); // included in GamePlay0
     return;
   }
 }
@@ -367,33 +257,16 @@ export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
   declare readonly gStats: TableStats // https://github.com/TypeStrong/typedoc/issues/1597
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
-  constructor(table: Table, public gameSetup: GameSetup) {
-    super();            // hexMap, history, gStats...
+  constructor(gods: string[], table: Table, public gameSetup: GameSetup) {
+    super(gods);            // hexMap, history, gStats...
     GP.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
-    // setTable(table)
     this.table = table;
     this.gStats = new TableStats(this, table); // upgrade to TableStats
     if (this.table.stage.canvas) this.bindKeys();
   }
 
-  /** attacks *against* color */
-  processAttacks(attacker: PlayerColor) {
-    // TODO: until next 'click': show flames on hex & show Tile in 'purgatory'.
-    // loop to check again after capturing (cascade)
-    while (this.hexMap.findHex(hex => {
-      if (hex.tile?.isThreat[attacker]) {
-        this.recycleTile(hex.tile);  // remove tile, allocate points; no change to infP!
-        return true;
-      }
-      if (hex.meep?.isThreat[attacker]) {
-        this.recycleTile(hex.meep);  // remove tile, allocate points; no change to infP!
-        return true;
-      }
-      return false;
-    }));
-  }
-
+  /** suitable for keybinding */
   unMove() {
     this.curPlayer.meeples.forEach((meep: Meeple) => meep.hex?.isOnMap && meep.unMove());
   }
@@ -404,7 +277,7 @@ export class GamePlay extends GamePlay0 {
     let roboPause = () => { this.forEachPlayer(p => this.pauseGame(p) )}
     let roboResume = () => { this.forEachPlayer(p => this.resumeGame(p) )}
     let roboStep = () => {
-      let p = this.curPlayer, op = this.otherPlayer(p)
+      let p = this.curPlayer, op = this.nextPlayer(p)
       this.pauseGame(op); this.resumeGame(p);
     }
     // KeyBinder.keyBinder.setKey('p', { thisArg: this, func: roboPause })
@@ -418,9 +291,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('b', { thisArg: this, func: this.undoMove })
     KeyBinder.keyBinder.setKey('f', { thisArg: this, func: this.redoMove })
     //KeyBinder.keyBinder.setKey('S', { thisArg: this, func: this.skipMove })
-    KeyBinder.keyBinder.setKey('M-K', { thisArg: this, func: this.resignMove })// S-M-k
     KeyBinder.keyBinder.setKey('Escape', {thisArg: table, func: table.stopDragging}) // Escape
-    KeyBinder.keyBinder.setKey('M-C', { thisArg: this, func: this.autoCrime, argVal: true })// S-M-C (force)
     KeyBinder.keyBinder.setKey('C-s', { thisArg: this.gameSetup, func: () => { this.gameSetup.restart() } })// C-s START
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.stopPlayer })// C-c Stop Planner
     KeyBinder.keyBinder.setKey('m', { thisArg: this, func: this.makeMove, argVal: true })
@@ -443,7 +314,6 @@ export class GamePlay extends GamePlay0 {
     //KeyBinder.keyBinder.setKey('M-d', { thisArg: this, func: () => { this.gameSetup.netState = "no" } })
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
-    table.skipShape.on(S.click, () => this.skipMove(), this)
   }
 
   useReferee = true
@@ -456,7 +326,7 @@ export class GamePlay extends GamePlay0 {
       await p.planner.waitPaused(ident)
       console.log(stime(this, `.waitPaused: ${p.colorn} ${ident} running`))
     }
-    this.hexMap.update()
+    this.hexMap.update();
   }
   pauseGame(p = this.curPlayer) {
     p.planner?.pause();
@@ -471,14 +341,14 @@ export class GamePlay extends GamePlay0 {
   /** tell [robo-]Player to stop thinking and make their Move; also set useRobo = false */
   stopPlayer() {
     this.autoMove(false)
-    this.curPlayer.stopMove()
+    this.curPlayer.stopMove();
     console.log(stime(this, `.stopPlan:`), { planner: this.curPlayer.planner }, '----------------------')
     setTimeout(() => { this.table.showWinText(`stopPlan`) }, 400)
   }
   /** undo and makeMove(incb=1) */
   makeMoveAgain(arg?: boolean, ev?: any) {
     if (this.curPlayer.plannerRunning) return
-    this.undoMove()
+    this.undoMove();
     this.makeMove(true, undefined, 1)
   }
 
@@ -546,38 +416,15 @@ export class GamePlay extends GamePlay0 {
     }
   }
 
-  skipMove() {
-    this.table.stopDragging() // drop on nextHex (no Move)
-  }
-  resignMove() {
-    this.table.stopDragging() // drop on nextHex (no Move)
-  }
-
 
   override endTurn2(): void {
     this.table.buttonsForPlayer[this.curPlayerNdx].visible = false;
     super.endTurn2();   // shift(), roll(); totalVps += vps
   }
 
-  override isPlayerWin(player: Player): boolean {
-    const cont = this.table.winIndForPlayer[player.index];
-    const win = super.isPlayerWin(player)
-    const warn = this.vTurn1(player) || win;
-    cont.removeAllChildren();
-    if (warn || win) {
-      // console.log(stime(this, `.isPlayerWin: ${AT.ansiText(['$red'], 'warn!')} ${player.Aname}`))
-      const color = win ? 'rgba(0,180,0,.8)' : 'rgba(180,0,0,.8)';
-      const ddd = new CenterText('!!', 80, color); // F.fontSpec()
-      cont.addChild(ddd);
-    }
-    this.hexMap.update();
-    return win;
-  }
-
   override setNextPlayer(plyr?: Player) {
     super.setNextPlayer(plyr); // update player.coins
     this.paintForPlayer();
-    this.updateCostCounters();
     this.updateCounters(); // beginning of round...
     this.table.buttonsForPlayer[this.curPlayerNdx].visible = true;
     this.table.showNextPlayer(); // get to nextPlayer, waitPaused when Player tries to make a move.?
@@ -591,12 +438,7 @@ export class GamePlay extends GamePlay0 {
   }
 
   paintForPlayer() {
-    this.costIncHexCounters.forEach(cic => {
-      const plyr = (cic.repaint instanceof Player) ? cic.repaint : this.curPlayer;
-      if (cic.repaint !== false) {
-        cic.hex.tile?.setPlayerAndPaint(plyr);
-      }
-    })
+
   }
 
   /** dropFunc | eval_sendMove -- indicating new Move attempt */

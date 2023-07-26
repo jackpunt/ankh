@@ -347,7 +347,6 @@ export class Criminal extends SourcedMeeple {
     const toHex = super.moveTo(hex);
     const curPlayer = GP.gamePlay.curPlayer;
     if (toHex === GP.gamePlay.recycleHex && this.player !== curPlayer) {
-      curPlayer.coins -= this.econ;   // capturing player gets this Criminal's salary (0 if autoCrime)
     }
     return toHex;
   }

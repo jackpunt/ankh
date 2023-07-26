@@ -70,9 +70,10 @@ export class GameSetup {
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
+    const gods = ['Bastet', 'Ra', 'Amun', 'Isis'];
 
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
-    const gamePlay = new GamePlay(table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
+    const gamePlay = new GamePlay(gods, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup

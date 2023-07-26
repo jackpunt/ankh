@@ -504,7 +504,7 @@ export class Tile extends Tile0 {
   logRecycle(verb: string) {
     const cp = GP.gamePlay.curPlayer;
     const loc = this.hex?.isOnMap ? 'onMap' : 'offMap';
-    const info = { Aname: this.Aname, fromHex: this.fromHex?.Aname, cp: cp.colorn, caps: cp.captures, tile: {...this} }
+    const info = { Aname: this.Aname, fromHex: this.fromHex?.Aname, cp: cp.colorn, tile: {...this} }
     console.log(stime(this, `.recycleTile[${loc}]: ${verb}`), info);
     GP.gamePlay.logText(`${cp.Aname} ${verb} ${this}`, `GamePlay.recycle`);
   }
@@ -561,12 +561,6 @@ export class Civic extends MapTile {
   override sendHome() {   // Civic - put under Leader
     super.sendHome();
     this.parent.addChildAt(this, 1); // above HexShape, under meeple
-  }
-
-  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-      super.dropFunc(targetHex, ctx);
-      // placing a Civic changes the cost of Auction Tiles:
-      GP.gamePlay.updateCostCounters();
   }
 }
 
