@@ -90,7 +90,7 @@ export class TP {
   /** Order [number of rings] of metaHexes */
   static mHexes = 1;   // number hexes on side of Meta-Hex
   /** Order [number of Hexs on side] of District [# rings of Hexes in each metaHex] */
-  static nHexes = 8;    // number of Hexes on side of District
+  static nHexes = 10;    // number of Hexes on side of District
   static nDistricts = 1;
   static nVictory = 3  // number of Colony to win
   static tHexes = TP.ftHexes(this.mHexes) * TP.ftHexes(this.nHexes)

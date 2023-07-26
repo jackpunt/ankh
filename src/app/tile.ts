@@ -315,7 +315,6 @@ export class Tile extends Tile0 {
     return `${this.Aname}@${this.hex?.Aname ?? '?'}`;
   }
 
-  get andInfStr()  { return `${this} ${this.hex?.infStr ?? ''}`};
 
   /** name in set of filenames loaded in GameSetup
    * @param at = 2; above HexShape & BalMark
@@ -324,23 +323,6 @@ export class Tile extends Tile0 {
     let bm = super.addImageBitmap(name, at);
     this.updateCache();
     return bm;
-  }
-
-  /** add influence rays to Tile (for infP).
-   * @inf this.hex.getInfP(this.infColor)
-   */
-  setInfRays(inf = this.hex?.getInfP(this.infColor) ?? this.infP, ) {
-    this.removeChildType(InfRays);
-    if (inf !== 0) {
-      this.addChild(new InfRays(inf, this.infColor));
-    }
-    const rad = this.radius;
-    this.cache(-rad, -rad, 2 * rad, 2 * rad);
-  }
-
-  override paint(pColor?: "b" | "w" | "c", colorn?: string): void {
-    super.paint(pColor, colorn);
-    if (this.inf > 0) this.setInfRays();
   }
 
   infText: Text
@@ -355,12 +337,6 @@ export class Tile extends Tile0 {
     Object.values(this.capMarks).forEach(cm => cm && (cm.visible = false))
   }
 
-  assessThreat(atkr: PlayerColor) {
-    this.isThreat[atkr] = this.infColor && (this.hex.getInfT(this.infColor) < this.hex.getInfT(atkr));
-  }
-  assessThreats() {
-    playerColorsC.forEach(pc => this.assessThreat(pc) )
-  }
   capMarks: PlayerColorRecord<CapMark> = playerColorRecord()
 
   setCapMark(pc: PlayerColor, capMark = CapMark) {
@@ -434,29 +410,9 @@ export class Tile extends Tile0 {
   flipOwner(targetHex: Hex2, ctx: DragContext) {
     const gamePlay = GP.gamePlay, player = ctx?.lastCtrl ? this.player.otherPlayer : gamePlay.curPlayer;
     if (targetHex?.isOnMap && (targetHex === this.fromHex)) {
-      const infT = this.hex?.getInfT(this.player?.color);
-      if (targetHex.getInfT(player.color) > infT || ctx?.lastCtrl) {
-        this.flipPlayer(player, gamePlay); // flip if Infl or ctrlKey:
-      }
       return true;
     }
     return false;
-  }
-
-  // flipOwer->flipPlayer; compare to gamePlay.placeEither()
-  private flipPlayer(player: Player, gamePlay = GP.gamePlay) {
-    gamePlay.logText(`Flip ${this} to ${player.colorn}`, `FlipableTile.flipPlayer`);
-    const hex = this.hex, hadInfP = (this.infP + this.bonusInf()) > 0; // Monument && bonusInf
-    if (hadInfP) {
-      this.moveTo(undefined); // tile.hex = hex.tile = undefined
-      gamePlay.decrInfluence(hex, this, this.player.color);
-    }
-    this.setPlayerAndPaint(player); // Flip ownership
-    if (hadInfP) {
-      this.moveTo(hex);
-      gamePlay.incrInfluence(hex, player.color);
-    }
-    gamePlay.updateCounters();
   }
 
   resetTile() {
@@ -464,7 +420,6 @@ export class Tile extends Tile0 {
     this.removeBonus();
     this.x = this.y = 0;
     this.setInfText('');
-    this.setInfRays(0);    // Civics and Leaders
   }
 
   /**
@@ -528,7 +483,6 @@ export class Tile extends Tile0 {
   }
 
   isLegalRecycle(ctx: DragContext) {
-    if (this.hex.getInfT(GP.gamePlay.curPlayer.color) > this.hex.getInfT(this.player.color)) return false;
     return true;
   }
 
@@ -564,7 +518,6 @@ export class WhiteTile extends NoDragTile {
   override makeShape(): Paintable { return new HexShape(this.radius); }
 
   override paint(pColor?: PlayerColor, colorn?: string): void {
-    this.setInfRays();
     super.paint(pColor, C.WHITE);
   }
 }
@@ -587,21 +540,7 @@ export interface BagTile extends Tile {
 export class MapTile extends Tile {
   override dragStart(ctx: DragContext): void {
     super.dragStart(ctx);
-    if (this.infP > 0) this.setInfRays(this.infP);  // tile influence w/o meeple
-    this.hex?.meep?.setInfRays(this.hex.meep.infP); // meeple influence w/o tile
   }
-
-  override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
-    if (this.hex?.isOnMap) {
-      const infT = this.hex.getInfT(this.player?.color);
-      // captured - allow to recycle
-      if (this.hex.getInfT(criminalColor) > infT) return false;
-      // captured - allow to flip, no recycle
-      if (this.hex.getInfT(player.color) > infT) return false;
-    }
-    return super.cantBeMovedBy(player, ctx);
-  }
-
 }
 
 // Leader.civicTile -> Civic; Civic does not point to its leader...

@@ -125,8 +125,12 @@ export class Table extends EventDispatcher  {
   setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
     this.scaleCont.addChild(this.undoCont);
-    const { x, y } = this.hexMap.getCornerHex('W').xywh();
-    this.hexMap.mapCont.hexCont.localToLocal(x-2.5*TP.hexRad, y - this.hexMap.rowHeight * 4, undoC.parent, undoC);
+    {
+      let hexC = this.hexMap.centerHex, hex0 = hexC;
+      this.hexMap.forEachHex(hex => { if (hex.col < hex0.col) hex0 = hex })
+      const { x } = hex0.xywh(), y = hexC.y;
+      this.hexMap.mapCont.hexCont.localToLocal(x - 3.5 * TP.hexRad, y + this.hexMap.rowHeight * 3.5, undoC.parent, undoC);
+    }
     const progressBg = new Shape(), bgw = 200, bgym = 240, y0 = 0;
     const bgc = C.nameToRgbaString(TP.bgColor, .8);
     progressBg.graphics.f(bgc).r(-bgw / 2, y0, bgw, bgym - y0);
@@ -257,7 +261,7 @@ export class Table extends EventDispatcher  {
     const hex = new claz(this.hexMap, row, col, name);
     hex.distText.text = name;
     if (row <= 0) {
-      hex.y += (sy + row * .5 - .75) * (this.hexMap.rowHeight / 1.5);
+      hex.y += (sy + row * .5 - .75) * (this.hexMap.radius);
     }
     return hex
   }
@@ -288,7 +292,7 @@ export class Table extends EventDispatcher  {
     this.gamePlay = gamePlay
     const hexMap = this.hexMap = gamePlay.hexMap as HexMap<Hex2>;
     hexMap.addToMapCont(Hex2);               // addToMapCont; make Hex2
-    hexMap.makeAllDistricts();           //
+    hexMap.makeAllDistricts();               //
 
     const mapCont = hexMap.mapCont, hexCont = mapCont.hexCont; // local reference
     this.scaleCont.addChild(mapCont);
@@ -297,6 +301,7 @@ export class Table extends EventDispatcher  {
     const { x: rx, y: ry, width: rw, height: rh } = hexCont.getBounds();
     const rowh = hexMap.rowHeight, colw = hexMap.colWidth;
     const bgr: XYWH = { x: 0, y: -rowh * .6, w: rw + 5 * colw, h: rh + 4 * rowh }
+    // const bgr = { x: rw, y: ry, w: rw, h: rh};
     // align center of mapCont(0,0) == hexMap(center) with center of background
     mapCont.x = (bgr.w - bgr.x) / 2;
     mapCont.y = (bgr.h - bgr.y) / 2;
@@ -314,9 +319,10 @@ export class Table extends EventDispatcher  {
     this.hexMap.update();
     {
       // position turnLog & turnText
-      let parent = this.scaleCont
-      let rhex = this.hexMap[7][0] as Hex2; //getCornerHex('W') as Hex2;
-      let rhpt = rhex.cont.parent.localToLocal(rhex.x - 9 * this.hexMap.colWidth, rhex.y, parent)
+      const parent = this.scaleCont, n = TP.nHexes;
+      const lhex = this.hexMap.getCornerHex('W');
+      let rhex = lhex.links['NE'] as Hex2;
+      let rhpt = rhex.cont.parent.localToLocal(rhex.x - (n + 1) * this.hexMap.colWidth, rhex.y, parent)
       this.bagLog.x = rhpt.x; this.bagLog.y = rhpt.y - this.turnLog.height(1);;
       this.turnLog.x = rhpt.x; this.turnLog.y = rhpt.y;
       this.textLog.x = rhpt.x; this.textLog.y = rhpt.y + this.turnLog.height(Player.allPlayers.length + 1);
@@ -517,10 +523,10 @@ export class Table extends EventDispatcher  {
     })
 
     this.gamePlay.forEachPlayer(p => {
-      p.initialHex.forEachLinkHex(hex => hex.isLegal = true, true )
-      this.hexMap.update();
-      // place Town on hexMap
-      p.initialHex.forEachLinkHex(hex => hex.isLegal = false, true )
+      // p.initialHex.forEachLinkHex(hex => hex.isLegal = true, true )
+      // this.hexMap.update();
+      // // place Town on hexMap
+      // p.initialHex.forEachLinkHex(hex => hex.isLegal = false, true )
       this.toggleText(false)
     })
     this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[0])
@@ -583,8 +589,8 @@ export class Table extends EventDispatcher  {
     // press SHIFT to capture [recycle] opponent's Criminals or Tiles
     const reason = tile.cantBeMovedBy(this.gamePlay.curPlayer, ctx);
     if (reason) {
-      console.log(stime(this, `.dragStart: ${reason}: ${tile.andInfStr},`), 'ctx=',{...ctx});
-      this.logText(`${reason}: ${tile.andInfStr}`, 'Table.dragStart');
+      console.log(stime(this, `.dragStart: ${reason}: ${tile},`), 'ctx=',{...ctx});
+      this.logText(`${reason}: ${tile}`, 'Table.dragStart');
       this.stopDragging();
     } else {
       // mark legal targets for tile; SHIFT for all hexes, if payCost
@@ -652,10 +658,9 @@ export class Table extends EventDispatcher  {
     const dice = this.gamePlay.dice.text.text;
     const lm = history[0]
     const prev = lm ? `${lm.Aname}${lm.ind}#${tn-1}` : ""
-    const board = !!this.hexMap.allStones[0] && lm?.board // TODO: hexMap.allStones>0 but history.len == 0
     const robo = plyr.useRobo ? AT.ansiText(['red','bold'],"robo") : "----";
     const coins = plyr.coins, econs = plyr.econs, vps = plyr.vps, tvps = plyr.totalVps, vpr = plyr.vpsPerRound.toFixed(1);
-    const info = { turn: `#${tn}`, plyr: plyr.Aname, coins, econs, exp: plyr.expenses, vps, tvps, vpr, prev, gamePlay: this.gamePlay, curPlayer: plyr, board }
+    const info = { turn: `#${tn}`, plyr: plyr.Aname, coins, econs, exp: plyr.expenses, vps, tvps, vpr, prev, gamePlay: this.gamePlay, curPlayer: plyr }
     console.log(stime(this, `.logCurPlayer --${robo}--`), info);
     const inc = plyr.econs + plyr.expenses;
     this.logTurn(`#${tn}: ${plyr.Aname} ${dice} \$${coins} ${inc >= 0 ? '+' : '-'}${inc} vp: ${vps} tvp: ${tvps}`);

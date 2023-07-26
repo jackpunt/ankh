@@ -1,11 +1,10 @@
-import { Constructor, json } from "@thegraid/common-lib";
+import { json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { Container } from "@thegraid/easeljs-module";
-import { EzPromise } from "@thegraid/ezpromise";
 import { CostIncCounter } from "./counters";
 import { GameSetup } from "./game-setup";
-import { Hex, Hex1, Hex2, HexMap, IHex } from "./hex";
-import { H } from "./hex-intfs";
+import { Hex, Hex1, Hex2, IHex, SquareMap } from "./hex";
+import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
 import { CenterText } from "./shapes";
@@ -13,9 +12,7 @@ import { GameStats, TableStats } from "./stats";
 import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerColorRecord, playerColors, } from "./table-params";
-import { BagTile, Civic, MapTile, Tile } from "./tile";
-import { TileSource } from "./tile-source";
-import { Meeple } from "./meeple";
+import { BagTile, MapTile, Tile } from "./tile";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -55,7 +52,7 @@ export class GamePlay0 {
 
   get allPlayers() { return Player.allPlayers; }
 
-  readonly hexMap = new HexMap<Hex2>()
+  readonly hexMap = new SquareMap<Hex2>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly gStats: GameStats             // 'readonly' (set once by clone constructor)
   readonly redoMoves = []
@@ -101,13 +98,6 @@ export class GamePlay0 {
   curPlayer: Player;
   preGame = true;
   curPlayerMapTiles: Tile[] = [];
-  get didPlayerBuild() {
-    const plyr = this.curPlayer;
-    const nowTiles = plyr.allOnMap(MapTile);
-    const isNew = !!nowTiles.find(tile => !this.curPlayerMapTiles.includes(tile))
-    plyr.vpCounter.setLabel(isNew ? 'vps' : 'vps*');
-    return isNew;
-  }
 
   dice: Dice;
 
@@ -164,7 +154,6 @@ export class GamePlay0 {
     // this.rollDiceForBonus();
     // Jubilee if win condition:
     const playerVps = this.curPlayer.isComplete ? 2 * this.curPlayer.vps : this.curPlayer.vps;
-    this.curPlayer.totalVps += this.didPlayerBuild ? playerVps : Math.floor(playerVps / 2);
     if (this.isEndOfGame()) {
       this.endGame();
     } else {
@@ -197,9 +186,7 @@ export class GamePlay0 {
     this.curPlayerNdx = plyr.index
     this.curPlayer.actions = 0;
     this.curPlayerMapTiles = this.curPlayer.allOnMap(MapTile);
-    this.didPlayerBuild; // false: set 'vps*'
     this.curPlayer.newTurn();
-    this.assessThreats();
   }
 
   vca: { vc1: number, vc2: number }[] = [{ vc1: -3, vc2: -3 }, { vc1: -3, vc2: -3 }];
@@ -228,10 +215,6 @@ export class GamePlay0 {
     return endp;
   }
 
-  assessThreats() {
-    this.hexMap.forEachHex(hex => hex.assessThreats()); // try ensure threats are correctly marked
-  }
-
   /** Planner may override with alternative impl. */
   newMoveFunc: ((hex: Hex, sc: PlayerColor, caps: Hex[], gp: GamePlay0) => Move) | undefined
   newMove(hex: Hex, sc: PlayerColor, caps: Hex[], gp: GamePlay0) {
@@ -240,22 +223,6 @@ export class GamePlay0 {
   undoRecs: Undo = new Undo().enableUndo();
   addUndoRec(obj: NamedObject, name: string, value: any | Function = obj.name) {
     this.undoRecs.addUndoRec(obj, name, value);
-  }
-
-  /** after add Tile to hex: propagate its influence in each direction; maybe capture. */
-  incrInfluence(hex: Hex1, infColor: PlayerColor) {
-    H.infDirs.forEach(dn => {
-      const inf = hex.getInf(infColor, dn);
-      hex.propagateIncr(infColor, dn, inf); // use test to identify captured Criminals?
-    })
-  }
-
-  /** after remove Tile [w/tileInf] from hex: propagate influence in each direction. */
-  decrInfluence(hex: Hex1, tile: Tile, infColor: PlayerColor) {
-    H.infDirs.forEach(dn => {
-      const inf = hex.getInf(infColor, dn);
-      hex.propagateDecr(infColor, dn, inf, tile);       // because no-stone, hex gets (inf - 1)
-    })
   }
 
   playerBalanceString(player: Player, ivec = [0, 0, 0, 0]) {
@@ -330,8 +297,7 @@ export class GamePlay0 {
 
   /** update Counters (econ, expense, vp) for ALL players. */
   updateCounters() {
-    this.didPlayerBuild;
-    Player.allPlayers.forEach(player => player.setCounters(false));
+    // Player.allPlayers.forEach(player => player.setCounters(false));
     this.hexMap.update();
   }
 
@@ -352,7 +318,7 @@ export class GamePlay0 {
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.hex;
-    const info = { tile, fromHex, toHex, infStr: toHex?.infStr ?? '?', payCost };
+    const info = { tile, fromHex, toHex, payCost };
     if (toHex !== tile.hex) console.log(stime(this, `.placeEither:`), info);
     // commit to pay, and verify payment made:
     if (payCost) {
@@ -361,25 +327,9 @@ export class GamePlay0 {
       tile.moveTo(tile.hex); // abort; return to fromHex
       return;
     }
-    // update influence on map:
-    const infColor = tile.infColor || this.curPlayer.color;
-    const tileInfP = tile.infP + tile.bonusInf(infColor);
-    if (fromHex?.isOnMap && tileInfP !== 0) {
-      this.decrInfluence(fromHex, tile, infColor);        // as if tile has no influence
-    }
     if (toHex !== fromHex) this.logText(`Place ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
-    if (fromHex?.meep || fromHex?.tile) {
-      const infP = fromHex.getInfP(infColor);
-      fromHex.meep?.setInfRays(infP); // meep inf w/o tile moved
-      fromHex.tile?.setInfRays(infP); // tile inf w/o meep moved
-    }
-    if (toHex?.isOnMap) {
-      this.incrInfluence(tile.hex, infColor);
-      const infP = toHex.getInfP(infColor);
-      toHex.meep?.setInfRays(infP);   // meep inf with tile placed
-      toHex.tile?.setInfRays(infP);   // tile inf with meep placed
-    } else if (toHex === this.recycleHex) {
+    if (toHex === this.recycleHex) {
       this.logText(`Recycle ${tile} from ${fromHex?.Aname || '?'}`, `gamePlay.placeEither`)
       this.recycleTile(tile);    // Score capture; log; return to homeHex
     }
@@ -446,7 +396,6 @@ export class GamePlay extends GamePlay0 {
 
   unMove() {
     this.curPlayer.meeples.forEach((meep: Meeple) => meep.hex?.isOnMap && meep.unMove());
-    this.assessThreats();
   }
 
 

@@ -2,7 +2,6 @@ import { C, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } 
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { EBC, PidChoice } from "./choosers";
 import { GamePlay } from "./game-play";
-import { InfMark } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { StatsPanel, TableStats } from "./stats";
@@ -120,7 +119,7 @@ export class GameSetup {
     const gui = new ParamGUI(TP, { textAlign: 'right'})
     const schemeAry = TP.schemeNames.map(n => { return { text: n, value: TP[n] } })
     const setSize = (dpb: number, dop: number) => { restart && this.restart.call(this, dpb, dop) };
-    gui.makeParamSpec("nh", [3, 4, 5, 6], { fontColor: "red" }); TP.nHexes;
+    gui.makeParamSpec("nh", [6, 7, 8, 9, 10, 11], { fontColor: "red" }); TP.nHexes;
     gui.makeParamSpec("mh", [0, 1, 2, 3], { fontColor: "red" }); TP.mHexes;
     gui.makeParamSpec("nCivics", [4, 3, 2, 1], { fontColor: "green" }); TP.nCivics;
     gui.makeParamSpec("auctionSlots", [5, 4, 3], { fontColor: "green" }); TP.auctionSlots;
@@ -152,7 +151,6 @@ export class GameSetup {
     gui.spec("colorScheme").onChange = (item: ParamItem) => {
       gui.setValue(item)
       Tile.allTiles.forEach(tile => { tile.paint() }); // tile.player or C1.grey
-      InfMark.setInfGraphics();
       this.gamePlay.paintForPlayer();  // re-paint ActionCont tiles
       this.gamePlay.hexMap.update()
     }

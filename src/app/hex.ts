@@ -1,9 +1,9 @@
 import { C, Constructor, F, RC, S } from "@thegraid/easeljs-lib";
-import { Container, DisplayObject, Graphics, Point, Shape, Text } from "@thegraid/easeljs-module";
-import { EwDir, H, HexAxis, HexDir, InfDir, NsDir } from "./hex-intfs";
+import { Container, Point, Shape, Text } from "@thegraid/easeljs-module";
+import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { CapMark, HexShape, LegalMark, MeepCapMark } from "./shapes";
-import { PlayerColor, PlayerColorRecord, TP, playerColorRecord, playerColorRecordF, playerColorsC } from "./table-params";
+import { HexShape, LegalMark } from "./shapes";
+import { PlayerColor, TP } from "./table-params";
 import type { MapTile, Tile } from "./tile";
 
 export const S_Resign = 'Hex@Resign'
@@ -13,9 +13,7 @@ export type IHex = { Aname: string, row: number, col: number }
 type HexConstructor<T extends Hex> = new (map: HexMap<T>, row: number, col: number) => T;
 // Note: graphics.drawPolyStar(x,y,radius, sides, pointSize, angle) will do a regular polygon
 
-type LINKS<T extends Hex> = { [key in InfDir]?: T }
-type INF   = { [key in InfDir]?: number }
-type INFM   = { [key in HexAxis]?: InfMark }
+type LINKS<T extends Hex> = { [key in HexDir]?: T }
 type DCR    = { [key in "dc" | "dr"]: number }  // Delta for Col & Row
 type TopoEW = { [key in EwDir]: DCR }
 type TopoNS = { [key in NsDir]: DCR }
@@ -23,40 +21,6 @@ type Topo = TopoEW | TopoNS
 
 export type HSC = { hex: Hex, sc: PlayerColor, Aname: string }
 export function newHSC(hex: Hex, sc: PlayerColor, Aname = hex.Aname) { return { Aname, hex, sc } }
-
-/** Lines showing influence on the HexMap. */
-export class InfMark extends Shape {
-  static wxoAry = playerColorRecord([5, 2.5], [5, -2.5], [6, 0]); // [width, xoffset]
-  /** Note: requires a Canvas for nameToRgbaString() */
-  static gColor(sc: PlayerColor, g: Graphics = new Graphics()) {
-    let alpha = '.85'
-    let lightgreyA = C.nameToRgbaString('lightgrey', '.5')
-    let c = C.nameToRgbaString(TP.colorScheme[sc], alpha)
-    let r = TP.hexRad * H.sqrt3_2 - 1, [w, xo] = InfMark.wxoAry[sc];
-
-    let gStroke = (color: string, w: number) => {
-      return g.ss(w).s(color).mt(xo, r).lt(xo, -r)
-    }
-    g.clear()
-    if (C.dist(c, C.WHITE) < 10) gStroke(lightgreyA, w + 2) // makes 'white' more visible
-    if (C.dist(c, C.BLACK) < 10) w -= 1 // makes 'black' less bold
-    gStroke(c, w)
-    return g
-  }
-  /** 2 Graphics, one is used by each InfMark */
-  static setInfGraphics(): PlayerColorRecord<Graphics> {
-    return InfMark.infG = playerColorRecordF<Graphics>(sc => InfMark.gColor(sc, InfMark.infG[sc]))
-  }
-  static infG = playerColorRecordF<Graphics>(sc => InfMark.gColor(sc))
-  /** @param ds show Influence on Axis */
-  constructor(sc: PlayerColor, ds: HexAxis, x: number, y: number) {
-    super(InfMark.infG[sc])
-    this.mouseEnabled = false
-    this.rotation = H.dirRot[ds]
-    this.x = x; this.y = y
-    this[S.Aname] = `Inf[${TP.colorScheme[sc]},${ds},${this.id}]`  // for debug, not production
-  }
-}
 
 /** to recognize this class in hexUnderPoint and obtain the associated Hex2. */
 class HexCont extends Container {
@@ -92,13 +56,13 @@ export class Hex {
   }
   /** (x,y): center of hex; (width,height) of hex; scaled by radius if supplied
    * @param radius [1] radius used in drawPolyStar(radius,,, H.dirRot[tiltDir])
-   * @param nsAxis [true] suitable for nsTopo (long axis of hex is N/S)
+   * @param ewTopo [true] suitable for ewTopo (long axis of hex is N/S)
    * @param row [this.row]
    * @param col [this.col]
    * @returns \{ x, y, w, h } of cell at [row, col]
    */
-  xywh(radius = TP.hexRad, nsAxis = true, row = this.row, col = this.col) {
-    if (nsAxis) { // tiltDir = 'NE'; tilt = 30-degrees; nsTOPO
+  xywh(radius = TP.hexRad, ewTopo = true, row = this.row, col = this.col) {
+    if (ewTopo) { // tiltDir = 'NE'; tilt = 30-degrees; nsTOPO
       const h = 2 * radius, w = radius * H.sqrt3;  // h height of hexagon (long-vertical axis)
       const x = (col + Math.abs(row % 2) / 2) * w;
       const y = row * 1.5 * radius;   // dist between rows
@@ -139,10 +103,10 @@ export class Hex {
   readonly map: HexMap<Hex>;  // Note: this.parent == this.map.hexCont [cached] TODO: typify ??
   readonly row: number;
   readonly col: number;
-  /** influence of color passing through this hex; see also getInfT() */
-  readonly inf = playerColorRecord<INF>({},{},{})
   /** Link to neighbor in each H.dirs direction [NE, E, SE, SW, W, NW] */
   readonly links: LINKS<this> = {}
+
+  get linkDirs() { return Object.keys(this.links) as HexDir[];}
 
   /** colorScheme(playerColor)@rcs */
   toString(sc?: PlayerColor) {
@@ -153,22 +117,20 @@ export class Hex {
     return `${TP.colorScheme[sc] ?? 'Empty'}@${this.rcsp}`
   }
 
-  get linkDirs() { return Object.keys(this.links) as InfDir[];}
-
   /** convert LINKS object to Array */
   get linkHexes() {
-    return Object.keys(this.links).map((dir: InfDir) => this.links[dir])
+    return Object.keys(this.links).map((dir: HexDir) => this.links[dir])
   }
-  forEachLinkHex(func: (hex: Hex, dir: InfDir, hex0: Hex) => unknown, inclCenter = false) {
+  forEachLinkHex(func: (hex: Hex, dir: HexDir, hex0: Hex) => unknown, inclCenter = false) {
     if (inclCenter) func(this, undefined, this);
-    this.linkDirs.forEach((dir: InfDir) => func(this.links[dir], dir, this));
+    this.linkDirs.forEach((dir: HexDir) => func(this.links[dir], dir, this));
   }
   /** search each Hex linked to this. */
-  findLinkHex(pred: (hex: this, dir: InfDir, hex0: this) => boolean) {
-    return this.linkDirs.find((dir: InfDir) => pred(this.links[dir], dir, this));
+  findLinkHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
+    return this.linkDirs.find((dir: HexDir) => pred(this.links[dir], dir, this));
   }
 
-  findInDir(dir: InfDir, pred: (hex: Hex, dir: InfDir, hex0: Hex) => boolean) {
+  findInDir(dir: HexDir, pred: (hex: Hex, dir: HexDir, hex0: Hex) => boolean) {
     let hex: Hex = this;
     do {
        if (pred(hex, dir, this)) return hex;
@@ -176,15 +138,15 @@ export class Hex {
     return undefined;
   }
 
-  hexesInDir(dir: InfDir, rv: Hex[] = []) {
+  hexesInDir(dir: HexDir, rv: Hex[] = []) {
     let hex: Hex = this;
     while (!!(hex = hex.links[dir])) rv.push(hex);
     return rv;
   }
 
   /** for each Hex in each Dir: func(hex, dir, this) */
-  forEachHexDir(func: (hex: Hex, dir: InfDir, hex0: Hex) => unknown) {
-    this.linkDirs.forEach((dir: InfDir) => this.hexesInDir(dir).filter(hex => !!hex).map(hex => func(hex, dir, this)));
+  forEachHexDir(func: (hex: Hex, dir: HexDir, hex0: Hex) => unknown) {
+    this.linkDirs.forEach((dir: HexDir) => this.hexesInDir(dir).filter(hex => !!hex).map(hex => func(hex, dir, this)));
   }
 
   nextHex(ds: HexDir, ns: number = 1) {
@@ -228,78 +190,6 @@ export class Hex1 extends Hex {
   override rcspString(sc = this.tile?.player.color || this.meep?.player?.color) {
     return `${TP.colorScheme[sc] || 'Empty'}@${this.rcsp}`
   }
-  /**
-   * Is this Hex [already] influenced by color/dn? [for skipAndSet()]
-   * @param color PlayerColor
-   * @param dn dir of Influence: ds | revDir[ds]
-   * @returns true if Hex is PlayerColor or has InfMark(color, dn)
-   */
-  isInf(color: PlayerColor, dn: InfDir) { return this.inf[color][dn] > 0}
-  getInf(color: PlayerColor, dn: InfDir) { return this.inf[color] ? (this.inf[color][dn] ?? 0) : 0 }
-  setInf(color: PlayerColor, dn: InfDir, inf: number) { return this.inf[color][dn] = inf }
-
-  // Presence of Tile and/or Meeple may provide influence to adjacent cells
-  // that propagates along the axies, decrementing on non-presence cells,
-  // boosting on presence/occupied cells.
-  /** influence from presence of Tile/Meeple. */
-  getInfP(color: PlayerColor, xTile?: Tile | Meeple) {
-    const tileInf = (this.tile !== xTile && this.tile?.infColor === color) ? this.tile.inf : 0;
-    const meepInf = (this.meep !== xTile && this.meep?.infColor === color) ? this.meep.inf : 0;
-    return tileInf + meepInf;
-  }
-  /** Total external inf on this Hex. */
-  getInfX(color: PlayerColor) {
-    let tinf = 0;
-    H.infDirs.forEach(dn => tinf += this.getInf(color, dn));
-    return tinf;
-  }
-  /** Total inf on this Hex. */
-  getInfT(color: PlayerColor) {
-    const infP = this.getInfP(color);
-    return infP + this.getInfX(color);
-  }
-
-  get infStr() {
-    let infc = playerColorsC; // red, blue, criminal
-    let rv = infc.reduce((pv, cv, ci) => `${pv}${ci > 0 ? ':' : ''}${this.getInfT(cv as PlayerColor)}`, '');
-    return rv;
-  }
-
-  /**
-   * @param inf is influence *passed-in* to Hex; *next* gets [inf+infP or inc-1]
-   * @param test after hex.setInf(inf) and hex.propagateIncr(nxt), apply test(hex); [a visitor]
-   */
-  propagateIncr(color: PlayerColor, dn: InfDir, inf: number, test: ((hex: Hex1) => void) = (hex) => hex.assessThreats()) {
-    const infP = this.getInfP(color);
-    this.setInf(color, dn, inf);
-    const nxt = inf + ((infP > 0) ? infP : (this.bonusInf(color) - 1));
-    if (nxt > 0) (this.links[dn] as Hex1)?.propagateIncr(color, dn, nxt, test)
-    if (test) test(this);
-  }
-
-  private bonusInf(color: PlayerColor) { return this.tile?.bonusInf(color) ?? 0; }
-  /**
-   * Afer removing tileInf, set inf of this hex AND set inf of next in line to reduced value.
-   * Pass on based on *orig/current* inf, not the new/decremented inf.
-   * @param inf for hex, without infP
-   * @param test after hex.setInf(infn) and hex.propagateDecr(nxt), apply test(hex)
-   * @param tile whose infP has been removed.
-   */
-  propagateDecr(color: PlayerColor, dn: InfDir, inf: number, tile: Tile, test: ((hex: Hex1) => void) = (hex) => hex.assessThreats()) {
-    // if *this* has inf, then next may also have propagated inf.
-    const infP = this.getInfP(color, tile);
-    const inf0 = this.getInf(color, dn) + infP + (tile?.infP ?? 0); // original, largest inf
-    this.setInf(color, dn, inf);
-    const nxt = (infP > 0) ? inf + infP : Math.max(0, inf - ((this.tile !== tile) && (this.bonusInf(color) === 1) ? 0 : 1));
-    if (inf0 > 0) (this.links[dn] as Hex1)?.propagateDecr(color, dn, nxt, undefined, test) // pass-on a smaller number
-    if (test) test(this);
-  }
-
-  assessThreats() {
-    this.tile?.assessThreats();    // playerColorsC.forEach(pc => this.assessThreat(pc));
-    this.meep?.assessThreats();
-  }
-
 }
 /** One Hex cell in the game, shown as a polyStar Shape */
 export class Hex2 extends Hex1 {
@@ -326,7 +216,6 @@ export class Hex2 extends Hex1 {
   distColor: string // district color of hexShape (paintHexShape)
   distText: Text    // shown on this.cont
   rcText: Text      // shown on this.cont
-  infm: Record<PlayerColor, INFM> = playerColorRecord({}, {}, {})
 
   override get tile() { return super.tile; }
   override set tile(tile: Tile) {
@@ -378,10 +267,6 @@ export class Hex2 extends Hex1 {
 
   /** set visibility of rcText & distText */
   showText(vis = this.rcText.visible) {
-    if (this.isOnMap) {
-      this.distText.text = this.infStr;
-      this.tile?.setInfText(this.infStr);
-    }
     this.rcText.visible = this.distText.visible = vis;
     this.cont.updateCache();
   }
@@ -393,9 +278,9 @@ export class Hex2 extends Hex1 {
     this.legalMark.visible = v;
   }
 
-  initCont(row: number, col: number) {
-    const cont = this.cont;
-    const { x, y, w, h } = this.xywh(this.radius, undefined, row, col); // include margin space between hexes
+  private initCont(row: number, col: number) {
+    const cont = this.cont, ewTopo = this.map.topo === this.map.ewTopo;
+    const { x, y, w, h } = this.xywh(this.radius, ewTopo, row, col); // include margin space between hexes
     cont.x = x;
     cont.y = y;
     // initialize cache bounds:
@@ -421,30 +306,6 @@ export class Hex2 extends Hex1 {
     this.distColor = color;
     this.hexShape.paint(color);
     this.cont.updateCache();
-  }
-
-  override setInf(color: PlayerColor, dn: InfDir, inf: number): number {
-    super.setInf(color, dn, inf)
-    this.showInf(color, dn, inf + this.getInf(color, H.dirRevEW[dn]) > 0)
-    return inf
-  }
-
-  showInf(color: PlayerColor, dn: InfDir, show = true) {
-    let ds: HexAxis = H.dnToAxis[dn], infMark = this.infm[color][ds]  // infm only on [ds]
-    if (this.isOnMap) this.showText(); // update infStr
-    if (show && !infMark) {
-      infMark = this.infm[color][ds] = new InfMark(color, ds, this.x, this.y)
-      this.map.mapCont.infCont.addChild(infMark)
-    }
-    if (infMark) { infMark.visible = show; }
-  }
-
-  override assessThreats(): void {
-    super.assessThreats();
-    playerColorsC.forEach(pc => {
-      this.tile?.setCapMark(pc, CapMark);
-      this.meep?.setCapMark(pc, MeepCapMark);
-    });
   }
 
   // The following were created for the map in hexmarket:
@@ -522,7 +383,6 @@ export class MapCont extends Container {
 }
 
 export interface HexM<T extends Hex> {
-  readonly allStones: HSC[]       // all the Hex with a Stone/Color
   readonly district: T[][]        // all the Hex in a given district
   readonly mapCont: MapCont
   rcLinear(row: number, col: number): number
@@ -549,7 +409,6 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
 
   get asHex2Map() { return this as any as HexMap<Hex2> }
   /** Each occupied Hex, with the occupying PlayerColor  */
-  readonly allStones: HSC[] = []                    // aka hexStones in Board (readonly when we stop remove/filter)
   readonly district: Array<T[]> = []
   readonly mapCont: MapCont = new MapCont(this.asHex2Map);   // if/when using Hex2
 
@@ -564,13 +423,13 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
 
   readonly radius = TP.hexRad
   // SEE ALSO: hex.xywh(radius, axis, row, col)
-  /** height per row of cells with NS axis */
+  /** height per row of cells with EW Topo */
   get rowHeight() { return this.radius * 1.5 };
-  /** height of hexagonal cell with NS axis */
+  /** height of hexagonal cell with EW Topo */
   get cellHeight() { return this.radius * 2 }
-  /** width per col of cells with NS axis */
+  /** width per col of cells with EW Topo */
   get colWidth() { return this.radius * H.sqrt3 }
-  /** width of hexagonal cell with NS axis */
+  /** width of hexagonal cell with EW Topo */
   get cellWidth() { return this.radius * H.sqrt3 }
 
   private minCol: number | undefined = undefined               // Array.forEach does not look at negative indices!
@@ -695,26 +554,33 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   ewOddRow: TopoEW = {
     NE: { dc: 1, dr: -1 }, E: { dc: 1, dr: 0 }, SE: { dc: 1, dr: 1 },
     SW: { dc: 0, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: 0, dr: -1 }}
-  nsOddCol: TopoNS = {
-    NE: { dc: 1, dr: -1 }, SE: { dc: 1, dr: 0 }, S: { dc: 0, dr: 1 }, N: { dc: 0, dr: -1 },
-    SW: { dc: -1, dr: 0 }, NW: { dc: -1, dr: -1 }}
   nsEvenCol: TopoNS = {
-    NE: { dc: 1, dr: 0 }, SE: { dc: 1, dr: 1 }, S: { dc: 0, dr: 1 }, N: { dc: 0, dr: -1 },
-    SW: { dc: -1, dr: 1}, NW: { dc: -1, dr: 0 }}
-  nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? this.nsEvenCol : this.nsOddCol }
-  ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? this.ewEvenRow : this.ewOddRow}
+    NE: { dc: +1, dr: -1 }, N: { dc: 0, dr: -1 }, SE: { dc: +1, dr: 0 },
+    SW: { dc: -1, dr: 0 }, S: { dc: 0, dr: +1 }, NW: { dc: -1, dr: -1 }}
+  nsOddCol: TopoNS = {
+    NE: { dc: 1, dr: 0 }, N: { dc: 0, dr: -1 }, SE: { dc: 1, dr: 1 },
+    SW: { dc: -1, dr: 1 }, S: { dc: 0, dr: 1 }, NW: { dc: -1, dr: 0 }}
+  nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? this.nsEvenCol : this.nsOddCol };
+  ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? this.ewEvenRow : this.ewOddRow };
+  topo: (rc: RC) => (TopoEW | TopoNS) = this.ewTopo;
 
-  nextRowCol(hex: RC, dir: HexDir, nt: Topo = this.ewTopo(hex)): RC {
+  /** see also: Hex.linkDirs */
+  get linkDirs(): HexDir[] {
+    return (this.topo === this.ewTopo) ? H.ewDirs : H.nsDirs;
+  }
+
+  nextRowCol(hex: RC, dir: HexDir, nt: Topo = this.topo(hex)): RC {
     let row = hex.row + nt[dir].dr, col = hex.col + nt[dir].dc
-    return {row, col}
+    return { row, col }
   }
 
   /** link hex to/from each extant neighor */
-  link(hex: T, rc: RC = hex, map: T[][] = this, nt: Topo = this.ewTopo(rc), lf: (hex: T) => LINKS<T> = (hex) => hex.links) {
-    let topoDirs = Object.keys(nt) as Array<HexDir>
+  link(hex: T, rc: RC = hex, map: T[][] = this, nt: Topo = this.topo(rc), lf: (hex: T) => LINKS<T> = (hex) => hex.links) {
+    const topoDirs = Object.keys(nt) as Array<HexDir>
     topoDirs.forEach(dir => {
-      let nr = rc.row + nt[dir].dr, nc = rc.col + nt[dir].dc //let {row, col} = this.nextRowCol(hex, dir, nt)
-      let nHex = map[nr] && map[nr][nc]
+      const nr = rc.row + nt[dir].dr;
+      const nc = rc.col + nt[dir].dc;
+      const nHex = map[nr] && map[nr][nc]
       if (!!nHex) {
         lf(hex)[dir] = nHex
         lf(nHex)[H.dirRev[dir]] = hex
@@ -754,8 +620,8 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   pickColor(hexAry: Hex2[]): string {
     let hex = hexAry[0]
     let adjColor: string[] = [HexMap.distColor[0]] // colors not to use
-    H.dirs.forEach(hd => {
-      let nhex: Hex2 = hex
+    this.linkDirs.forEach(hd => {
+      let nhex: Hex2 = hex;
       while (!!(nhex = nhex.nextHex(hd) as Hex2)) {
         if (nhex.district != hex.district) { adjColor.push(nhex.distColor); return }
       }
@@ -763,6 +629,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     return HexMap.distColor.find(ci => !adjColor.includes(ci))
   }
   /**
+   * rings of Hex with EwTopo; HexShape(tilt = 'NE')
    * @param nh order of inner-hex: number hexes on side of meta-hex
    * @param mr make new district on meta-row
    * @param mc make new district on meta-col
@@ -770,6 +637,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   makeDistrict(nh: number, district: number, mr: number, mc: number): Hex[] {
     const mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1;
     // irow-icol define topology of MetaHex composed of HexDistrict
+    // TODO: generalize using this.topo to compute offsets!
     const irow = (mr: number, mc: number) => {
       let ir = mr * dia - nh * (mcp + 1) + 1
       ir -= Math.floor((mc) / 2)              // - half a row for each metaCol
@@ -790,20 +658,26 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     let rc: RC = { row: row0, col: col0 } // == {hex.row, hex.col}
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
+    const dirs = this.linkDirs;
+    const startDir = dirs[4]; // 'W' or 'NW'
     for (let ring = 1; ring < nh; ring++) {
-      rc = this.nextRowCol(rc, 'W') // step West to start a ring
+      rc = this.nextRowCol(rc, startDir); // step West to start a ring
       // place 'ring' hexes along each axis-line:
-      H.infDirs.forEach(dir => rc = this.newHexesOnLine(ring, rc, dir, district, hexAry))
+      dirs.forEach(dir => rc = this.newHexesOnLine(ring, rc, dir, district, hexAry))
     }
     //console.groupEnd()
-    this.district[district] = hexAry;
+    this.setDistrictColor(hexAry, district);
+    return hexAry
+  }
+  setDistrictColor(hexAry: T[], district = 0) {
+  this.district[district] = hexAry;
     if (hexAry[0] instanceof Hex2) {
       const hex2Ary = hexAry as any as Hex2[];
       const dcolor = district == 0 ? HexMap.distColor[0] : this.pickColor(hex2Ary)
       hex2Ary.forEach(hex => hex.setHexColor(dcolor)) // makeDistrict: dcolor=lightgrey
     }
-    return hexAry
   }
+
   /**
    *
    * @param n number of Hex to create
@@ -813,7 +687,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
    * @param hexAry push created Hex(s) on this array
    * @returns RC of next Hex to create (==? RC of original hex)
    */
-  newHexesOnLine(n: number, rc: RC, dir: InfDir, district: number, hexAry: Hex[]): RC {
+  newHexesOnLine(n: number, rc: RC, dir: HexDir, district: number, hexAry: Hex[]): RC {
     let hex: Hex
     for (let i = 0; i < n; i++) {
       hexAry.push(hex = this.addHex(rc.row, rc.col, district))
@@ -830,53 +704,60 @@ export class HexMapD extends HexMap<Hex> {
 }
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
-  override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
-    super.makeAllDistricts();
+  constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
+    super(radius, addToMapCont, hexC);
+    this.topo = this.nsTopo;
+    HexShape.tilt = 'N';
   }
+  // SEE ALSO: hex.xywh(radius, axis, row, col)
+  /** height per row of cells with NS Topo */
+  override get rowHeight() { return this.radius * H.sqrt3 };
+  /** height of hexagonal cell with EW Topo */
+  override get cellHeight() { return this.radius * H.sqrt3 }
+  /** width per col of cells with EW Topo */
+  override get colWidth() { return this.radius * 1.5 }
+  /** width of hexagonal cell with EW Topo */
+  override get cellWidth() { return this.radius * 2 }
+
+  override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
+    if (this.topo === this.ewTopo) super.makeAllDistricts();
+    else {
+      this.makeRect(nh, nh + 1);
+      this.mapCont.hexCont && this.centerOnContainer()
+    }
+  }
+
   /**
    * Rectangle of hexes (comprising a metaRect)
    * @param nr height
    * @param nc width
    * @param mr metaRow = 1
    * @param mc metaCol = 1
-   * @returns
+   * @returns flat array of the Hexes that were created.
    */
-  makeRect(nr: number, nc = 1, district = 0, mr = 1, mc = 1): Hex[] {
-    const nh = 1;
-    const mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1;
-    // irow-icol define topology of MetaHex composed of HexDistrict
-    const irow = (mr: number, mc: number) => {
-      let ir = mr * dia - nh * (mcp + 1) + 1
-      ir -= Math.floor((mc) / 2)              // - half a row for each metaCol
-      return ir
-    }
-    const icol = (mr: number, mc: number, row: number) => {
-      let np = Math.abs(nh % 2), rp = Math.abs(row % 2)
-      let ic = Math.floor(mc * ((nh * 3 - 1) / 2))
-      ic += (nh - 1)                        // from left edge to center
-      ic -= Math.floor((mc + (2 - np)) / 4) // 4-metaCol means 2-rows, mean 1-col
-      ic += Math.floor((mr - rp) / 2)       // 2-metaRow means +1 col
-      return ic
-    }
-    const row0 = irow(mr, mc), col0 = icol(mr, mc, row0);
-    const hexAry = Array<Hex>(); hexAry['Mr'] = mr; hexAry['Mc'] = mc;
-    const hex = this.addHex(row0, col0, district);
-    hexAry.push(hex) // The *center* hex
-    let rc: RC = { row: row0, col: col0 } // == {hex.row, hex.col}
+  makeRect(nr: number, nc = nr + 1, district = 0, roundCorner = true): Hex[] {
+    const hexAry = Array<T>(); hexAry['Nr'] = nr; hexAry['Nc'] = nc;
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
-    for (let ring = 1; ring < nh; ring++) {
-      rc = this.nextRowCol(rc, 'W') // step West to start a ring
-      // place 'ring' hexes along each axis-line:
-      H.infDirs.forEach(dir => rc = this.newHexesOnLine(ring, rc, dir, district, hexAry))
+    const nc0 = roundCorner ? nc - 1 - (nc % 2) : nc
+    const ncf = roundCorner ? nc -3 : nc;
+    this.newHexesOnRow(nc0, { row: 0, col: roundCorner ? 1 : 0 }, district, hexAry);
+    for (let row = 1; row < nr - 1; row++) {
+      // place 'row' of hexes
+      this.newHexesOnRow(nc, { row, col: 0 }, district, hexAry);
     }
+    this.newHexesOnRow(ncf, { row: nr - 1, col: roundCorner ? 2 : 0 }, district, hexAry, roundCorner ? 2 : 1);
     //console.groupEnd()
-    this.district[district] = hexAry as T[];
-    if (hexAry[0] instanceof Hex2) {
-      const hex2Ary = hexAry as Hex2[]
-      const dcolor = district == 0 ? HexMap.distColor[0] : this.pickColor(hex2Ary)
-      hex2Ary.forEach(hex => hex.setHexColor(dcolor)) // makeDistrict: dcolor=lightgrey
-    }
+    this.setDistrictColor(hexAry, district);
     return hexAry
+  }
+
+  newHexesOnRow(n: number, rc: RC, district: number, hexAry: Hex[], di = 1): RC {
+    let hex: Hex, { row, col } = rc;
+    for (let i = 0; i < n; i += di) {
+      // if (!(row == 0 && (i == 0 || i == n-1)) && !(false))
+        hexAry.push(hex = this.addHex(row, col + i, district))
+    }
+    return rc
   }
 }

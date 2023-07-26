@@ -30,9 +30,10 @@ export interface Paintable extends DisplayObject {
  * @param radius in call to drawPolyStar()
  */
 export class HexShape extends Shape implements Paintable {
+  static tilt: HexDir = 'NE';
   constructor(
     readonly radius = TP.hexRad,
-    readonly tiltDir: HexDir = 'NE',
+    readonly tiltDir = HexShape.tilt
   ) {
     super();
   }

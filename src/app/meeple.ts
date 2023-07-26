@@ -67,8 +67,6 @@ export class Meeple extends Tile {
     this.player = player;
     this.nameText.visible = true;
     this.nameText.y = this.baseShape.y;
-    let { x, y, width, height } = this.baseShape.getBounds();
-    this.setInfRays();  // cache(x, y, w, y)
     this.paint();
     Meeple.allMeeples.push(this);
   }
@@ -130,19 +128,6 @@ export class Meeple extends Tile {
     return undefined;
   }
 
-  // Meeple
-  /** decorate with influence rays (playerColorn)
-   * @param inf 0 ... n (see also: this.infColor)
-   */
-  override setInfRays(inf = this.hex?.getInfP(this.infColor) ?? this.infP): void {
-    this.removeChildType(InfRays);
-    if (inf !== 0) {
-      this.addChildAt(new InfRays(inf, this.infColor), this.children.length - 1);
-    }
-    const radxy = -TP.hexRad, radwh = 2 * TP.hexRad;
-    this.cache(radxy, radxy, radwh, radwh);
-  }
-
   isOnLine(hex0: Hex, fromHex = this.hex) {
     return !!fromHex.linkDirs.find(dir => fromHex.hexesInDir(dir).includes(hex0));
     // return !!fromHex.linkDirs.find(dir => fromHex.findInDir(dir, hex => hex === hex0));
@@ -167,15 +152,13 @@ export class Meeple extends Tile {
     if (hex.meep) return false;    // no move onto meeple
     if (!hex.isOnMap) return false;
     if (!ctx?.lastShift && this.backSide.visible) return false;
-    // only move in line, to hex with influence:
-    const onLine = this.isOnLine(hex), noInf = hex.getInfT(this.infColor) === 0;
-    if (this.startHex.isOnMap && (!onLine || noInf)) return false;
+    // TODO: Check distance <= 3
     return true;
   }
 
   override isLegalRecycle(ctx: DragContext) {
     if (this.player === GP.gamePlay.curPlayer) return true;
-    if (this.hex.getInfT(GP.gamePlay.curPlayer.color) > this.hex.getInfT(this.infColor)) return true;
+    // if (this.hex.getInfT(GP.gamePlay.curPlayer.color) > this.hex.getInfT(this.infColor)) return true;
     return false;
   }
 
@@ -193,12 +176,6 @@ export class Meeple extends Tile {
     const mark = super.drawEcon(econ);
     mark.visible = false;
     return mark;
-  }
-
-  override dragStart(ctx?: DragContext): void {
-    super.dragStart(ctx);
-    if (this.infP > 0) this.setInfRays(this.infP);   // meeple influence w/o tile
-    this.hex.tile?.setInfRays(this.hex.tile.infP);   // tile influence w/o meeple
   }
 
   override sendHome(): void { // Meeple

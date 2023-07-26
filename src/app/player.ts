@@ -128,7 +128,7 @@ export class Player {
   readonly startDir: HexDir;
 
   // HexMap is populated AFTER Players are created!
-  get initialHex() { // TODO: c/startHex/initialHex/
+  get initialHex() {
     let hex = this.gamePlay.hexMap.centerHex as Hex;
     let path = [this.startDir, this.startDir, this.startDir];
     path.forEach(dir => hex = hex.nextHex(dir));
