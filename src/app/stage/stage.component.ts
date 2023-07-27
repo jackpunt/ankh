@@ -57,9 +57,11 @@ export class StageComponent implements OnInit {
     TP.ghost = urlParams.get('host') || TP.ghost
     TP.gport = Number.parseInt(urlParams.get('port') || TP.gport.toString(10), 10)
     TP.networkUrl = buildURL(undefined)
-    let extstr = urlParams.get('ext')
-    let ext = !!extstr ? extstr.split(',') : []
-    new GameSetup(this.mapCanvasId, ext) // load images; new GamePlay
+    const ngodstr = urlParams.get('n');
+    const ngods = ngodstr ? Number.parseInt(ngodstr) : undefined;
+    const extstr = urlParams.get('gods');
+    const ext = !!extstr ? extstr.split(',') : []
+    new GameSetup(this.mapCanvasId, ext, ngods) // load images; new GamePlay
   }
   // see: stream-writer.setButton
   // static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',

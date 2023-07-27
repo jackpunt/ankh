@@ -7,6 +7,7 @@ import { Player } from "./player";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
+import { selectN } from "./god";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
@@ -25,10 +26,10 @@ export class GameSetup {
    * ngAfterViewInit --> start here!
    * @param canvasId supply undefined for 'headless' Stage
    */
-  constructor(canvasId: string, ext?: string[]) {
+  constructor(canvasId: string, ext?: string[], ngods = 5) {
     stime.fmt = "MM-DD kk:mm:ss.SSS"
     this.stage = makeStage(canvasId, false)
-    Tile.loader.loadImages(() => this.startup(ext));
+    Tile.loader.loadImages(() => this.startup(ext, ngods));
   }
   _netState = " " // or "yes" or "ref"
   set netState(val: string) {
@@ -65,12 +66,12 @@ export class GameSetup {
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param ext Extensions from URL
    */
-  startup(ext: string[] = []) {
+  startup(ext: string[] = [], ngods = 4) {
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
-    const gods = ['Bastet', 'Ra', 'Amun', 'Isis', 'Osiris'];
-
+    const gods = ext.length > 2 ? ext : selectN(ngods);
+    gods.length = Math.min(gods.length, 5);
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
     const gamePlay = new GamePlay(gods, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
