@@ -35,20 +35,13 @@ export namespace H {
   export const ewDirs: EwDir[] = [NE, E, SE, SW, W, NW]; // directions for EwTOPO
   /** includes N,W, suitable for NsTopo */
   export const nsDirs: NsDir[] = [NE, SE, S, SW, NW, N]; // directions for NsTOPO
-  export const dirRot: {[key in HexDir] : number} = { N: 0, NE: 30, E: 90, SE: 150, S: 180, SW: 210, W: 270, NW: 330 }
+  // angles for ewTopo!
+  export const ewDirRot: {[key in HexDir] : number} = { N: 0, NE: 30, E: 90, SE: 150, S: 180, SW: 210, W: 270, NW: 330 }
+  // angles for nwTopo!
+  export const nsDirRot: {[key in HexDir] : number} = { N: 0, NE: 60, E: 90, SE: 120, S: 180, SW: 240, W: 270, NW: 300 }
   export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevEW: {[key in EwDir] : EwDir} = { E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, NE: SW, SE: NW, SW: NE, NW: SE }
-  export const dirAngle: { [key in HexDir]: [number, number] } = {
-     N: [330,  30],
-    NE: [ 30,  90],
-    SE: [ 90, 150],
-     S: [150, 210],
-    SW: [210, 270],
-    NW: [270, 330],
-     E: [ 60, 120],
-     W: [240, 300],
-  }
 
   export const capColor1:   string = "rgba(150,  0,   0, .8)"  // unplayable: captured last turn
   export const capColor2:   string = "rgba(128,  80, 80, .8)"  // protoMove would capture

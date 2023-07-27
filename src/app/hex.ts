@@ -321,7 +321,7 @@ export class Hex2 extends Hex1 {
   }
   /** location of corner between dir0 and dir1; in parent coordinates. */
   cornerPoint(dir0: HexDir, dir1: HexDir) {
-    let d0 = H.dirRot[dir0], d1 = H.dirRot[dir1]
+    let d0 = H.ewDirRot[dir0], d1 = H.ewDirRot[dir1]
     let a2 = (d0 + d1) / 2, h = this.radius
     if (Math.abs(d0 - d1) > 180) a2 += 180
     let a = a2 * H.degToRadians
@@ -329,7 +329,7 @@ export class Hex2 extends Hex1 {
   }
   /** location of edge point in dir; in parent coordinates. */
   edgePoint(dir: HexDir) {
-    let a = H.dirRot[dir] * H.degToRadians, h = this.radius * H.sqrt3_2
+    let a = H.ewDirRot[dir] * H.degToRadians, h = this.radius * H.sqrt3_2
     return new Point(this.x + Math.sin(a) * h, this.y - Math.cos(a) * h)
   }
 }
@@ -773,7 +773,7 @@ export class AnkhMap<T extends Hex> extends SquareMap<T> {
   }
   addTerrain() {
     const newGraphics = (color: string) => {
-      const g = new Graphics().c(), tilt = H.dirRot[HexShape.tilt];
+      const g = new Graphics().c(), tilt = H.ewDirRot[HexShape.tilt];
       return g.s(C.grey).f(color).dp(0, 0, Math.floor(this.radius * 60 / 60), 6, 0, tilt);
     }
     const fix = ([r, c]: hexSpec, color: string) => {
@@ -785,7 +785,8 @@ export class AnkhMap<T extends Hex> extends SquareMap<T> {
     const river = ([row, col, ...e]: hexSpecr, rshape: Shape) => {
       const hex = this[row][col] as any as Hex2, x = hex.x, y = hex.y, r = hex.radius;
       e.forEach((dir: HexDir) => {
-        const [a0, a1] = H.dirAngle[dir];  // 0-degrees is North
+        // 0-degrees is North
+        const a = H.nsDirRot[dir], a0 = a - 30, a1 = a + 30;
         const x0 = x + r * Math.sin(a0 * H.degToRadians);
         const y0 = y - r * Math.cos(a0 * H.degToRadians);
         const x1 = x + r * Math.sin(a1 * H.degToRadians);
@@ -794,10 +795,10 @@ export class AnkhMap<T extends Hex> extends SquareMap<T> {
       })
     }
     if (this.hexC === Hex2 as any) {
-      AnkhMap.fspec.forEach(spec => fix(spec, '#93c47dff'));
-      AnkhMap.dspec.forEach(spec => fix(spec, '#ffe599ff'));
-      AnkhMap.wspec.forEach(spec => fix(spec, '#a4c2f4ff'));
-      const rshape = new Shape(new Graphics().ss(12, 'round', 'round').s('blue'));
+      AnkhMap.fspec.forEach(spec => fix(spec, '#93c47d'));
+      AnkhMap.dspec.forEach(spec => fix(spec, '#ffe599'));
+      AnkhMap.wspec.forEach(spec => fix(spec, '#a4c2f4'));
+      const rshape = new Shape(new Graphics().ss(12, 'round', 'round').s('#90b2f4')); // slightly darker
       AnkhMap.rspec.forEach(spec => river(spec, rshape));
       this.mapCont.infCont.addChild(rshape);
     }
