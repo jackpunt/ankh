@@ -4,15 +4,26 @@ import type { GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { H, HexDir, XYWH } from "./hex-intfs";
 import { Player } from "./player";
-import { HexShape } from "./shapes";
+import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
 import type { StatsPanel } from "./stats";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
 import { God } from "./god";
 //import { TablePlanner } from "./planner";
 
-interface ScoreBox extends Shape {
+interface ScoreShape extends Shape {
   color: string;
+}
+interface AnkhPowerInfo {
+  button: Shape;
+  ankhs: DisplayObject[];
+  radius?: number;
+  name?: string;
+}
+
+interface AnkhPowerCont extends Container {
+  ankhs: DisplayObject[];
+  guardian: number;
 }
 
 /** to own file... */
@@ -126,8 +137,12 @@ export class Table extends EventDispatcher  {
   setToRowCol(cont: Container, row = 0, col = 0) {
     if (!cont.parent) this.scaleCont.addChild(cont);
     const hexC = this.hexMap.centerHex;
-    const { x, y, w, h } = hexC.xywh(undefined, undefined, row, col);
-    this.hexMap.mapCont.hexCont.localToLocal(x, y, cont.parent, cont);
+    const fcol = Math.floor((col)), ecol = fcol - fcol % 2, cresi = col - ecol;
+    const frow = Math.floor((row)), erow = frow - frow % 2, rresi = row - erow;
+    const { x, y, w, h, dxdc, dydr } = hexC.xywh(undefined, undefined, erow, ecol);
+    const xx = x + cresi * dxdc;
+    const yy = y + rresi * dydr;
+    this.hexMap.mapCont.hexCont.localToLocal(xx, yy, cont.parent, cont);
   }
   setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = TP.nHexes, col = -8) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
@@ -286,10 +301,10 @@ export class Table extends EventDispatcher  {
     // background sized for hexMap:
     const { width: rw, height: rh } = hexCont.getBounds();
     const rowh = hexMap.rowHeight, colw = hexMap.colWidth;
-    const bgr: XYWH = { x: 0, y: 0, w: rw + 12 * colw, h: rh + .5 * rowh }
+    const bgr: XYWH = { x: -2 * colw, y: 0, w: rw + 14 * colw, h: rh + .5 * rowh }
     // align center of mapCont(0,0) == hexMap(center) with center of background
-    mapCont.x = (bgr.w - bgr.x) / 2;
-    mapCont.y = (bgr.h - bgr.y) / 2;
+    mapCont.x = bgr.x + (bgr.w) / 2;
+    mapCont.y = bgr.y + (bgr.h) / 2;
     bgr.h += rowh;
 
     this.bgRect = this.setBackground(this.scaleCont, bgr); // bounded by bgr
@@ -299,8 +314,9 @@ export class Table extends EventDispatcher  {
 
     this.homeRowHexes.length = 0;
 
-    this.scaleCont.addChild(this.makeActionCont());
-    this.scaleCont.addChild(this.makeScoreCont());
+    this.makeActionCont();
+    this.makeEventCont();
+    this.makeScoreCont();
     this.makePerPlayer();
 
     this.gamePlay.recycleHex = this.makeRecycleHex(TP.nHexes, TP.nHexes);
@@ -345,9 +361,9 @@ export class Table extends EventDispatcher  {
   }
 
   makePerPlayer() {
-    this.buttonsForPlayer.length = 0; // TODO: maybe deconstruct
+    this.panelForPlayer.length = 0; // TODO: maybe deconstruct
     Player.allPlayers.forEach((p, pIndex) => {
-      this.layoutButtonsAndCounters(p);
+      this.makePlayerPanel(p);
       p.makePlayerBits();
       const colf = (col: number, row: number) => this.colf(pIndex, col, row);
 
@@ -376,44 +392,115 @@ export class Table extends EventDispatcher  {
   }
   readonly winIndForPlayer: Container[] = [];
 
-  readonly buttonsForPlayer: Container[] = [];
-  private contForPlayer(index: number) {
-    const parent = this.scaleCont;
-    const ppt = (dir: HexDir) => {
-      const hex = this.hexMap.getCornerHex(dir) as Hex2;
-      const { x, y } = hex.xywh(); // on hex.cont.parent = hexMap.mapCont.hexCont
-      return hex.cont.parent.localToLocal(x, y, parent);
-    }
-    const cont = new Container()
-    cont.x = ppt([H.W, H.E][index]).x;
-    cont.y = ppt(H.NW).y;
-    cont.visible = false;
-    parent.addChild(cont); // Container for Player's Buttons
-    this.buttonsForPlayer[index] = cont;
+  readonly panelForPlayer: Container[] = [];
+  readonly panelLocs = [[0-.2, -6.2], [3.6, -6.2], [7.5, -6.2], [0-.2, TP.nHexes], [3.6, TP.nHexes]];
+  private contForPlayer(index: number, row = this.panelLocs[index][0], col = this.panelLocs[index][1]) {
+    const cont = new Container();
+    this.setToRowCol(cont, row , col);
+    this.panelForPlayer[index] = cont;
     return cont;
   }
 
   /** per player buttons to invoke GamePlay */
-  layoutButtonsAndCounters(player: Player) {
+  makePlayerPanel(player: Player) {
     const index = player.index;
-    const cont = this.buttonsForPlayer[index] = this.contForPlayer(index);
+    const god = player.god;
+    const panel = this.contForPlayer(index);
+    const ankhPowers = [
+      ['Commanding', 'Inspiring', 'Omnipresent', 'Revered'],  // rank 0
+      ['Resplendent', 'Obelisk', 'Temple', 'Pyramid'],        // rank 1
+      ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
+    ];
+    const { x, y, w, h, dydr } = this.hexMap.centerHex.xywh();
+    const wide = 500, high = dydr * 3.7, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 190;
+    const g = new Graphics().ss(5);
+    const outline = new RectShape({ x: -(brad + gap), y: -(brad + gap), w: wide+2*(brad+3*gap), h: high }, '', god.color, g);
+    panel.addChild(outline);
+    const onClick = (evt: Object, info: AnkhPowerInfo) => {
+      const god = player.god, ankh = info.ankhs.shift();
+      if (!ankh) return;
+      ankh.x = 0; ankh.y = 0;
+      god.ankhPowers.push(info.name);
+      console.log(stime(this, `.onClick: ankhPowers =`), god.ankhPowers, info.button.id);
+      const parent = info.button.parent;
+      const powerCont = parent.parent as AnkhPowerCont;
+      parent.addChild(ankh);
+      parent.stage.update();
+      if (powerCont.guardian === info.ankhs.length) {
+        console.log(stime(this, `.onClick: takeGuardian powerCont =`), powerCont, powerCont.guardian, info.ankhs);
+        // TODO: take Guardian (move to god.stable)
+      }
+    }
+    ankhPowers.forEach((ary, rank) => {
+      const colCont = new Container() as AnkhPowerCont;
+      panel.addChild(colCont);
+      const ankhs = [god.getAnhkToken(), god.getAnhkToken()];
+      ankhs.forEach((ankh, i) => {
+        ankh.x = 30 + i * (2 * brad + gap);
+        ankh.y = 4 * rowh;
+      });
+      colCont.guardian = (rank < 2) ? 0 : 1;
+      colCont.ankhs = ankhs;
+      colCont.addChild(...ankhs);
+      colCont.x = rank * colWide;
+
+      ary.forEach((name, nth) => {
+        const powerLine = new Container();
+        const button = new CircleShape(brad, C.white, );
+        button.on(S.click, onClick as any, this, false, { button, name, ankhs });
+        powerLine.addChild(button);
+        const text = new CenterText(name, brad);
+        text.textAlign = 'left';
+        text.x = brad + gap;
+        powerLine.addChild(text);
+        powerLine.y = nth * rowh;
+        colCont.addChild(powerLine);
+      })
+    });
+    // Stable:
+    const stableCont = new Container();
+    const srad1 = 32, srad2 = 40, dir = (index < 3) ? -1 : 1;
+    const x0 = [wide, srad1 - 2*gap][(1 + dir) / 2];
+    const sgap = 1.25 * srad2;
+    const swide = 2 * (srad1 + srad2 + sgap + sgap);
+    stableCont.y = 5.5 * rowh;
+    panel.addChild(stableCont);
+    const sourceInfo = [srad1, srad1, srad2, srad2, ]; // size for each type: Warrior, G1, G2, G3
+    sourceInfo.forEach((radi, i) => {
+      const g0 = new Graphics().ss(1).sd([5, 5]);
+      const circle = new CircleShape(radi + 1, 'lightgrey', god.color, g0);
+      // circle.graphics.f('').dc(0, 0, radi + 1);
+      circle.x = x0 + dir * i * (radi + sgap);
+      stableCont.addChild(circle);
+    });
+    // Special:
+    const swidth = 200;
+    const specl = god.makeSpecial({ width: swidth, height: srad2 * 2 });
+    specl.y = 5.5 * rowh - srad2;
+    specl.x = ((dir + 1) / 2) * (wide - swide + brad) - (brad / 2); // [(wide-swide-brad/2) , -brad/2, ]
+    specl.x = [ - (brad), wide - swide/2 + (brad / 2), ][(1 + dir) / 2]
+    panel.addChild(specl)
+    // amun special area
+
   }
+
+
   makeButton(color = C.WHITE, rad = 20) {
     const button = new Container();
-    const shape = new Shape();
+    const shape = new CircleShape(rad, color, '');
     button.addChild(shape);
-    shape.graphics.f(color).dc(0, 0, rad);
     shape.mouseEnabled = true;
     return button;
   }
 
   actionPanels: { [index: string]: Container } = {};
-  makeActionCont(x = 60, y = 50) {
+  makeActionCont(row = TP.nHexes - 2, col = TP.nHexes) {
     const np = Player.allPlayers.length, rad = 30, wide = (2 * rad + 5) * (np + 1), rh = 2 * rad + 5;
     console.log(stime(this, `.makeActionCont`), np);
     // TODO: class actionCont, with slots to hold button & each circle/state (number activated)
     // or could use children[] and the color/visiblity of each shape/cont
     const actionCont = new Container()
+    this.setToRowCol(actionCont, row, col);
     const actionRows = [{ id: 'Move' }, { id: 'Summon ' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
     const selectAction = (id: string, button: Container) => {
       this.gamePlay.selectedAction = id;
@@ -437,17 +524,47 @@ export class Table extends EventDispatcher  {
       }
       this.actionPanels[action.id] = rowCont;
     }
-    actionCont.x = x; actionCont.y = y;
     return actionCont;
   }
 
-  makeEventCont() {
+  makeEventCont(row = TP.nHexes + 1.1, col = TP.nHexes) {
     const eventCont = new Container();
-
+    this.setToRowCol(eventCont, row, col);
+    const events = [
+      'claim', 'claim', 'claim', 'battle',
+      'split', 'claim', 'claim', 'battle',
+      'split', 'claim', 'claim', 'battle', 'merge',
+      'split', 'claim', 'claim', 'battle', 'redzone',
+      'claim', 'battle',
+    ];
+    const x0 = 0, y = 0, rad = 20, gap = 5, dx = 2 * rad + gap;
+    let cx = 0;
+    events.forEach((evt, nth) => {
+      const icon = new Container();
+      const k = evt.substring(0, 1).toUpperCase();
+      const shape = new CircleShape(rad, 'rgb(240,240,240)');
+      const text = new CenterText(k, rad * 1.8); text.y += 2;
+      const row = Math.min(1, Math.floor(cx / 8))
+      icon.y = row * dx;
+      icon.x = x0 + ((row == 0) ? cx : cx - 8 ) * dx;
+      cx += 1;
+      if (k === 'M' || k === 'R') {
+        icon.y += dx;
+        cx -= 1;
+        shape.graphics.c().f('brown').dr(-rad, -rad * 3 - 2 * gap, 2 * rad, 4 * rad + 2 * gap);
+      } else {
+        this.eventCells.push(icon);
+      }
+      icon.addChild(shape);
+      icon.addChild(text);
+      eventCont.addChild(icon);
+    })
     return eventCont;
   }
+  eventCells: Container[] = [];
+
   readonly emptyColor = 'rgb(240,240,240)';
-  makeScoreCont(row = TP.nHexes + 1.3, col = -6, np = Player.allPlayers.length) {
+  makeScoreCont(row = TP.nHexes + 1.3, col = -5, np = Player.allPlayers.length) {
     const redzone = 'rgb(230,100,100)', empty = this.emptyColor, win = C.lightgreen;
     const scoreCont = new Container()
     this.setToRowCol(scoreCont, row, col);
@@ -460,7 +577,7 @@ export class Table extends EventDispatcher  {
     scoreCont.addChild(bg2);
     for (let cn = 0; cn < 32; cn++) {   // a value for 'score'
       for (let pn = 0; pn < np; pn++) { // rank of player at that score
-        const box = new Shape() as ScoreBox;
+        const box = new Shape() as ScoreShape;
         box.x = cn * dx;
         box.y = ym - pn * h;
         scoreCont.addChild(box);
@@ -471,8 +588,8 @@ export class Table extends EventDispatcher  {
     }
     return scoreCont;
   }
-  scoreCells: ScoreBox[][] = [[]];
-  drawBox(box: ScoreBox, color: string) {
+  scoreCells: ScoreShape[][] = [[]];
+  drawBox(box: ScoreShape, color: string) {
     const w = 36, h = 20, x = -w/2, y = -h/2, rz = 20;
     box.color = color;
     box.graphics.f(color).s(C.black).dr(x, y, w, h);
@@ -908,14 +1025,11 @@ export class Table extends EventDispatcher  {
   }
 
   /** put a Rectangle Shape at (0,0) with XYWH bounds as given */
-  setBackground(parent: Container, bounds: XYWH, bgColor: string = TP.bgColor) {
-    let bgRect = new Shape(); bgRect[S.Aname] = "BackgroundRect"
-    if (!!bgColor) {
-      // specify an Area that is Dragable (mouse won't hit "empty" space)
-      bgRect.graphics.f(bgColor).r(bounds.x, bounds.y, bounds.w, bounds.h);
-      parent.addChildAt(bgRect, 0);
-      //console.log(stime(this, ".makeScalableBack: background="), background);
-    }
+  setBackground(parent: Container, bounds: XYWH, bgColor = TP.bgColor) {
+    // specify an Area that is Dragable (mouse won't hit "empty" space)
+    const bgRect = new RectShape(bounds, bgColor, '');
+    bgRect[S.Aname] = "BackgroundRect"
+    parent.addChildAt(bgRect, 0);
     return bgRect
   }
   /**

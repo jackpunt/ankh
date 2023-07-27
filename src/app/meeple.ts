@@ -3,7 +3,7 @@ import { Shape, Text } from "@thegraid/easeljs-module";
 import { GP, NamedObject } from "./game-play";
 import type { Hex, Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { C1, InfRays, Paintable } from "./shapes";
+import { C1, Paintable } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, TP, criminalColor } from "./table-params";
 import { Civic, Tile } from "./tile";

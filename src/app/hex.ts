@@ -59,19 +59,23 @@ export class Hex {
    * @param ewTopo [true] suitable for ewTopo (long axis of hex is N/S)
    * @param row [this.row]
    * @param col [this.col]
-   * @returns \{ x, y, w, h } of cell at [row, col]
+   * @returns \{ x, y, w, h, dxdc, dydr } of cell at [row, col]
    */
   xywh(radius = TP.hexRad, ewTopo = true, row = this.row, col = this.col) {
     if (ewTopo) { // tiltDir = 'NE'; tilt = 30-degrees; nsTOPO
       const h = 2 * radius, w = radius * H.sqrt3;  // h height of hexagon (long-vertical axis)
-      const x = (col + Math.abs(row % 2) / 2) * w;
-      const y = row * 1.5 * radius;   // dist between rows
-      return { x, y, w, h }
+      const dxdc = w;
+      const dydr = 1.5 * radius;
+      const x = (col + Math.abs(Math.floor(row) % 2) / 2) * dxdc;
+      const y = (row) * dydr;   // dist between rows
+      return { x, y, w, h, dxdc, dydr }
     } else { // tiltdir == 'N'; tile = 0-degrees; ewTOPO
       const w = 2 * radius, h = radius * H.sqrt3 // radius * 1.732
-      const x = (col) * 1.5 * radius;
-      const y = (row + Math.abs(col % 2) / 2) * h;
-      return { x, y, w, h }
+      const dxdc = 1.5 * radius;
+      const dydr = h;
+      const x = (col) * dxdc;
+      const y = (row + Math.abs(Math.floor(col) % 2) / 2) * dydr;
+      return { x, y, w, h, dxdc, dydr }
     }
   }
 

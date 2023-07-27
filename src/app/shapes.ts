@@ -44,6 +44,24 @@ export class HexShape extends Shape implements Paintable {
     return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, tilt);
   }
 }
+export class CircleShape extends Shape {
+  constructor(rad = 30, fillc = C.white, strokec = C.black, g0?: Graphics) {
+    super(g0);
+    const g = this.graphics;
+    (fillc ? g.f(fillc) : g.ef());
+    (strokec ? g.s(strokec) : g.es());
+    g.dc(0, 0, rad);
+  }
+}
+export class RectShape extends Shape {
+  constructor({ x = 0, y = 0, w = 30, h = 30 }, fillc = C.white, strokec = C.black, g0?: Graphics) {
+    super(g0);
+    const g = this.graphics;
+    if (fillc) g.f(fillc);
+    if (strokec) g.s(strokec);
+    g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+  }
+}
 
 /** lines showing influence of a Tile. */
 export class InfRays extends Shape {

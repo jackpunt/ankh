@@ -418,7 +418,7 @@ export class GamePlay extends GamePlay0 {
 
 
   override endTurn2(): void {
-    this.table.buttonsForPlayer[this.curPlayerNdx].visible = false;
+    this.table.panelForPlayer[this.curPlayerNdx].visible = false;
     super.endTurn2();   // shift(), roll(); totalVps += vps
   }
 
@@ -426,7 +426,7 @@ export class GamePlay extends GamePlay0 {
     super.setNextPlayer(plyr); // update player.coins
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...
-    this.table.buttonsForPlayer[this.curPlayerNdx].visible = true;
+    this.table.panelForPlayer[this.curPlayerNdx].visible = true;
     this.table.showNextPlayer(); // get to nextPlayer, waitPaused when Player tries to make a move.?
     this.hexMap.update();
     this.startTurn();

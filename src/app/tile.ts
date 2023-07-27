@@ -3,7 +3,7 @@ import { Bitmap, Container, DisplayObject, MouseEvent, Shape, Text } from "@theg
 import { GP } from "./game-play";
 import { Hex, Hex1, Hex2, HexMap } from "./hex";
 import type { Player } from "./player";
-import { BalMark, C1, CapMark, CenterText, HexShape, InfRays, InfShape, Paintable, TileShape } from "./shapes";
+import { BalMark, C1, CapMark, CenterText, HexShape, InfShape, Paintable, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, playerColorRecord, playerColorsC } from "./table-params";
 

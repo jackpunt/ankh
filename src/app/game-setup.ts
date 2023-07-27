@@ -79,7 +79,7 @@ export class GameSetup {
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     if (this.stage.canvas) {
-      const statsx = -300, statsy = 30
+      const statsx = -380, statsy = 30
       const statsPanel = this.makeStatsPanel(gamePlay.gStats, table.scaleCont, statsx, statsy)
       table.statsPanel = statsPanel
       const guiy = statsPanel.y + statsPanel.ymax + statsPanel.lead * 2
