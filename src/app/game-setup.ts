@@ -4,7 +4,6 @@ import { EBC, PidChoice } from "./choosers";
 import { GamePlay } from "./game-play";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { StatsPanel, TableStats } from "./stats";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
@@ -79,36 +78,12 @@ export class GameSetup {
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     if (this.stage.canvas) {
-      const statsx = -380, statsy = 30
-      const statsPanel = this.makeStatsPanel(gamePlay.gStats, table.scaleCont, statsx, statsy)
-      table.statsPanel = statsPanel
-      const guiy = statsPanel.y + statsPanel.ymax + statsPanel.lead * 2
       console.groupCollapsed('initParamGUI')
-      this.paramGUIs = this.makeParamGUI(table, table.scaleCont, statsx, guiy) // modify TP.params...
-      const [gui, gui2] = this.paramGUIs
       // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
       console.groupEnd()
     }
     table.startGame(); // allTiles.makeDragable(); placeStartTowns(); setNextPlayer();
     return gamePlay
-  }
-  /** reporting stats. values also used by AI Player. */
-  makeStatsPanel(gStats: TableStats, parent: Container, x: number, y: number): StatsPanel {
-    let panel = new StatsPanel(gStats) // a ReadOnly ParamGUI reading gStats [& pstat(color)]
-    panel.makeParamSpec("nCoins")     // implicit: opts = { chooser: StatChoice }
-    // panel.makeParamSpec("nInf")
-    // panel.makeParamSpec("nAttacks")
-    // panel.makeParamSpec("nThreats")
-    // panel.makeParamSpec("dMax")
-    panel.makeParamSpec("score", [], {name: `score: ${TP.nVictory}`})
-    panel.makeParamSpec("sStat", [1])
-
-    parent.addChild(panel)
-    panel.x = x
-    panel.y = y
-    panel.makeLines()
-    panel.stage.update()
-    return panel
   }
   /** affects the rules of the game & board
    *
@@ -123,39 +98,11 @@ export class GameSetup {
     const setSize = (dpb: number, dop: number) => { restart && this.restart.call(this, dpb, dop) };
     gui.makeParamSpec("nh", [6, 7, 8, 9, 10, 11], { fontColor: "red" }); TP.nHexes;
     gui.makeParamSpec("mh", [0, 1, 2, 3], { fontColor: "red" }); TP.mHexes;
-    gui.makeParamSpec("nCivics", [4, 3, 2, 1], { fontColor: "green" }); TP.nCivics;
-    gui.makeParamSpec("auctionSlots", [5, 4, 3], { fontColor: "green" }); TP.auctionSlots;
-    gui.makeParamSpec("auctionMerge", [0, 1, 2, 3], { fontColor: "green" }); TP.auctionMerge;
     gui.makeParamSpec("colorScheme", schemeAry, { chooser: CycleChoice, style: { textAlign: 'center' } });
 
     gui.spec("nh").onChange = (item: ParamItem) => { setSize(item.value, TP.mHexes) }
     gui.spec("mh").onChange = (item: ParamItem) => { setSize(TP.nHexes, item.value) }
-    gui.spec('auctionSlots').onChange = (item: ParamItem) => {
-      gui.setValue(item);
-      TP.preShiftCount = Math.max(1, TP.auctionSlots - 2);
-      restart && this.restart();
-    }
-    gui.spec('auctionMerge').onChange = (item: ParamItem) => {
-      if (item.value > TP.auctionSlots) return;
-      gui.setValue(item);
-      restart && this.restart();
-    }
-    const infName = "inf:cap"
-    gui.makeParamSpec(infName, ['1:1', '1:0', '0:1', '0:0'], { name: infName, target: table, fontColor: 'green' })
-    const infSpec = gui.spec(infName);
-    table[infSpec.fieldName] = infSpec.choices[0].text
-    infSpec.onChange = (item: ParamItem) => {
-      const v = item.value as string
-      table.showInf = v.startsWith('1')
-      //table.showSac = v.endsWith('1')
-      table.showCap = v.endsWith('1')
-    }
-    gui.spec("colorScheme").onChange = (item: ParamItem) => {
-      gui.setValue(item)
-      Tile.allTiles.forEach(tile => { tile.paint() }); // tile.player or C1.grey
-      this.gamePlay.paintForPlayer();  // re-paint ActionCont tiles
-      this.gamePlay.hexMap.update()
-    }
+
     parent.addChild(gui)
     gui.x = x // (3*cw+1*ch+6*m) + max(line.width) - (max(choser.width) + 20)
     gui.y = y
@@ -173,14 +120,6 @@ export class GameSetup {
     gui.makeParamSpec("log", [-1, 0, 1, 2], { style: { textAlign: 'right' } }); TP.log
     gui.makeParamSpec("maxPlys", [1, 2, 3, 4, 5, 6, 7, 8], { fontColor: "blue" }); TP.maxPlys
     gui.makeParamSpec("maxBreadth", [5, 6, 7, 8, 9, 10], { fontColor: "blue" }); TP.maxBreadth
-    gui.makeParamSpec('infOnCivic', [0, 1]); TP.infOnCivic;
-    // gui.makeParamSpec("nPerDist", [2, 3, 4, 5, 6, 8, 11, 15, 19], { fontColor: "blue" }); TP.nPerDist
-    // gui.makeParamSpec("pWeight", [1, .99, .97, .95, .9]) ; TP.pWeight
-    // gui.makeParamSpec("pWorker", [true, false], { chooser: BC }); TP.pWorker
-    // gui.makeParamSpec("pPlaner", [true, false], { chooser: BC, name: "parallel" }); TP.pPlaner
-    // gui.makeParamSpec("pBoards", [true, false], { chooser: BC }); TP.pBoards
-    // gui.makeParamSpec("pMoves",  [true, false], { chooser: BC }); TP.pMoves
-    // gui.makeParamSpec("pGCM",    [true, false], { chooser: BC }); TP.pGCM
     parent.addChild(gui)
     gui.x = x; gui.y = y
     gui.makeLines()

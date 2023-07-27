@@ -8,11 +8,10 @@ import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
 import { CenterText } from "./shapes";
-import { GameStats, TableStats } from "./stats";
 import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerColorRecord, playerColors, } from "./table-params";
-import { BagTile, MapTile, Tile } from "./tile";
+import { MapTile, Tile } from "./tile";
 import { EzPromise } from "@thegraid/ezpromise";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
@@ -57,9 +56,7 @@ export class GamePlay0 {
 
   readonly hexMap = new SquareMap<Hex2>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
-  readonly gStats: GameStats             // 'readonly' (set once by clone constructor)
   readonly redoMoves = []
-  readonly auctionTiles: BagTile[] = []     // per game
 
   logWriterLine0() {
     let time = stime('').substring(6,15)
@@ -255,14 +252,12 @@ export class GamePlayD extends GamePlay0 {
 /** GamePlay with Table & GUI (KeyBinder, ParamGUI & Dragger) */
 export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
-  declare readonly gStats: TableStats // https://github.com/TypeStrong/typedoc/issues/1597
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
   constructor(gods: string[], table: Table, public gameSetup: GameSetup) {
     super(gods);            // hexMap, history, gStats...
     GP.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;
-    this.gStats = new TableStats(this, table); // upgrade to TableStats
     if (this.table.stage.canvas) this.bindKeys();
   }
 

@@ -107,7 +107,6 @@ export class BonusMark extends Container {
 
 class TileLoader {
   Uname = ['Univ0', 'Univ1'];
-  Monu = new Array(TP.inMarket['Monument']).fill(1).map((v, k) => `Monument${k}`);
   imageMap = new Map<string, HTMLImageElement>();
   aliases = { Monument1: 'arc_de_triomphe3', Monument2: 'Statue-of-liberty' };
   fromAlias(names: string[]) {
@@ -531,91 +530,9 @@ export class Token extends Tile {
 
 }
 
-/** Tiles that are placed in the TileBag (AuctionTile & EvalTile). */
-export interface BagTile extends Tile {
-  sendToBag(): void; //     GP.gamePlay.shifter.tileBag.unshift(this);
-}
-
 /** Tiles that can be played to the Map: AuctionTile, Civic, Monument, BonusTile */
 export class MapTile extends Tile {
   override dragStart(ctx: DragContext): void {
     super.dragStart(ctx);
-  }
-}
-
-// Leader.civicTile -> Civic; Civic does not point to its leader...
-export class Civic extends MapTile {
-  constructor(player: Player, id: string, image: string, inf = 1, vp = 1, cost = TP.tileCost(Civic, 2), econ = 1) {
-    super(`${id}:${player.index}`, player, inf, vp, cost, econ); // CivicTile
-    this.player = player;
-    this.loanLimit = 10;
-    this.addImageBitmap(image);
-  }
-
-  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Civic
-    if (!super.isLegalTarget(hex, ctx)) return false; // check cost & influence (& balance)
-    if (!hex.isOnMap) return false;
-    return true;
-  }
-
-  override sendHome() {   // Civic - put under Leader
-    super.sendHome();
-    this.parent.addChildAt(this, 1); // above HexShape, under meeple
-  }
-}
-
-type TownSpec = string
-
-export class TownRules {
-  static rulesText: Array<Array<TownSpec>> = [
-    ['+1 Actn, +1 Coins  (fast start)', '+6 Econ  (fast start)'], // 6 Econ buys Police/Mayor
-    ['+1 TVP per R/B in 37 meta-hex around TC, -2 TVP per other hex', // (compact) ~23 (4-Civic, Lake, Bank, PS)
-     '+1 TVP per R/B*, R/B* are Level-1 (compact)'], // -1 inflR on R/B*
-    ['+4 TVP per Civic-adj-Civic', '+1 per edge of Civic meta-triad'], // 12-20 TVP (dense), 6,12,24 (tactical/spread)
-    ['+2 TVP per tile in longest strip', '+4 TVP per strip >= length 5 (strip)'], // 10-20 ; 12-24
-    ['+3 TVP per business triad', '+3 per resi triad'], // 18-27 & Banks!; more R, but Lakes
-    ['+10 TVP per business r-hex', '+10 per residential r-hex (hexes)'], // 6 in ring
-    ['+1 TVP per Police & Station & Prisoner & Threat (police state)'],  // threats at EoG (also regular prisoner points)
-    ['+24 TVP, -1 per Police & Station & Police Action (libertarian)'], // -1 everytime you build/recruit!
-    ['+1 TVP, +1 Coin per Criminal hired', '+1 TVP for each tile/meep destroyed (crime boss)'], //
-  ];
-  rulesBag: TownSpec[] = [];
-  fillRulesBag() {
-    this.rulesBag = TownRules.rulesText.slice(0)[0];
-  }
-  selectOne(bag = this.rulesBag) {
-    return bag.splice(Math.floor(Math.random() * bag.length), 1);
-  }
-  static inst = new TownRules();
-}
-
-export class TownStart extends Civic {
-  override get fB() { return 1; } // TS
-  override get fR() { return 1; } // TS
-
-  rule: TownSpec;
-  constructor(player: Player) {
-    super(player, 'TS', 'TownStart')
-  }
-}
-
-export class Courthouse extends Civic {
-  constructor(player: Player) {
-    super(player, 'CH', 'Courthouse')
-  }
-}
-
-export class University extends Civic {
-  override get fB() { return 1; } // Univ
-  override get fR() { return 1; } // Univ
-  constructor(player: Player) {
-    super(player, 'U', Tile.loader.Uname[player.index])
-  }
-}
-
-export class Church extends Civic {
-  override get fR() { return 1; } // Church
-  constructor(player: Player) {
-    super(player, 'T', 'Temple')
   }
 }

@@ -6,7 +6,7 @@ import type { Player } from "./player";
 import { C1, Paintable } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, TP, criminalColor } from "./table-params";
-import { Civic, Tile } from "./tile";
+import { Tile } from "./tile";
 import { UnitSource } from "./tile-source";
 
 class MeepleShape extends Shape implements Paintable {
@@ -184,62 +184,6 @@ export class Meeple extends Tile {
   }
 }
 
-export class Leader extends Meeple {
-  civicTile: Civic;               // Leader deploys to civicTile & extra VP when on civicTile
-
-  // VP bonus when Leader is on CivicTile
-  override get vp()   { return super.vp   + (this.civicTile !== this.hex?.tile ? 0 : TP.vpOnCivic); }
-  // InfP bonus when Leader is on CivicTile [if enabled by TP.infOnCivic]
-  override get infP() { return super.infP + (this.civicTile !== this.hex?.tile ? 0 : TP.infOnCivic); }
-
-  constructor(tile: Civic, abbrev: string) {  // Leader(name, player, inf, vp, cost, econ)
-    super(`${abbrev}:${tile.player.index}`, tile.player, 1, 1, TP.leaderCost, TP.leaderEcon);
-    this.civicTile = tile;
-    this.addChild(this.nameText); // on top
-    this.paint();
-    this.markCivicWithLetter();
-  }
-
-  markCivicWithLetter(civic = this.civicTile) {
-    const letterText = new Text(this.Aname.substring(0, 1), F.fontSpec(civic.radius / 2));
-    letterText.visible = true;
-    letterText.textAlign = 'center';
-    letterText.y -= civic.radius * .75;
-    civic.addChild(letterText);
-    civic.paint();
-  }
-
-  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Leader
-    if (!super.isLegalTarget(hex, ctx)) return false;
-    if (!this.hex.isOnMap && (hex !== this.civicTile.hex)) return false; // deploy ONLY to civicTile.
-    return true
-  }
-
-}
-export class Mayor extends Leader {
-  constructor(tile: Civic) {
-    super(tile, 'M')
-  }
-}
-
-export class Judge extends Leader {
-  constructor(tile: Civic) {
-    super(tile, 'J')
-  }
-}
-
-export class Chancellor extends Leader {
-  constructor(tile: Civic) {
-    super(tile, 'C')
-  }
-}
-
-export class Priest extends Leader {
-  constructor(tile: Civic) {
-    super(tile, 'P')
-  }
-}
-
 class SourcedMeeple extends Meeple {
 
   static makeSource0<TS extends UnitSource<SourcedMeeple>, T extends SourcedMeeple>(stype: new(type, p, hex) => TS, type: new(p: Player, n: number) => T, player: Player, hex: Hex2, n = 0) {
@@ -277,118 +221,5 @@ class SourcedMeeple extends Meeple {
     const source = this.source;
     source.availUnit(this);
     if (!source.hex.meep) source.nextUnit();
-  }
-}
-
-export class Police extends SourcedMeeple {
-  private static source: UnitSource<Police>[] = [];
-
-  static makeSource(player: Player, hex: Hex2, n = TP.policePerPlayer) {
-    return SourcedMeeple.makeSource0(UnitSource, Police, player, hex, n);
-  }
-
-  // Police
-  constructor(player: Player, serial: number) {
-    super(Police.source[player.index], `P-${serial}`, player, 1, 0, TP.policeCost, TP.policeEcon);
-  }
-  override paint(pColor = this.player?.color, colorn = pColor ? TP.colorScheme[pColor] : C1.grey) {
-    this.paintRings(colorn, C.briteGold, 4, 4);
-  }
-
-  override isLegalTarget(hex: Hex1, ctx?: DragContext) { // Police
-    if (!super.isLegalTarget(hex, ctx)) return false;
-    if (this.hex === this.source.hex && !(hex.tile.player === this.player)) return false;
-    return true;
-  }
-}
-
-export class CriminalSource extends UnitSource<Criminal> {
-  override availUnit(unit: Criminal): void {
-    super.availUnit(unit);
-    unit.autoCrime = false;
-    unit.paint();
-  }
-  get hexMeep() { return this.hex.meep as Criminal; }
-}
-
-/**
- * Criminal, Barbarian, Insurgent, Looter, Rioter...
- *
- * They swarm and destroy civil and economic resources:
- * if negative influence exceeds positive influence on hex, meep or tile is removed.
- *
- * Owned & Operated by Player, to destroy Tiles of the opposition.
- *
- * if autoCrime, then owning Player is not charged for econ cost.
- */
-export class Criminal extends SourcedMeeple {
-  private static source: CriminalSource[] = [];
-
-  static makeSource(player: Player, hex: Hex2, n = TP.criminalPerPlayer) {
-    return Criminal.source[player.index] = SourcedMeeple.makeSource0(CriminalSource, Criminal, player, hex, n);
-  }
-
-  autoCrime = false;  // set true for zero-econ for this unit.
-
-  override get econ(): number { return this.autoCrime ? 0 : super.econ; }
-
-  constructor(player: Player, serial: number) {
-    super(Criminal.source[player.index], `C-${serial}`, player, 1, 0, TP.criminalCost, TP.criminalEcon)
-  }
-
-  override get infColor(): PlayerColor { return criminalColor; }
-
-  override paint(pColor = this.player?.color, colorn = pColor ? TP.colorScheme[pColor] : C1.grey) {
-    this.paintRings(colorn, C.black, ...this.autoCrime ? [4, 4]: [2, 3]);
-  }
-
-  override moveTo(hex: Hex1) {
-    if (this.hex === this.source.hex && this.autoCrime) this.paint();
-    const toHex = super.moveTo(hex);
-    const curPlayer = GP.gamePlay.curPlayer;
-    if (toHex === GP.gamePlay.recycleHex && this.player !== curPlayer) {
-    }
-    return toHex;
-  }
-
-  private get startAutoCrime() { return this.autoCrime && (this.startHex === this.source.hex); }
-
-  override faceUp(up?: boolean): void {
-    const sac = this.startAutoCrime; // before faceUp changes startHex
-    super.faceUp(up === false ? sac : up);
-    if (up !== undefined && sac) this.startHex = this.source.hex; // until next turn (up == undefined)
-  }
-
-  override isOnLine(hex: Hex): boolean {
-    return this.startAutoCrime ? true : super.isOnLine(hex);
-  }
-
-  override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean { // Criminal
-    if (!super.isLegalTarget(hex, ctx)) return false;
-    const plyr = this.player ?? GP.gamePlay.curPlayer; // owner or soon-to-be owner
-    // must NOT be on or adj to plyr's Tile:
-    if (hex.tile?.player === plyr) return false;
-    if (hex.findLinkHex(hex => hex.tile?.player === plyr)) return false;
-    // if fromSource, must be to empty cell:
-    if (this.startHex === this.source.hex && hex.tile) return false;
-    // must be on or adj to otherPlayer Tile OR aligned Criminal:
-    if (hex.tile?.player && hex.tile.player !== plyr) return true;
-    const sac = this.startAutoCrime;
-    if (hex.findLinkHex(adj =>
-      (adj.tile?.player && adj.tile.player !== plyr) ||
-      ((adj.meep instanceof Criminal) && adj.meep.player === plyr) && (sac ? adj.meep !== this : true))
-      ) return true;
-    return false;
-  }
-
-  override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
-    if (this.isLegalRecycle(ctx)) return false;
-    if (!ctx?.lastShift && player !== this.player) return "not your criminal";
-    if (!ctx?.lastShift && this.backSide.visible) return "already moved"; // no move if not faceUp
-    return undefined;
-  }
-  // don't 'auto-unmove' Criminals (without lastShift)
-  override get canAutoUnmove(): boolean {
-    return false;
   }
 }

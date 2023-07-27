@@ -1,6 +1,7 @@
 import { C, F, WH } from "@thegraid/common-lib";
 import { Container, Shape, Text } from "@thegraid/easeljs-module";
 import { CenterText, CircleShape } from "./shapes";
+import { TP } from "./table-params";
 
 export class God {
   static gods = new Map<string, God>();
@@ -15,7 +16,7 @@ export class God {
   }
   ankhPowers: string[] = [];
 
-  radius = 20;
+  radius = TP.anhkRad;
   getAnhkToken(rad = this.radius) {
     const cont = new Container();
     const shape = new CircleShape(rad, this.color, );

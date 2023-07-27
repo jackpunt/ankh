@@ -5,11 +5,12 @@ import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { H, HexDir, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
-import type { StatsPanel } from "./stats";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
 import { God } from "./god";
 //import { TablePlanner } from "./planner";
+
+function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
 
 interface ScoreShape extends Shape {
   color: string;
@@ -98,7 +99,6 @@ export class Table extends EventDispatcher  {
   static stageTable(obj: DisplayObject) {
     return (obj.stage as StageTable).table
   }
-  statsPanel: StatsPanel;
   gamePlay: GamePlay;
   stage: Stage;
   scaleCont: Container
@@ -315,10 +315,11 @@ export class Table extends EventDispatcher  {
     this.hexMap.update();
     // position turnLog & turnText
     {
-      const parent = this.scaleCont, n = TP.nHexes;
+      const parent = this.scaleCont, n = TP.nHexes + 2;
       const lhex = this.hexMap.getCornerHex('SW');
       let rhex = lhex.links['N'] as Hex2;
-      let rhpt = rhex.cont.parent.localToLocal(rhex.x - (n + 1) * this.hexMap.colWidth, rhex.y, parent)
+      const {x, y, w, h, dxdc, dydr } = this.hexMap.centerHex.xywh();
+      let rhpt = rhex.cont.parent.localToLocal(rhex.x - n * dxdc, rhex.y, parent)
       this.bagLog.x = rhpt.x; this.bagLog.y = rhpt.y - this.turnLog.height(1);;
       this.turnLog.x = rhpt.x; this.turnLog.y = rhpt.y;
       this.textLog.x = rhpt.x; this.textLog.y = rhpt.y + this.turnLog.height(Player.allPlayers.length + 1);
@@ -356,16 +357,6 @@ export class Table extends EventDispatcher  {
       this.makePlayerPanel(p);
       p.makePlayerBits();
       const colf = (col: number, row: number) => this.colf(pIndex, col, row);
-
-      let col0 = -4;
-      const leaderHexes = p.allLeaders.map((meep, ndx) => this.homeRowHex(meep.Aname, colf(ndx + col0, -1)));
-      // place [civic/leader, academy/police] meepleHex on Table/Hex (but not on Map)
-      this.leaderHexes[pIndex] = leaderHexes;
-      p.allLeaders.forEach((meep, i) => {
-        const homeHex = meep.homeHex = meep.civicTile.homeHex = leaderHexes[i];
-        meep.moveTo(homeHex);
-        meep.civicTile.moveTo(homeHex);
-      })
 
       {
         // Win indicators:
@@ -484,10 +475,14 @@ export class Table extends EventDispatcher  {
 
   }
 
-  makeButton(color = C.WHITE, rad = 20) {
+  makeButton(color = C.WHITE, rad = 20, c?: string) {
     const button = new Container();
     const shape = new CircleShape(rad, color, '');
     button.addChild(shape);
+    if (c) {
+      const t = new CenterText(c, rad); t.y += 2;
+      button.addChild(t);
+    }
     shape.mouseEnabled = true;
     return button;
   }
@@ -508,21 +503,24 @@ export class Table extends EventDispatcher  {
       button.mouseEnabled = false;
       button.stage.update();
     }
-    for (let rn = 0; rn < actionRows.length; rn++) {
-      const action = actionRows[rn], nc = np + 2 + (action.dn ?? 0), dx = wide/(nc-1), id = action.id;
+    //for (let rn = 0; rn < actionRows.length; rn++) {
+    actionRows.forEach((action, rn) => {
+      const nc = np + 2 + (action.dn ?? 0), dx = wide/(nc-1), id = action.id;
       const rowCont = new Container();
       rowCont.y = rn * rh;
       actionCont.addChild(rowCont);
+      const k = firstChar(action.id);
       for (let cn = 0; cn < nc; cn++) {
-        const color = C.lightgrey;
-        const button = this.makeButton(color, rad);
+        const color = (cn < nc - 1) ? C.lightgrey : C.white;
+        const t = (cn < nc - 1) ? k : 'E';
+        const button = this.makeButton(color, rad, t);
         button.x = cn * dx;
         rowCont.addChild(button);
         if (cn == nc - 1) { button['isEvent'] = true; }
         button.on(S.click, (evt: Object) => selectAction(id, button));
       }
       this.actionPanels[action.id] = rowCont;
-    }
+    });
     return actionCont;
   }
 
@@ -536,11 +534,11 @@ export class Table extends EventDispatcher  {
       'split', 'claim', 'claim', 'battle', 'redzone',
       'claim', 'battle',
     ];
-    const x0 = 0, y = 0, rad = 20, gap = 5, dx = 2 * rad + gap;
+    const x0 = 0, y = 0, rad = TP.anhkRad, gap = 5, dx = 2 * rad + gap;
     let cx = 0;
     events.forEach((evt, nth) => {
       const icon = new Container();
-      const k = evt.substring(0, 1).toUpperCase();
+      const k = firstChar(evt);
       const shape = new CircleShape(rad, 'rgb(240,240,240)');
       const text = new CenterText(k, rad * 1.8); text.y += 2;
       if (Math.floor(cx) === 8) cx = Math.floor(cx);

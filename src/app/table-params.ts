@@ -19,50 +19,8 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
   return `${scheme}://${host}.${domain}:${port}${path}`
 }
 export class TP {
-  // negative Econ is charged as cost when recruited.
-  static leaderEcon = -6;
-  static policeEcon = -3;
-  static criminalEcon = -3;
-  // Meeples: pay with econ; no inf cost, place in Civic/PStation, or crime zone.
-  static leaderCost = 0; // increased by [bonus('star') + costInc] == 1 + -leaderEcon
-  static policeCost = 0;
-  static criminalCost = 0;
-  static econForCrime = 6;
-  static econForEvents = 6;
-
-  static eventScale = 1.5;
-  static allowMultiEvent = false;
-  static anyPlayerAdj = true;
-  static bankAdjBank = false;
-  static nCivics = 4;
-  static vpOnCivic = 1;
-  static infOnCivic = 0;
-  static maxCivics = 4;
-  static auctionMerge = 0;
-  static auctionSlots = 5;
-  static reserveSlots = 1;
-  static nResaDraw = 3;
-  static nPolicySlots = 4;
-  static preShiftCount = Math.max(1, TP.auctionSlots - 2);
-  static alwaysShiftPolicy = true;
-  static resiPerPlayer = 11
-  static busiPerPlayer = 9;
-  static lakePerPlayer = 3;
-  static bankPerPlayer = 3;
-  static pstaPerPlayer = 3;
-  static eventsPerPlayer = 3;
-  static policyPerPlayer = 3;
-  static autoCrimePerBag = 1 / 6;   // 1 in 6 --> 1 in 7;
-  static bonusPerType = 3; // 4 types
-  static bonusOnBoard = 4;
-  static inMarket = { Busi: 2, Resi: 2, Monument: 3 } as const;
-  // 58 Baggable Tiles + 4 Civic Tiles per player.
-  static criminalPerPlayer = 4;
-  static policePerPlayer = 3;
+  static anhkRad = 20;
   static textLogLines = 6;
-  static tileCosts = { Lake: 2, Bank: 2, PS: 2 }
-  static tileCost(type: Constructor<Object>, def = 1) { return TP.tileCosts[type.name] ?? def }
-
   static placeAdjacent = true;
   static alwaysShift = false;
   static parallelAttack = true;  // true --> N intersects S
@@ -94,8 +52,6 @@ export class TP {
   static nDistricts = 1;
   static nVictory = 3  // number of Colony to win
   static tHexes = TP.ftHexes(this.mHexes) * TP.ftHexes(this.nHexes)
-  static nMinControl  = (TP.nHexes <= 1) ? 1 : TP.nHexes + 1 // [1, 1, 3, 4, 5, ...]
-  static nDiffControl = (TP.nHexes <= 1) ? 0 : TP.nHexes - 1 // [0, 0, 1, 2, 3, ...]
   static hexRad = 60;
   static meepleRad = TP.hexRad * .4;
   static meepleY0 = TP.hexRad * .25;

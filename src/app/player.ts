@@ -3,11 +3,11 @@ import { DecimalCounter, NumCounter } from "./counters";
 import { GP, GamePlay, GamePlay0 } from "./game-play";
 import type { Hex, Hex1 } from "./hex";
 import { HexDir } from "./hex-intfs";
-import { Chancellor, Criminal, CriminalSource, Judge, Leader, Mayor, Meeple, Police, Priest } from "./meeple";
+import { Meeple } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";
 import { CenterText } from "./shapes";
-import { PlayerColor, TP } from "./table-params";
-import { Church, Civic, Courthouse, MapTile, Tile, TownRules, TownStart, University } from "./tile";
+import { TP } from "./table-params";
+import { MapTile, Tile, } from "./tile";
 import { UnitSource } from "./tile-source";
 import { God } from "./god";
 
@@ -36,15 +36,8 @@ export class Player {
   get mapTiles() { return this.allOf(MapTile) as MapTile[] }
   // Player's Leaders, Police & Criminals
   get meeples() { return Meeple.allMeeples.filter(meep => meep.player == this) };
-  get allLeaders() { return this.meeples.filter(m => m instanceof Leader) as Leader[] }
-  get allPolice() { return this.meeples.filter(m => m instanceof Police) as Police[] }
-  get criminals() { return this.meeples.filter(meep => meep instanceof Criminal) };
 
   /** Leader: God? */
-  /** Police: warriors? */
-  policeSource: UnitSource<Police>;
-  /** Criminal: guardians? */
-  criminalSource: CriminalSource;
 
   // Created in masse by Table.layoutCounter
   coinCounter: NumCounter; // set by layoutCounters: `${'Coin'}Counter`
