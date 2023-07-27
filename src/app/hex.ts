@@ -1,5 +1,5 @@
-import { C, Constructor, F, RC, S } from "@thegraid/easeljs-lib";
-import { Container, Point, Shape, Text } from "@thegraid/easeljs-module";
+import { C, Constructor, F, KeyBinder, RC, S } from "@thegraid/easeljs-lib";
+import { Container, Graphics, Point, Shape, Text } from "@thegraid/easeljs-module";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { HexShape, LegalMark } from "./shapes";
@@ -426,15 +426,8 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   //
 
   readonly radius = TP.hexRad
-  // SEE ALSO: hex.xywh(radius, axis, row, col)
-  /** height per row of cells with EW Topo */
-  get rowHeight() { return this.radius * 1.5 };
-  /** height of hexagonal cell with EW Topo */
-  get cellHeight() { return this.radius * 2 }
-  /** width per col of cells with EW Topo */
-  get colWidth() { return this.radius * H.sqrt3 }
-  /** width of hexagonal cell with EW Topo */
-  get cellWidth() { return this.radius * H.sqrt3 }
+  /** return this.centerHex.xywh() for this.topo */
+  get xywh() { return this.centerHex.xywh(undefined, this.topo === this.ewTopo); }
 
   private minCol: number | undefined = undefined               // Array.forEach does not look at negative indices!
   private maxCol: number | undefined = undefined               // used by rcLinear
@@ -490,9 +483,9 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   }
 
   /** to build this HexMap: create Hex (or Hex2) and link it to neighbors. */
-  addHex(row: number, col: number, district: number, hexC?: Constructor<T> ): T {
+  addHex(row: number, col: number, district: number, hexC: Constructor<T> = this.hexC ): T {
     // If we have an on-screen Container, then use Hex2: (addToCont *before* makeAllDistricts)
-    const hex = new this.hexC(this, row, col);
+    const hex = new hexC(this, row, col);
     hex.district = district // and set Hex2.districtText
     if (this[row] === undefined) {  // create new row array
       this[row] = new Array<T>()
@@ -713,15 +706,6 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
     this.topo = this.nsTopo;
     HexShape.tilt = 'N';
   }
-  // SEE ALSO: hex.xywh(radius, axis, row, col)
-  /** height per row of cells with NS Topo */
-  override get rowHeight() { return this.radius * H.sqrt3 };
-  /** height of hexagonal cell with EW Topo */
-  override get cellHeight() { return this.radius * H.sqrt3 }
-  /** width per col of cells with EW Topo */
-  override get colWidth() { return this.radius * 1.5 }
-  /** width of hexagonal cell with EW Topo */
-  override get cellWidth() { return this.radius * 2 }
 
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
     if (this.topo === this.ewTopo) super.makeAllDistricts();
@@ -759,9 +743,62 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
   newHexesOnRow(n: number, rc: RC, district: number, hexAry: Hex[], di = 1): RC {
     let hex: Hex, { row, col } = rc;
     for (let i = 0; i < n; i += di) {
-      // if (!(row == 0 && (i == 0 || i == n-1)) && !(false))
-        hexAry.push(hex = this.addHex(row, col + i, district))
+      hexAry.push(hex = this.addHex(row, col + i, district))
     }
-    return rc
+    return rc;
+  }
+}
+/** row, col, terrain-type, edges(river) */
+type hexSpec = { r: number, c: number, t?: 'd'|'f'|'w', e?: HexDir[]}[];
+type hexSpec2 = [r: number, c: number, t?: 'd'|'f'|'w', e?: HexDir[]][];
+export class AnkhMap<T extends Hex> extends SquareMap<T> {
+  static fspec: hexSpec2 = [
+    [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8], [2, 9], [2, 10], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8], [4, 4], [4, 5], [4, 6], [5, 5], [5, 6], [6, 5], [6, 6], [7, 4], [7, 5], [8, 4], [8, 5], [9, 4]
+  ];
+  static dspec: hexSpec2 = [
+    [3, 0], [3, 1], [4, 0], [4, 1], [4, 2], [4, 3], [4, 7], [4, 8], [4, 9], [5, 0], [5, 1], [5, 3], [5, 4], [5, 7], [5, 8], [5, 9], [6, 0], [6, 1], [6, 7], [6, 8], [7, 0], [7, 1], [7, 2], [7, 3], [7, 6], [7, 7], [7, 9], [8, 0], [8, 1], [8, 2], [8, 3], [8, 6], [8, 7], [8, 8], [8, 9], [9, 2], [9, 6], [9, 8],
+  ];
+  static wspec: hexSpec2 = [
+    [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [1, 10], [3, 9], [4, 10], [5, 2], [5, 10], [6, 2], [6, 3], [6, 4], [6, 9], [6, 10], [7, 8], [7, 10], [8, 10],
+  ];
+
+  constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
+    super(radius, addToMapCont, hexC);
+  }
+  override makeAllDistricts(nh?: number, mh?: number): void {
+    const rv = super.makeAllDistricts(nh, mh);
+    const newGraphics = (color) => {
+      const g = new Graphics().c(), tilt = H.dirRot[HexShape.tilt];
+      return g.s(C.grey).f(color).dp(0, 0, Math.floor(this.radius * 60 / 60), 6, 0, tilt);
+    }
+    const fix = (r, c, color) => {
+        const hex = this[r][c] as any as Hex2;
+        const hexShape = hex.cont.getChildAt(0) as HexShape;
+        hexShape.graphics = newGraphics(color);
+        hex.cont.updateCache();
+    }
+    if (this.hexC === Hex2 as any) {
+      AnkhMap.fspec.forEach(([r, c]) => fix(r, c, '#93c47dff'));
+      AnkhMap.dspec.forEach(([r,c]) => fix(r, c, '#ffe599ff'));
+      AnkhMap.wspec.forEach(([r,c]) => fix(r, c, '#a4c2f4ff'));
+    }
+    return rv;
+  }
+  identCells() {
+    this.forEachHex(hex => {
+      const h2 = (hex as any as Hex2);
+      const hc = h2.cont;
+      hc.mouseEnabled = true;
+      hc.on(S.click, () => {
+        h2.isLegal = !h2.isLegal;
+        this.update()
+      })
+    });
+    KeyBinder.keyBinder.setKey('x', {func: () => {
+      const cells = this.filterEachHex(hex => hex.isLegal);
+      const list = cells.map(hex => `${hex.rcs},` );
+
+      console.log(''.concat(...list));
+    }})
   }
 }

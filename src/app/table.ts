@@ -290,7 +290,8 @@ export class Table extends EventDispatcher  {
 
     // background sized for hexMap:
     const { width: rw, height: rh } = hexCont.getBounds();
-    const rowh = hexMap.rowHeight, colw = hexMap.colWidth;
+    const {x, y, w, h, dxdc, dydr} = hexMap.xywh;
+    const rowh = dydr, colw = dxdc;
     const bgr: XYWH = { x: -2 * colw, y: 0, w: rw + 14 * colw, h: rh + .5 * rowh }
     // align center of mapCont(0,0) == hexMap(center) with center of background
     mapCont.x = bgr.x + (bgr.w) / 2;
@@ -356,22 +357,8 @@ export class Table extends EventDispatcher  {
     Player.allPlayers.forEach((p, pIndex) => {
       this.makePlayerPanel(p);
       p.makePlayerBits();
-      const colf = (col: number, row: number) => this.colf(pIndex, col, row);
-
-      {
-        // Win indicators:
-        const parent = this.hexMap.mapCont.capCont;
-        const cont = this.winIndForPlayer[pIndex] = new Container();
-        const refHex = this.hexMap.centerHex;
-        const { x, y, w, h } = refHex.xywh();
-        const x0 = x - 3 * w * (1 - 2 * pIndex);
-        const y0 = y - 8 * this.hexMap.rowHeight;
-        refHex.cont.parent.localToLocal(x0, y0, parent, cont);
-        parent.addChild(cont);
-      }
     });
   }
-  readonly winIndForPlayer: Container[] = [];
 
   setToRowCol(cont: Container, row = 0, col = 0) {
     if (!cont.parent) this.scaleCont.addChild(cont);

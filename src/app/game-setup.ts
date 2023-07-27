@@ -26,7 +26,7 @@ export class GameSetup {
    * ngAfterViewInit --> start here!
    * @param canvasId supply undefined for 'headless' Stage
    */
-  constructor(canvasId: string, ext?: string[], ngods = 5) {
+  constructor(canvasId: string, ext?: string[], ngods = 4) {
     stime.fmt = "MM-DD kk:mm:ss.SSS"
     this.stage = makeStage(canvasId, false)
     Tile.loader.loadImages(() => this.startup(ext, ngods));
