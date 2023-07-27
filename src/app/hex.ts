@@ -484,7 +484,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
 
   /** to build this HexMap: create Hex (or Hex2) and link it to neighbors. */
   addHex(row: number, col: number, district: number, hexC: Constructor<T> = this.hexC ): T {
-    // If we have an on-screen Container, then use Hex2: (addToCont *before* makeAllDistricts)
+    // If we have an on-screen Container, then use Hex2: (addToMapCont *before* makeAllDistricts)
     const hex = new hexC(this, row, col);
     hex.district = district // and set Hex2.districtText
     if (this[row] === undefined) {  // create new row array
@@ -749,39 +749,63 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
   }
 }
 /** row, col, terrain-type, edges(river) */
-type hexSpec = { r: number, c: number, t?: 'd'|'f'|'w', e?: HexDir[]}[];
-type hexSpec2 = [r: number, c: number, t?: 'd'|'f'|'w', e?: HexDir[]][];
+type hexSpec = [r: number, c: number]; // type hexSpec = { r: number, c: number, t?: 'd'|'f'|'w', e?: HexDir[]}[];
+type hexSpecr = [r: number, c: number, ...e: HexDir[]];
 export class AnkhMap<T extends Hex> extends SquareMap<T> {
-  static fspec: hexSpec2 = [
+  static fspec: hexSpec[] = [
     [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8], [2, 9], [2, 10], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8], [4, 4], [4, 5], [4, 6], [5, 5], [5, 6], [6, 5], [6, 6], [7, 4], [7, 5], [8, 4], [8, 5], [9, 4]
   ];
-  static dspec: hexSpec2 = [
+  static dspec: hexSpec[] = [
     [3, 0], [3, 1], [4, 0], [4, 1], [4, 2], [4, 3], [4, 7], [4, 8], [4, 9], [5, 0], [5, 1], [5, 3], [5, 4], [5, 7], [5, 8], [5, 9], [6, 0], [6, 1], [6, 7], [6, 8], [7, 0], [7, 1], [7, 2], [7, 3], [7, 6], [7, 7], [7, 9], [8, 0], [8, 1], [8, 2], [8, 3], [8, 6], [8, 7], [8, 8], [8, 9], [9, 2], [9, 6], [9, 8],
   ];
-  static wspec: hexSpec2 = [
+  static wspec: hexSpec[] = [
     [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [1, 10], [3, 9], [4, 10], [5, 2], [5, 10], [6, 2], [6, 3], [6, 4], [6, 9], [6, 10], [7, 8], [7, 10], [8, 10],
   ];
+  static rspec: hexSpecr[] = [
+    [1, 0, 'NE', 'SE'], [2, 0, 'NE'], [2, 1, 'N', 'NE'], [3, 2, 'N', 'NE'], [3, 3, 'N', 'NE'], [4, 4, 'N', 'NE'],
+    [4, 5, 'N', 'NE', 'SE'],
+    [4, 6, 'NW', 'N'], [3, 7, 'NW', 'N'], [3, 8, 'NW', 'N'], [2, 9, 'NW', 'N'], [2, 10, 'NW'],
+    [5, 5, 'NE', 'SE', 'S'], [6, 5, 'SW'], [7, 5, 'NW', 'SW'], [8, 5, 'NW', 'SW'],
+  ]
 
   constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC);
   }
-  override makeAllDistricts(nh?: number, mh?: number): void {
-    const rv = super.makeAllDistricts(nh, mh);
-    const newGraphics = (color) => {
+  addTerrain() {
+    const newGraphics = (color: string) => {
       const g = new Graphics().c(), tilt = H.dirRot[HexShape.tilt];
       return g.s(C.grey).f(color).dp(0, 0, Math.floor(this.radius * 60 / 60), 6, 0, tilt);
     }
-    const fix = (r, c, color) => {
-        const hex = this[r][c] as any as Hex2;
-        const hexShape = hex.cont.getChildAt(0) as HexShape;
-        hexShape.graphics = newGraphics(color);
-        hex.cont.updateCache();
+    const fix = ([r, c]: hexSpec, color: string) => {
+      const hex = this[r][c] as any as Hex2;
+      const hexShape = hex.cont.getChildAt(0) as HexShape;
+      hexShape.graphics = newGraphics(color);
+      hex.cont.updateCache();
+    }
+    const river = ([row, col, ...e]: hexSpecr, rshape: Shape) => {
+      const hex = this[row][col] as any as Hex2, x = hex.x, y = hex.y, r = hex.radius;
+      e.forEach((dir: HexDir) => {
+        const [a0, a1] = H.dirAngle[dir];  // 0-degrees is North
+        const x0 = x + r * Math.sin(a0 * H.degToRadians);
+        const y0 = y - r * Math.cos(a0 * H.degToRadians);
+        const x1 = x + r * Math.sin(a1 * H.degToRadians);
+        const y1 = y - r * Math.cos(a1 * H.degToRadians);
+        rshape.graphics.mt(x0, y0).lt(x1, y1);
+      })
     }
     if (this.hexC === Hex2 as any) {
-      AnkhMap.fspec.forEach(([r, c]) => fix(r, c, '#93c47dff'));
-      AnkhMap.dspec.forEach(([r,c]) => fix(r, c, '#ffe599ff'));
-      AnkhMap.wspec.forEach(([r,c]) => fix(r, c, '#a4c2f4ff'));
+      AnkhMap.fspec.forEach(spec => fix(spec, '#93c47dff'));
+      AnkhMap.dspec.forEach(spec => fix(spec, '#ffe599ff'));
+      AnkhMap.wspec.forEach(spec => fix(spec, '#a4c2f4ff'));
+      const rshape = new Shape(new Graphics().ss(12, 'round', 'round').s('blue'));
+      AnkhMap.rspec.forEach(spec => river(spec, rshape));
+      this.mapCont.infCont.addChild(rshape);
     }
+
+  }
+  override makeAllDistricts(nh?: number, mh?: number): void {
+    const rv = super.makeAllDistricts(nh, mh);
+    this.addTerrain();
     return rv;
   }
   identCells() {
@@ -794,11 +818,12 @@ export class AnkhMap<T extends Hex> extends SquareMap<T> {
         this.update()
       })
     });
-    KeyBinder.keyBinder.setKey('x', {func: () => {
-      const cells = this.filterEachHex(hex => hex.isLegal);
-      const list = cells.map(hex => `${hex.rcs},` );
-
-      console.log(''.concat(...list));
-    }})
+    KeyBinder.keyBinder.setKey('x', {
+      func: () => {
+        const cells = this.filterEachHex(hex => hex.isLegal);
+        const list = cells.map(hex => `${hex.rcs},`);
+        console.log(''.concat(...list));
+      }
+    })
   }
 }

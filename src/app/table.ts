@@ -1,7 +1,7 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Event, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import type { GamePlay } from "./game-play";
-import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
+import { AnkhMap, Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { H, HexDir, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
@@ -280,7 +280,7 @@ export class Table extends EventDispatcher  {
 
   layoutTable(gamePlay: GamePlay) {
     this.gamePlay = gamePlay
-    const hexMap = this.hexMap = gamePlay.hexMap as HexMap<Hex2>;
+    const hexMap = this.hexMap = gamePlay.hexMap as AnkhMap<Hex2>;
     hexMap.addToMapCont(Hex2);               // addToMapCont; make Hex2
     hexMap.makeAllDistricts();               //
     // hexCont is offset to be centered on mapCont (center of hexCont is at mapCont[0,0])

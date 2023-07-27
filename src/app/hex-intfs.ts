@@ -39,6 +39,16 @@ export namespace H {
   export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevEW: {[key in EwDir] : EwDir} = { E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, NE: SW, SE: NW, SW: NE, NW: SE }
+  export const dirAngle: { [key in HexDir]: [number, number] } = {
+     N: [330,  30],
+    NE: [ 30,  90],
+    SE: [ 90, 150],
+     S: [150, 210],
+    SW: [210, 270],
+    NW: [270, 330],
+     E: [ 60, 120],
+     W: [240, 300],
+  }
 
   export const capColor1:   string = "rgba(150,  0,   0, .8)"  // unplayable: captured last turn
   export const capColor2:   string = "rgba(128,  80, 80, .8)"  // protoMove would capture
