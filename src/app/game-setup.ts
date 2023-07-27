@@ -70,13 +70,14 @@ export class GameSetup {
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
-    const gods = ['Bastet', 'Ra', 'Amun', 'Isis'];
+    const gods = ['Bastet', 'Ra', 'Amun', 'Isis', 'Osiris'];
 
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
     const gamePlay = new GamePlay(gods, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
+    gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     if (this.stage.canvas) {
       const statsx = -300, statsy = 30
       const statsPanel = this.makeStatsPanel(gamePlay.gStats, table.scaleCont, statsx, statsy)

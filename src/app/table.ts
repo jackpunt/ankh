@@ -1,18 +1,19 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Event, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
-import { ButtonBox, CostIncCounter, DecimalCounter, NumCounter, NumCounterBox } from "./counters";
 import type { GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { H, HexDir, XYWH } from "./hex-intfs";
-import { Criminal, Police } from "./meeple";
 import { Player } from "./player";
 import { HexShape } from "./shapes";
 import type { StatsPanel } from "./stats";
-import { PlayerColor, playerColor0, playerColor1, playerColors, TP } from "./table-params";
-import { BagTile, NoDragTile, Tile, WhiteTile } from "./tile";
-import { TileSource } from "./tile-source";
+import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
+import { NoDragTile, Tile } from "./tile";
+import { God } from "./god";
 //import { TablePlanner } from "./planner";
 
+interface ScoreBox extends Shape {
+  color: string;
+}
 
 /** to own file... */
 class TablePlanner {
@@ -122,15 +123,15 @@ export class Table extends EventDispatcher  {
   logText(line: string, from = '') {
     this.textLog.log(`#${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
   }
-  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH) {
+  setToRowCol(cont: Container, row = 0, col = 0) {
+    if (!cont.parent) this.scaleCont.addChild(cont);
+    const hexC = this.hexMap.centerHex;
+    const { x, y, w, h } = hexC.xywh(undefined, undefined, row, col);
+    this.hexMap.mapCont.hexCont.localToLocal(x, y, cont.parent, cont);
+  }
+  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = TP.nHexes, col = -8) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
-    this.scaleCont.addChild(this.undoCont);
-    {
-      let hexC = this.hexMap.centerHex, hex0 = hexC;
-      this.hexMap.forEachHex(hex => { if (hex.col < hex0.col) hex0 = hex })
-      const { x } = hex0.xywh(), y = hexC.y;
-      this.hexMap.mapCont.hexCont.localToLocal(x - 3.5 * TP.hexRad, y + this.hexMap.rowHeight * 3.5, undoC.parent, undoC);
-    }
+    this.setToRowCol(undoC, row, col);
     const progressBg = new Shape(), bgw = 200, bgym = 140, y0 = 0; // bgym = 240
     const bgc = C.nameToRgbaString(TP.bgColor, .8);
     progressBg.graphics.f(bgc).r(-bgw / 2, y0, bgw, bgym - y0);
@@ -138,6 +139,7 @@ export class Table extends EventDispatcher  {
     this.enableHexInspector(30)
     this.dragger.makeDragable(undoC)
     if (true && xOffs > 0) return
+
     this.skipShape.graphics.f("white").dp(0, 0, 40, 4, 0, skipRad)
     this.undoShape.graphics.f("red").dp(-xOffs, 0, bSize, 3, 0, 180);
     this.redoShape.graphics.f("green").dp(+xOffs, 0, bSize, 3, 0, 0);
@@ -284,10 +286,11 @@ export class Table extends EventDispatcher  {
     // background sized for hexMap:
     const { width: rw, height: rh } = hexCont.getBounds();
     const rowh = hexMap.rowHeight, colw = hexMap.colWidth;
-    const bgr: XYWH = { x: 0, y: 0, w: rw + 9 * colw, h: rh + 1 * rowh }
+    const bgr: XYWH = { x: 0, y: 0, w: rw + 12 * colw, h: rh + .5 * rowh }
     // align center of mapCont(0,0) == hexMap(center) with center of background
     mapCont.x = (bgr.w - bgr.x) / 2;
     mapCont.y = (bgr.h - bgr.y) / 2;
+    bgr.h += rowh;
 
     this.bgRect = this.setBackground(this.scaleCont, bgr); // bounded by bgr
     const p00 = this.scaleCont.localToLocal(bgr.x, bgr.y, hexCont);
@@ -297,9 +300,12 @@ export class Table extends EventDispatcher  {
     this.homeRowHexes.length = 0;
 
     this.scaleCont.addChild(this.makeActionCont());
+    this.scaleCont.addChild(this.makeScoreCont());
     this.makePerPlayer();
 
-    this.gamePlay.recycleHex = this.makeRecycleHex(5, -1.5);
+    this.gamePlay.recycleHex = this.makeRecycleHex(TP.nHexes, TP.nHexes);
+    this.setupUndoButtons(55, 60, 45, bgr) // & enableHexInspector()
+
     this.hexMap.update();
     // position turnLog & turnText
     {
@@ -314,8 +320,6 @@ export class Table extends EventDispatcher  {
       parent.addChild(this.bagLog, this.turnLog, this.textLog);
       parent.stage.update()
     }
-
-    this.setupUndoButtons(55, 60, 45, bgr) // & enableHexInspector()
 
     this.on(S.add, this.gamePlay.playerMoveEvent, this.gamePlay)[S.Aname] = "playerMoveEvent"
   }
@@ -404,7 +408,7 @@ export class Table extends EventDispatcher  {
   }
 
   actionPanels: { [index: string]: Container } = {};
-  makeActionCont(x = 40, y = 50) {
+  makeActionCont(x = 60, y = 50) {
     const np = Player.allPlayers.length, rad = 30, wide = (2 * rad + 5) * (np + 1), rh = 2 * rad + 5;
     console.log(stime(this, `.makeActionCont`), np);
     // TODO: class actionCont, with slots to hold button & each circle/state (number activated)
@@ -442,11 +446,59 @@ export class Table extends EventDispatcher  {
 
     return eventCont;
   }
-
-  makeScoreCont() {
-    const scoreCont = new Container();
-
+  readonly emptyColor = 'rgb(240,240,240)';
+  makeScoreCont(row = TP.nHexes + 1.3, col = -6, np = Player.allPlayers.length) {
+    const redzone = 'rgb(230,100,100)', empty = this.emptyColor, win = C.lightgreen;
+    const scoreCont = new Container()
+    this.setToRowCol(scoreCont, row, col);
+    const w = 36, h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, rz = 20, ym = (np - 1) * h;
+    const bg1 = new Shape();
+    bg1.graphics.f(redzone).dr(x - gap, y - gap, rz * dx + gap, np * h + 2 * gap);
+    scoreCont.addChild(bg1);
+    const bg2 = new Shape();
+    bg1.graphics.f(win).dr(x + 31 * dx - gap, y - gap, dx + gap, np * h + 2 * gap);
+    scoreCont.addChild(bg2);
+    for (let cn = 0; cn < 32; cn++) {   // a value for 'score'
+      for (let pn = 0; pn < np; pn++) { // rank of player at that score
+        const box = new Shape() as ScoreBox;
+        box.x = cn * dx;
+        box.y = ym - pn * h;
+        scoreCont.addChild(box);
+        if (!this.scoreCells[cn]) this.scoreCells[cn] = [];
+        this.scoreCells[cn][pn] = box;
+        this.drawBox(box, empty);
+      }
+    }
     return scoreCont;
+  }
+  scoreCells: ScoreBox[][] = [[]];
+  drawBox(box: ScoreBox, color: string) {
+    const w = 36, h = 20, x = -w/2, y = -h/2, rz = 20;
+    box.color = color;
+    box.graphics.f(color).s(C.black).dr(x, y, w, h);
+  }
+
+  setPlayerScore(plyr: Player, score: number) {
+    const s1 = Math.min(score, 31);
+    const empty = this.emptyColor;
+    const s0 = plyr.score;
+    const stack0 = this.scoreCells[s0], np = Player.allPlayers.length;
+    const ndx0 = stack0.findIndex(box => box.color === plyr.color);
+    if (ndx0 > 0) {
+      this.drawBox(stack0[ndx0], empty);
+      for (let i = ndx0 + 1; i < np; i++) {
+        if (stack0[i].color === empty) break;
+        const color = stack0[i].color;
+        this.drawBox(stack0[i - 1], color);
+        this.drawBox(stack0[i], empty);
+      }
+    }
+    const stack1 = this.scoreCells[s1];
+    for (let i = 0; i < np; i++) {
+      if (stack1[i].color !== empty) continue;
+      this.drawBox(stack1[i], plyr.color);
+      break;
+    }
   }
 
   /**

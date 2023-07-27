@@ -16,6 +16,7 @@ export class Player {
 
   readonly Aname: string;
   god: God;
+  score: number = 0;
   get color() { return this.god.color; }
 
   constructor(
