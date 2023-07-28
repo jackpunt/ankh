@@ -1,11 +1,11 @@
-import { C, F, S } from "@thegraid/common-lib";
-import { Shape, Text } from "@thegraid/easeljs-module";
+import { C } from "@thegraid/common-lib";
+import { Shape } from "@thegraid/easeljs-module";
 import { GP, NamedObject } from "./game-play";
 import type { Hex, Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, Paintable } from "./shapes";
 import type { DragContext, Table } from "./table";
-import { PlayerColor, TP, criminalColor } from "./table-params";
+import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { UnitSource } from "./tile-source";
 
@@ -40,7 +40,6 @@ class MeepleShape extends Shape implements Paintable {
   }
 }
 
-type MeepleInf = 0 | 1;
 export class Meeple extends Tile {
   static allMeeples: Meeple[] = [];
 
@@ -57,12 +56,8 @@ export class Meeple extends Tile {
   constructor(
     Aname: string,
     player?: Player,
-    inf: MeepleInf = 1,
-    vp = 0,    // 1 for Leader
-    cost = 1,  // Inf required to place (1 for Leader/Police, but placing in Civic/PS with Inf)
-    econ = -6, // Econ required: -2 for Police, -3 for Criminal [place, not maintain]
   ) {
-    super(Aname, player, inf, vp, cost, econ);
+    super(Aname, player);
     this.addChild(this.backSide);
     this.player = player;
     this.nameText.visible = true;
@@ -109,7 +104,7 @@ export class Meeple extends Tile {
     if (this.hex?.isOnMap) GP.gamePlay.hexMap.update();
   }
 
-  override moveTo(hex: Hex1) {
+  moveTo0(hex: Hex1) {
     const destMeep = hex?.meep;
     if (destMeep && destMeep !== this) {
       destMeep.x += 10; // make double occupancy apparent [until this.unMove()]
@@ -118,6 +113,16 @@ export class Meeple extends Tile {
     const fromHex = this.hex;
     super.moveTo(hex); // hex.set(meep) = this; this.x/y = hex.x/y
     this.faceUp(!!hex && (!hex.isOnMap || !fromHex?.isOnMap || hex === this.startHex));
+    return hex;
+  }
+
+  override moveTo(hex: Hex1) {
+    const source = this.source;
+    const fromHex = this.hex;
+    const toHex = this.moveTo0(hex);  // collides with source.hex.meep
+    if (source && fromHex === this.source.hex && fromHex !== toHex) {
+      source.nextUnit()   // shift; moveTo(source.hex); update source counter
+    }
     return hex;
   }
 
@@ -162,42 +167,23 @@ export class Meeple extends Tile {
     return false;
   }
 
-  override showCostMark(show?: boolean): void {
-    super.showCostMark(show, -.4);
-  }
+  // override sendHome(): void { // Meeple
+  //   this.faceUp();
+  //   super.sendHome();
+  // }
 
-  override drawStar() {
-    const mark = super.drawStar();
-    mark.y -= .2 * TP.hexRad;
-    return mark;
-  }
-
-  override drawEcon(econ?: number) {
-    const mark = super.drawEcon(econ);
-    mark.visible = false;
-    return mark;
-  }
-
-  override sendHome(): void { // Meeple
+  override sendHome(): void { // Criminal
     this.faceUp();
-    super.sendHome();
-  }
-}
+     super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
+     const source = this.source;
+     if (source) {
+       source.availUnit(this);
+       if (!source.hex.meep) source.nextUnit();
+     }
+   }
 
-class SourcedMeeple extends Meeple {
-
-  static makeSource0<TS extends UnitSource<SourcedMeeple>, T extends SourcedMeeple>(stype: new(type, p, hex) => TS, type: new(p: Player, n: number) => T, player: Player, hex: Hex2, n = 0) {
-    const source = new stype(type, player, hex);
-    type['source'][player.index] = source; // static source: TS = [];
-    for (let i = 0; i < n; i++) source.newUnit(new type(player, i + 1))
-    source.nextUnit();  // unit.moveTo(source.hex)
-    return source;
-  }
-
-  constructor(readonly source: UnitSource<SourcedMeeple>, Aname: string, player?: Player, inf?: MeepleInf, vp?: number, cost?: number, econ?: number) {
-    super(Aname, player, inf, vp, cost, econ);
-  }
-
+  // from SourcedMeeple:
+  source: UnitSource<Meeple>;  // undefined unless/until constructor sets it.
   paintRings(colorn: string, rColor = C.BLACK, ss = 4, rs = 4) {
     const r = (this.baseShape as MeepleShape).radius;
     const g = (this.baseShape as MeepleShape).graphics;
@@ -206,20 +192,12 @@ class SourcedMeeple extends Meeple {
     this.updateCache();
   }
 
-  override moveTo(hex: Hex1) {
-    const source = this.source;
-    const fromHex = this.hex;
-    const toHex = super.moveTo(hex);  // collides with source.hex.meep
-    if (fromHex === this.source.hex && fromHex !== toHex) {
-      source.nextUnit()   // shift; moveTo(source.hex); update source counter
-    }
-    return hex;
-  }
 
-  override sendHome(): void { // Criminal
-    super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
-    const source = this.source;
-    source.availUnit(this);
-    if (!source.hex.meep) source.nextUnit();
+  static makeSource0<TS extends UnitSource<Meeple>, T extends Meeple>(stype: new(type, p, hex) => TS, type: new(p: Player, n: number) => T, player: Player, hex: Hex2, n = 0) {
+    const source = new stype(type, player, hex);
+    type['source'][player.index] = source; // static source: TS = [];
+    for (let i = 0; i < n; i++) source.newUnit(new type(player, i + 1))
+    source.nextUnit();  // unit.moveTo(source.hex)
+    return source;
   }
 }

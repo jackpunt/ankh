@@ -28,7 +28,7 @@ export class GameState {
     return GP.gamePlay.allPlayers.find(p => p.god.name == name);
   }
 
-  states: { [index: string]: Phase } = {
+  readonly states: { [index: string]: Phase } = {
     Begin: {
       start: () => {
         this.phase(this.findGod('Bastet') ? 'Bastet' : this.chooseAction(true));
@@ -111,20 +111,21 @@ export class GameState {
     Conflict: {
       start: () => { },
       // process Omnipresent
+      // process TeleportToTemple (for each player!)
       // phase(Horus ? Horus : ConflictRegions)
     },
     Horus: {
       start: () => { },
       // place enable Eyes, drag to each Region (to Region index marker...)
-      // Done(phase(ConflictRegions))
+      // Done(phase(ConflictEachRegion))
     },
-    ConflictRegions: {
+    ConflictEachRegion: {
       start: () => { },
       // region = region ? ++region  : 1;
       // if (region > nRegions) phase(ConflictDone)
-      // phase(ConflictRegion)
+      // phase(ConflictInRegion)
     },
-    ConflictRegion: {
+    ConflictInRegion: {
       start: () => { },
       // process Obelisk-attuned!
       // phase(Card);

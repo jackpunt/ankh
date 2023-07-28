@@ -149,7 +149,7 @@ class Tile0 extends Container {
     return bm;
   }
 
-  get radius() { return TP.hexRad};
+  get radius() { return TP.hexRad };
   readonly baseShape: Paintable = this.makeShape();
 
   /** Default is TileShape; a HexShape with translucent disk.
@@ -263,33 +263,11 @@ export class Tile extends Tile0 {
     if (hex !== undefined) hex.tile = this;
   }
 
-  loanLimit = 0;
-
-  get infP() { return this.inf }
-
-  get vp() { return this._vp + (this.bonus.star ? 1 : 0); } // override in Lake
-  get econ() { return this._econ + (this.bonus.econ ? 1 : 0); } // override in Bank
-  get cost() { return this._cost; }
-
-  static costMark: Text = new CenterText('$ 0');
-  showCostMark(show = true, dy = .5) {
-    const mark = Tile.costMark;
-    if (!show) {
-      this.removeChild(mark);
-    }
-    this.updateCache();
-  }
-
   // Tile
   constructor(
     /** the owning Player. */
     public readonly Aname?: string,
     player?: Player,
-    /** aka: infP */
-    public readonly inf: number = 0,
-    private readonly _vp: number = 0,
-    public readonly _cost: number = 1,
-    public readonly _econ: number = 1,
   ) {
     super()
     Tile.allTiles.push(this);
@@ -299,10 +277,7 @@ export class Tile extends Tile0 {
     this.addChild(this.baseShape);
     this.addChild(new BalMark(this));
     this.setPlayerAndPaint(player);
-    if (_vp > 0) this.drawStar();
-    if (_econ !== 0) this.drawEcon(_econ);
     this.nameText = this.addTextChild(rad / 4);
-    this.infText = this.addTextChild(rad / 2, '');
   }
 
   setPlayerAndPaint(player: Player) {
@@ -324,41 +299,6 @@ export class Tile extends Tile0 {
     return bm;
   }
 
-  infText: Text
-  setInfText(text = '') {
-    this.infText.text = text;
-  }
-
-  isThreat: PlayerColorRecord<boolean> = playerColorRecord(false, false, false);
-
-  clearThreats() {
-    this.isThreat = playerColorRecord(false, false, false);
-    Object.values(this.capMarks).forEach(cm => cm && (cm.visible = false))
-  }
-
-  capMarks: PlayerColorRecord<CapMark> = playerColorRecord()
-
-  setCapMark(pc: PlayerColor, capMark = CapMark) {
-    const vis = this.isThreat[pc];
-    let mark = this.capMarks[pc];
-    if (vis && !mark) {
-      mark = this.capMarks[pc] = new capMark(pc);
-    }
-    if (mark) mark.visible = vis;
-    // put CapMark on its own Container, so we can disable them en masse
-    const cont = this.hex?.map.mapCont.capCont;
-    if (mark && cont && vis) {
-      mark.setXY(pc, this, cont);
-    }
-  }
-
-  override addBonus(bonusId: AuctionBonus) {
-    super.addBonus(bonusId);
-    const mark = new BonusMark(bonusId);
-    this.addChildAt(mark, this.getChildIndex(this.nameText));
-    this.paint();
-  }
-
   addTextChild(y0 = this.radius / 2, text = this.Aname, size = Tile.textSize, vis = false) {
     const nameText = new CenterText(text, size);
     nameText.y = y0;         // Meeple overrides in constructor!
@@ -369,7 +309,6 @@ export class Tile extends Tile0 {
 
   textVis(vis = !this.nameText.visible) {
     this.nameText.visible = vis
-    this.infText.visible = vis
     this.updateCache()
   }
 
@@ -415,10 +354,8 @@ export class Tile extends Tile0 {
   }
 
   resetTile() {
-    this.clearThreats();
     this.removeBonus();
     this.x = this.y = 0;
-    this.setInfText('');
   }
 
   /**
@@ -445,7 +382,6 @@ export class Tile extends Tile0 {
   /** entry point from Table.dropFunc; delegate to this.dropFunc() */
   dropFunc0(hex: Hex2, ctx: DragContext) {
     this.dropFunc(ctx.targetHex, ctx);
-    this.showCostMark(false); // QQQ: should this be in dropFunc() ??
     ctx.targetHex.map.showMark(undefined);
   }
 
@@ -455,8 +391,6 @@ export class Tile extends Tile0 {
 
   /** override as necessary. */
   dragStart(ctx: DragContext) {
-    this.clearThreats();  // when lifting a Tile from map, hide the CapMarks
-    if (!this.hex?.isOnMap) this.showCostMark();
   }
 
   /** state of shiftKey has changed during drag */

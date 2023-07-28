@@ -20,6 +20,9 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
 }
 export class TP {
   static anhkRad = 20;
+  static anhk1Rad = 32;
+  static anhk2Rad = 40;
+  static warriorPerPlayer = 6;
   static textLogLines = 6;
   static placeAdjacent = true;
   static alwaysShift = false;
@@ -56,6 +59,7 @@ export class TP {
   static meepleRad = TP.hexRad * .4;
   static meepleY0 = TP.hexRad * .25;
   static log = 0
+
   /** map size for (dpb, dop) */
   static fnHexes(nh = TP.nHexes, nm = TP.mHexes) {
     TP.nHexes = nh;

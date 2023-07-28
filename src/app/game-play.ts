@@ -14,6 +14,7 @@ import { Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerColorRecord, playerColors, } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { EzPromise } from "@thegraid/ezpromise";
+import { GameState } from "./game-state";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -48,6 +49,8 @@ export class GamePlay0 {
   static gamePlay: GamePlay0;
   static gpid = 0
   readonly id = GamePlay0.gpid++
+  readonly gameState = new GameState();
+  get gamePhase() { return this.gameState.state.Aname; }
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
   readonly logWriter: LogWriter

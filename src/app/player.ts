@@ -15,20 +15,20 @@ export class Player {
   static allPlayers: Player[] = [];
 
   readonly Aname: string;
-  god: God;
-  score: number = 0;
-  get color() { return this.god.color; }
-
   constructor(
     readonly index: number,
     readonly godName: string,
     readonly gamePlay: GamePlay0,
   ) {
-    this.god = God.gods.get(godName);
+    this.god = God.byName.get(godName);
     Player.allPlayers[index] = this;
     this.Aname = `P${index}-${this.god.name}:${this.god.color}`;
     console.log(stime(this, `.new:`), this.Aname);
   }
+
+  god: God;
+  score: number = 0;
+  get color() { return this.god.color; }
 
   allOf<T extends Tile>(claz: Constructor<T>) { return (Tile.allTiles as T[]).filter(t => t instanceof claz && t.player === this); }
   allOnMap<T extends Tile>(claz: Constructor<T>) { return this.allOf(claz).filter(t => t.hex?.isOnMap); }
@@ -36,8 +36,6 @@ export class Player {
   get mapTiles() { return this.allOf(MapTile) as MapTile[] }
   // Player's Leaders, Police & Criminals
   get meeples() { return Meeple.allMeeples.filter(meep => meep.player == this) };
-
-  /** Leader: God? */
 
   // Created in masse by Table.layoutCounter
   coinCounter: NumCounter; // set by layoutCounters: `${'Coin'}Counter`

@@ -7,7 +7,8 @@ import { Player } from "./player";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { selectN } from "./god";
+import { selectN } from "./functions";
+import { God } from "./god";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
@@ -70,7 +71,7 @@ export class GameSetup {
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
-    const gods = ext.length > 2 ? ext : selectN(ngods);
+    const gods = ext.length > 2 ? ext : selectN(God.allNames, ngods);
     gods.length = Math.min(gods.length, 5);
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
     const gamePlay = new GamePlay(gods, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay

@@ -4,8 +4,7 @@ import { H, HexDir } from "./hex-intfs";
 import { HexShape } from "./shapes";
 import { HexConstructor, Hex2, Hex, HexMap } from "./hex";
 import { TP } from "./table-params";
-import { godsList } from "./god";
-
+import { God } from "./god";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
@@ -72,6 +71,7 @@ export class AnkhHex extends Hex2 {
   terrain: Terrain;
   regionId: number;
   overlay: HexShape;
+  get piece() { return this.tile ?? this.meep }
 
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
     if (!this.overlay) this.overlay = new HexShape()
@@ -80,6 +80,11 @@ export class AnkhHex extends Hex2 {
     this.cont.addChild(this.overlay);
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
+    /** search each Hex linked to this. */
+    findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
+      return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
+    }
+
 }
 
 /** row, col, terrain-type, edges(river) */
@@ -230,7 +235,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return [regions, metaMap];
   }
 
-  showRegions(hexAry = this.hexAry, colors = godsList().map(g => g.color)) {
+  showRegions(hexAry = this.hexAry, colors = God.allGods.map(g => g.color)) {
     hexAry.forEach(ahex => {
       if (ahex.regionId !== undefined) {
         ahex.overlay.paint(C.nameToRgbaString(colors[ahex.regionId % colors.length], .4))
@@ -241,7 +246,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     this.update();
   }
 
-  showRegion(regionId = 0, colors = godsList().map(g => g.color)) {
+  showRegion(regionId = 0, colors = God.allGods.map(g => g.color)) {
     const region = this.regions[regionId], color = C.nameToRgbaString(colors[regionId % colors.length], .4);
     region.forEach(ahex => {
       ahex.overlay.paint(color);

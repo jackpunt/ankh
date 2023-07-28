@@ -290,8 +290,7 @@ export class Table extends EventDispatcher  {
 
     // background sized for hexMap:
     const { width: rw, height: rh } = hexCont.getBounds();
-    const {x, y, w, h, dxdc, dydr} = hexMap.xywh;
-    const rowh = dydr, colw = dxdc;
+    const { x, y, w, h, dxdc: colw, dydr: rowh } = hexMap.xywh;
     const bgr: XYWH = { x: -2 * colw, y: 0, w: rw + 14 * colw, h: rh + .5 * rowh }
     // align center of mapCont(0,0) == hexMap(center) with center of background
     mapCont.x = bgr.x + (bgr.w) / 2;
@@ -437,7 +436,7 @@ export class Table extends EventDispatcher  {
     });
     // Stable:
     const stableCont = new Container();
-    const srad1 = 32, srad2 = 40, dir = (index < 3) ? -1 : 1;
+    const srad1 = TP.anhk1Rad, srad2 = TP.anhk2Rad, dir = (index < 3) ? -1 : 1;
     const x0 = [wide - (srad1 + 3 * gap), srad1 + 2 * gap][(1 + dir) / 2];
     const sgap = 1.25 * srad2;
     const swide = 2 * (srad1 + srad2 + sgap + sgap);

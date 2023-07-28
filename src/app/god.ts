@@ -5,13 +5,21 @@ import { TP } from "./table-params";
 
 
 export class God {
-  static gods = new Map<string, God>();
+  static byName = new Map<string, God>();
+
+  static get allGods() {
+    return Array.from(God.byName).map(([gname, god]) => god);
+  }
+  static get allNames() {
+    return Array.from(God.byName).map(([gname, god]) => gname);
+  }
+
   constructor(
     public  name: string,
-    public color = godSpecs.find(spec => spec[0].name == name)[1],
+    public color: string,
   ) {
     // constructor here:
-    God.gods.set(name, this);
+    God.byName.set(name, this);
   }
   ankhPowers: string[] = [];
 
@@ -90,23 +98,6 @@ class Toth extends God {
   constructor() { super('Toth', 'cyan') }
 }
 
-
+// Make all the Gods:
 const godSpecs: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
-godSpecs.forEach((god) => {
-  const name = god.name;
-  God.gods.set(name, new god(name))
-});
-
-export function godsList() {
-  return Array.from(God.gods).map(([gname, god]) => god);
-}
-
-// TODO: move to util functions
-export function selectN(n = 1, remove = true, bag = godsList().map(god => god.name)) {
-  const rv = [];
-  for (let i = 0; i < n; i++) {
-  const index = Math.floor(Math.random() * bag.length);
-  rv.push(remove ? bag.splice(index, 1)[0] : bag[index]);
-  }
-  return rv;
-}
+godSpecs.forEach(god => new god());
