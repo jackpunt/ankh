@@ -514,6 +514,7 @@ export class NoDragTile extends Tile {}
 
 /** A plain WHITE tile; for Debt */
 export class WhiteTile extends NoDragTile {
+  // TileShape does not work here:
   override makeShape(): Paintable { return new HexShape(this.radius); }
 
   override paint(pColor?: PlayerColor, colorn?: string): void {

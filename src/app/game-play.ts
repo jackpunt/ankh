@@ -3,7 +3,8 @@ import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { Container } from "@thegraid/easeljs-module";
 import { CostIncCounter } from "./counters";
 import { GameSetup } from "./game-setup";
-import { Hex, Hex1, Hex2, IHex, AnkhMap } from "./hex";
+import { Hex, Hex1, Hex2, IHex } from "./hex";
+import { AnkhMap, AnkhHex } from "./ankh-map";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
@@ -54,7 +55,7 @@ export class GamePlay0 {
   get allPlayers() { return Player.allPlayers; }
   selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
 
-  readonly hexMap = new AnkhMap<Hex2>()
+  readonly hexMap = new AnkhMap<AnkhHex>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly redoMoves = []
 
@@ -75,7 +76,7 @@ export class GamePlay0 {
   constructor(godNames: string[]) {
     this.logWriter = this.logWriterLine0()
     this.hexMap.Aname = `mainMap`;
-    this.hexMap.makeAllDistricts(); // may be re-created by Table, after addToMapCont()
+    //this.hexMap.makeAllDistricts(); // For 'headless'; re-created by Table, after addToMapCont()
 
     // Create and Inject all the Players: (picking a townStart?)
     Player.allPlayers.length = 0;

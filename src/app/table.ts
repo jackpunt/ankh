@@ -1,13 +1,13 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Event, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import type { GamePlay } from "./game-play";
-import { AnkhMap, Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
-import { H, HexDir, XYWH } from "./hex-intfs";
+import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
+import { AnkhMap, AnkhHex } from "./ankh-map";
+import { XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
-import { God } from "./god";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -280,8 +280,8 @@ export class Table extends EventDispatcher  {
 
   layoutTable(gamePlay: GamePlay) {
     this.gamePlay = gamePlay
-    const hexMap = this.hexMap = gamePlay.hexMap as AnkhMap<Hex2>;
-    hexMap.addToMapCont(Hex2);               // addToMapCont; make Hex2
+    const hexMap = this.hexMap = gamePlay.hexMap as AnkhMap<AnkhHex>;
+    hexMap.addToMapCont();                   // addToMapCont; make AnkhHex
     hexMap.makeAllDistricts();               //
     // hexCont is offset to be centered on mapCont (center of hexCont is at mapCont[0,0])
     // mapCont is offset [0,0] to scaleCont
