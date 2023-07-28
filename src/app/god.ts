@@ -97,8 +97,12 @@ godSpecs.forEach((god) => {
   God.gods.set(name, new god(name))
 });
 
+export function godsList() {
+  return Array.from(God.gods).map(([gname, god]) => god);
+}
+
 // TODO: move to util functions
-export function selectN(n = 1, remove = true, bag = Array.from(God.gods).map(([n, g]) => g.name)) {
+export function selectN(n = 1, remove = true, bag = godsList().map(god => god.name)) {
   const rv = [];
   for (let i = 0; i < n; i++) {
   const index = Math.floor(Math.random() * bag.length);

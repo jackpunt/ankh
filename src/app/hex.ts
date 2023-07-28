@@ -414,6 +414,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   get asHex2Map() { return this as any as HexMap<Hex2> }
   /** Each occupied Hex, with the occupying PlayerColor  */
   readonly district: Array<T[]> = []
+  hexAry: T[];  // set by makeAllDistricts()
   readonly mapCont: MapCont = new MapCont(this.asHex2Map);   // if/when using Hex2
 
   //
@@ -443,7 +444,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   }
   rcLinear(row: number, col: number): number { return col + row * (1 + (this.maxCol || 0) - (this.minCol||0)) }
 
-  readonly metaMap = Array<Array<Hex>>()           // hex0 (center Hex) of each MetaHex, has metaLinks to others.
+  readonly metaMap = Array<Array<T>>()           // hex0 (center Hex) of each MetaHex, has metaLinks to others.
 
   mark: HexMark | undefined                        // a cached DisplayObject, used by showMark
   Aname: string = '';
@@ -601,8 +602,10 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
    * @param mh order of metaHexes (greater than 0);
    */
   makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes) {
-    this.makeDistrict(nh, 0, mh, 0);    // nh hexes on outer ring; single meta-hex
-    this.mapCont.hexCont && this.centerOnContainer()
+    const hexAry = this.makeDistrict(nh, 0, mh, 0);    // nh hexes on outer ring; single meta-hex
+    this.mapCont.hexCont && this.centerOnContainer();
+    this.hexAry = hexAry;
+    return hexAry;
   }
   centerOnContainer() {
     let mapCont = this.mapCont
@@ -631,7 +634,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
    * @param mr make new district on meta-row
    * @param mc make new district on meta-col
    */
-  makeDistrict(nh: number, district: number, mr: number, mc: number): Hex[] {
+  makeDistrict(nh: number, district: number, mr: number, mc: number): T[] {
     const mcp = Math.abs(mc % 2), mrp = Math.abs(mr % 2), dia = 2 * nh - 1;
     // irow-icol define topology of MetaHex composed of HexDistrict
     // TODO: generalize using this.topo to compute offsets!

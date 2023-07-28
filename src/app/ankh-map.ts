@@ -4,6 +4,7 @@ import { H, HexDir } from "./hex-intfs";
 import { HexShape } from "./shapes";
 import { HexConstructor, Hex2, Hex, HexMap } from "./hex";
 import { TP } from "./table-params";
+import { godsList } from "./god";
 
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
@@ -13,11 +14,12 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
     HexShape.tilt = 'N';
   }
 
-  override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): void {
-    if (this.topo === this.ewTopo) super.makeAllDistricts();
+  override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): T[] {
+    if (this.topo === this.ewTopo) return super.makeAllDistricts();
     else {
-      this.makeRect(nh, nh + 1);
-      this.mapCont.hexCont && this.centerOnContainer()
+      const hexAry = this.makeRect(nh, nh + 1);
+      this.mapCont.hexCont && this.centerOnContainer();
+      return hexAry;
     }
   }
 
@@ -29,7 +31,7 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
    * @param mc metaCol = 1
    * @returns flat array of the Hexes that were created.
    */
-  makeRect(nr: number, nc = nr + 1, district = 0, roundCorner = true): Hex[] {
+  makeRect(nr: number, nc = nr + 1, district = 0, roundCorner = true): T[] {
     const hexAry = Array<T>(); hexAry['Nr'] = nr; hexAry['Nc'] = nc;
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
@@ -43,6 +45,7 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
     this.newHexesOnRow(ncf, { row: nr - 1, col: roundCorner ? 2 : 0 }, district, hexAry, roundCorner ? 2 : 1);
     //console.groupEnd()
     this.setDistrictColor(hexAry, district);
+    this.hexAry = hexAry;
     return hexAry
   }
 
@@ -65,10 +68,16 @@ export type Terrain = 'd' | 'f' | 'w';
 export class AnkhHex extends Hex2 {
   // directions that are blocked; non-adjacent in Ankh.
   readonly borders: { [key in HexDir]?: boolean | undefined } = {};
+  Avisit: number = undefined;
   terrain: Terrain;
-  region: number;
+  regionId: number;
+  overlay: HexShape;
 
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
+    if (!this.overlay) this.overlay = new HexShape()
+    this.overlay.paint('rgba(250,250,250,.3)');
+    this.overlay.visible = false;
+    this.cont.addChild(this.overlay);
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
 }
@@ -96,18 +105,42 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   ];
   static tColor = { d: '#ffe599', f: '#93c47d', w: '#a4c2f4' };
 
+  regions: AnkhHex[][];
+  adjRegions: Map<number,number>;
 
   constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC ? AnkhHex as any as HexConstructor<T> : hexC);
+    KeyBinder.keyBinder.setKey('C-l', { thisArg: this, func: () => {
+      this.noRegions();
+      this.findRegions();
+      this.showRegions();
+    }});
+    KeyBinder.keyBinder.setKey('l', { thisArg: this, func: () => this.showRegions() });
+    KeyBinder.keyBinder.setKey('L', { thisArg: this, func: () => {
+      this.noRegions();
+      this.hexAry.forEach(hex => { hex.overlay.visible = false; hex.cont.updateCache() })
+      this.update();
+    } });
+    KeyBinder.keyBinder.setKey('M-l', { thisArg: this, func: () => {
+      this.noRegions();
+      const seedAry = [[3,0], [4,6], [0,2]].map(([r,c]) => this[r][c])
+      const [regions] = this.findRegions(seedAry);
+      this.showRegions();
+    }
+    });
   }
+
 
   override addToMapCont(hexC?: Constructor<T>): this {
     return super.addToMapCont(hexC ?? AnkhHex as any as HexConstructor<T>);
   }
 
-  override makeAllDistricts(nh?: number, mh?: number): void {
+  override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.addTerrain();
+    const [regions, adjRegions]= this.findRegions(this.hexAry);
+    this.regions = regions;
+    this.adjRegions = adjRegions;
     return rv;
   }
 
@@ -118,6 +151,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     hexShape.paint(color);
     hex.cont.updateCache();
   }
+
   addBorder(hex: AnkhHex, dir: HexDir, sym = true) {
     if (sym) {
       hex.borders[dir] = true;
@@ -157,9 +191,65 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     });
   }
 
-  findRegions() {
+  noRegions(hexAry = this.hexAry) {
+    hexAry.forEach(hex => hex.regionId = undefined);
+  }
+  findRegions(hexAry = this.hexAry): [AnkhHex[][], Map<number, number>,] {
+    const regions: AnkhHex[][] = []; // each element is AnkhHex[];
+    const metaMap = new Map<number, number>();
+    let avisit = 0;
+    const setRegion = (hex: AnkhHex, regionId: number) => {
+      hex.regionId = regionId;
+      hex.Avisit = avisit++;
+      regions[regionId].push(hex)
+    }
+    const addNeighbors = (hex: AnkhHex, region: AnkhHex[], id) => {
+      hex.forEachLinkHex((nhex: AnkhHex, dir: HexDir) => {
+        if (nhex.terrain === 'w') return;        // not member of any region
+        if (nhex.regionId !== undefined) {
+          if (nhex.regionId !== id) {
+            metaMap.set(id, nhex.regionId);     // regions are adjacent
+            metaMap.set(nhex.regionId, id);     // regions are adjacent
+          }
+          return;
+        }
+        if (hex.borders[dir]) return;          // not semantically adjacent
+        setRegion(nhex, id);
+        addNeighbors(nhex, region, id);
+      });
+    }
+    this.noRegions(hexAry);
+    hexAry.forEach(hex => {
+      // put hex and its adjacent neighbors in the same region;
+      if (hex.regionId !== undefined) return; // already done
+      if (hex.terrain === 'w') return;        // not member of any region
+      const region = [], id = regions.length;
+      regions.push(region);
+      addNeighbors(hex, region, id);
+    });
+    return [regions, metaMap];
   }
 
+  showRegions(hexAry = this.hexAry, colors = godsList().map(g => g.color)) {
+    hexAry.forEach(ahex => {
+      if (ahex.regionId !== undefined) {
+        ahex.overlay.paint(C.nameToRgbaString(colors[ahex.regionId % colors.length], .4))
+        ahex.overlay.visible = true;
+        ahex.cont.updateCache();
+      }
+    })
+    this.update();
+  }
+
+  showRegion(regionId = 0, colors = godsList().map(g => g.color)) {
+    const region = this.regions[regionId], color = C.nameToRgbaString(colors[regionId % colors.length], .4);
+    region.forEach(ahex => {
+      ahex.overlay.paint(color);
+      ahex.overlay.visible = true;
+      ahex.cont.updateCache();
+    });
+    this.update();
+  }
 
   identCells() {
     this.forEachHex(hex => {
