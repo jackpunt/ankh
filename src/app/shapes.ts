@@ -30,18 +30,30 @@ export interface Paintable extends DisplayObject {
  * @param radius in call to drawPolyStar()
  */
 export class HexShape extends Shape implements Paintable {
-  static tilt: HexDir = 'NE';
   constructor(
     readonly radius = TP.hexRad,
-    readonly tiltDir = HexShape.tilt
+    readonly tilt = 30,  // ewTopo->30, nsTopo->0
   ) {
     super();
   }
 
-  /** draw a Hexagon 1/60th inside the given radius */
+  setHexBounds(r = this.radius, tilt = this.tilt) {
+    // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
+    const w = r * Math.cos(H.degToRadians * tilt);
+    const h = r * Math.cos(H.degToRadians * (tilt - 30));
+    this.setBounds(-w, -h, 2 * w, 2 * h);
+    return { x: -2, y: -H, w: 2 * w, h: 2 * h };
+  }
+
+  /**
+   * Draw a Hexagon 1/60th inside the given radius.
+   * overrides shlould include call to setHexBounds(radius, angle)
+   * or in other way setBounds().
+   */
   paint(color: string) {
-    const g = this.graphics.c(), tilt = H.ewDirRot[this.tiltDir];
-    return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, tilt);
+    this.setHexBounds();
+    const g = this.graphics.c();
+    return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
 export class CircleShape extends Shape {
@@ -124,14 +136,11 @@ export class TileShape extends HexShape {
   override paint(colorn: string) {
     super.paint('rgba(255,255,255,.8)');                 // solid hexagon
     // calculate bounds of hexagon for cache:
-    let r = this.radius, g = this.graphics, tilt = H.ewDirRot[this.tiltDir];
-    // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
-    let w = r * Math.cos(H.degToRadians * tilt)
-    let h = r * Math.cos(H.degToRadians * (tilt - 30))
-    this.cache(-w, -h, 2 * w, 2 * h);    // solid hexagon
+    const { x, y, width, height } = this.getBounds();
+    this.cache(x, y, width, height);
     const fillColor = C.nameToRgbaString(colorn, .2); // was TileShape.fillcolor
     this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
-    return g;
+    return this.graphics;
   }
 }
 

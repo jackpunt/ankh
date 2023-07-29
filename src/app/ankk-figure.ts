@@ -1,4 +1,4 @@
-import { C } from "@thegraid/common-lib";
+import { C, Constructor } from "@thegraid/common-lib";
 import { Hex2, Hex, Hex1 } from "./hex";
 import { Player } from "./player";
 import { C1 } from "./shapes";
@@ -69,7 +69,7 @@ class GodFigure extends Figure {
 
 }
 
-class Warrior extends Figure {
+export class Warrior extends Figure {
   private static source: UnitSource<Warrior>[] = [];
 
   /**
@@ -77,53 +77,59 @@ class Warrior extends Figure {
    * makeSource0 will invoke new Warrior(), etc.
    */
   static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
-    return Meeple.makeSource0(UnitSource, Warrior, player, hex, n);
+    return Meeple.makeSource0(UnitSource<Warrior>, Warrior, player, hex, n);
   }
 
   override get radius() { return TP.anhk1Rad }
 
   // Warrior
   constructor(player: Player, serial: number) {
-    super(`P-${serial}`, player);
+    super(`W:${player.index}-${serial}`, player);
     this.source = Warrior.source[player.index];
   }
   override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.paintRings(colorn, colorn, 4, 4); // one fat ring...
   }
 }
-
-class Guardian1 extends Figure {
+export class Guardian extends Figure {
+  static n = 2;
+  static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = guard['n']) {
+    return Meeple.makeSource0(UnitSource<Guardian>, guard, undefined, hex, n);
+  }
+}
+class Guardian1 extends Guardian {
+  static override n = 3;
   override get radius() { return TP.anhk1Rad; }
 }
 
-class Guardian2 extends Figure {
-  override get radius() { return TP.anhk1Rad; }
-}
-
-class Guardian3 extends Figure {
+class Guardian2 extends Guardian {
   override get radius() { return TP.anhk2Rad; }
 }
 
-class Satet extends Guardian1 {
+class Guardian3 extends Guardian {
+  override get radius() { return TP.anhk2Rad; }
+}
+
+export class Satet extends Guardian1 {
 
 }
 
-class MumCat extends Guardian1 {
+export class MumCat extends Guardian1 {
 
 }
 
-class Apep extends Guardian2 {
+export class Apep extends Guardian2 {
 
 }
 
-class Mummy extends Guardian2 {
+export class Mummy extends Guardian2 {
 
 }
 
-class Scorpion extends Guardian3 {
+export class Scorpion extends Guardian3 {
 
 }
 
-class Androsphinx extends Guardian3 {
+export class Androsphinx extends Guardian3 {
 
 }

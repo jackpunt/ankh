@@ -1,4 +1,4 @@
-import { json } from "@thegraid/common-lib";
+import { Constructor, json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { Container } from "@thegraid/easeljs-module";
 import { CostIncCounter } from "./counters";
@@ -15,6 +15,7 @@ import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerCo
 import { MapTile, Tile } from "./tile";
 import { EzPromise } from "@thegraid/ezpromise";
 import { GameState } from "./game-state";
+import { Figure, Guardian } from "./ankk-figure";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -76,7 +77,7 @@ export class GamePlay0 {
     return logWriter;
   }
 
-  constructor(godNames: string[]) {
+  constructor(godNames: string[], public guards: Constructor<Figure>[]) {
     this.logWriter = this.logWriterLine0()
     this.hexMap.Aname = `mainMap`;
     //this.hexMap.makeAllDistricts(); // For 'headless'; re-created by Table, after addToMapCont()
@@ -245,8 +246,8 @@ export class GamePlay0 {
 /** GamePlayD has compatible hexMap(mh, nh) but does not share components. used by Planner */
 export class GamePlayD extends GamePlay0 {
   //override hexMap: HexMaps = new HexMap();
-  constructor(gods: string[], nh = TP.nHexes, mh = TP.mHexes) {
-    super(gods);
+  constructor(gods: string[], guards: Constructor<Figure>[], nh = TP.nHexes, mh = TP.mHexes) {
+    super(gods, guards);
     this.hexMap.Aname = `GamePlayD#${this.id}`;
     this.hexMap.makeAllDistricts(nh, mh); // included in GamePlay0
     return;
@@ -257,8 +258,8 @@ export class GamePlayD extends GamePlay0 {
 export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
-  constructor(gods: string[], table: Table, public gameSetup: GameSetup) {
-    super(gods);            // hexMap, history, gStats...
+  constructor(gods: string[], guards: Constructor<Figure>[], table: Table, public gameSetup: GameSetup) {
+    super(gods, guards);            // hexMap, history, gStats...
     GP.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;
@@ -300,7 +301,6 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.autoPlay, argVal: 0})
     KeyBinder.keyBinder.setKey('v', { thisArg: this, func: this.autoPlay, argVal: 1})
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
-    KeyBinder.keyBinder.setKey('i', { thisArg: this, func: () => {table.showInf = !table.showInf; this.hexMap.update() } })
 
     // diagnostics:
     //KeyBinder.keyBinder.setKey('x', { thisArg: this, func: () => {this.table.enableHexInspector(); }})

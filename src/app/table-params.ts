@@ -57,7 +57,7 @@ export class TP {
   static tHexes = TP.ftHexes(this.mHexes) * TP.ftHexes(this.nHexes)
   static hexRad = 60;
   static meepleRad = TP.hexRad * .4;
-  static meepleY0 = TP.hexRad * .25;
+  static meepleY0 = 0;//TP.hexRad * .25;
   static log = 0
 
   /** map size for (dpb, dop) */

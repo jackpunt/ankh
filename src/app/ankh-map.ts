@@ -2,7 +2,7 @@ import { C, Constructor, KeyBinder, RC, S } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
 import { H, HexDir } from "./hex-intfs";
 import { HexShape } from "./shapes";
-import { HexConstructor, Hex2, Hex, HexMap } from "./hex";
+import { HexConstructor, Hex2, Hex, HexMap, HexMark } from "./hex";
 import { TP } from "./table-params";
 import { God } from "./god";
 
@@ -10,11 +10,10 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC);
     this.topo = this.nsTopo;
-    HexShape.tilt = 'N';
   }
 
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): T[] {
-    if (this.topo === this.ewTopo) return super.makeAllDistricts();
+    if (false && this.topo === this.ewTopo) return super.makeAllDistricts();
     else {
       const hexAry = this.makeRect(nh, nh + 1);
       this.mapCont.hexCont && this.centerOnContainer();
@@ -49,9 +48,9 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
   }
 
   newHexesOnRow(n: number, rc: RC, district: number, hexAry: Hex[], di = 1): RC {
-    let hex: Hex, { row, col } = rc;
+    const { row, col } = rc;
     for (let i = 0; i < n; i += di) {
-      hexAry.push(hex = this.addHex(row, col + i, district))
+      hexAry.push(this.addHex(row, col + i, district))
     }
     return rc;
   }
@@ -59,8 +58,9 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
 
 class AnkhHexShape extends HexShape {
   override paint(color: string): Graphics {
-    const g = this.graphics.c(), tilt = H.nsDirRot[HexShape.tilt];
-    return g.s(C.grey).f(color).dp(0, 0, Math.floor(this.radius * 60 / 60), 6, 0, tilt);
+    this.setHexBounds();
+    const g = this.graphics.c();
+    return g.s(C.grey).f(color).dp(0, 0, Math.floor(this.radius * 60 / 60), 6, 0, this.tilt);
   }
 }
 export type Terrain = 'd' | 'f' | 'w';
@@ -74,7 +74,7 @@ export class AnkhHex extends Hex2 {
   get piece() { return this.tile ?? this.meep }
 
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
-    if (!this.overlay) this.overlay = new HexShape()
+    if (!this.overlay) this.overlay = new HexShape(); // for showRegion()
     this.overlay.paint('rgba(250,250,250,.3)');
     this.overlay.visible = false;
     this.cont.addChild(this.overlay);
@@ -115,26 +115,34 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
 
   constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC ? AnkhHex as any as HexConstructor<T> : hexC);
-    KeyBinder.keyBinder.setKey('C-l', { thisArg: this, func: () => {
-      this.noRegions();
-      this.findRegions();
-      this.showRegions();
-    }});
-    KeyBinder.keyBinder.setKey('l', { thisArg: this, func: () => this.showRegions() });
-    KeyBinder.keyBinder.setKey('L', { thisArg: this, func: () => {
-      this.noRegions();
-      this.hexAry.forEach(hex => { hex.overlay.visible = false; hex.cont.updateCache() })
-      this.update();
-    } });
-    KeyBinder.keyBinder.setKey('M-l', { thisArg: this, func: () => {
-      this.noRegions();
-      const seedAry = [[3,0], [4,6], [0,2]].map(([r,c]) => this[r][c])
-      const [regions] = this.findRegions(seedAry);
-      this.showRegions();
-    }
-    });
+    this.bindKeys();
   }
 
+  bindKeys() {
+    KeyBinder.keyBinder.setKey('C-l', {
+      thisArg: this, func: () => {
+        this.noRegions();
+        this.findRegions();
+        this.showRegions();
+      }
+    });
+    KeyBinder.keyBinder.setKey('l', { thisArg: this, func: () => this.showRegions() });
+    KeyBinder.keyBinder.setKey('L', {
+      thisArg: this, func: () => {
+        this.noRegions();
+        this.hexAry.forEach(hex => { hex.overlay.visible = false; hex.cont.updateCache() })
+        this.update();
+      }
+    });
+    KeyBinder.keyBinder.setKey('M-l', {
+      thisArg: this, func: () => {
+        this.noRegions();
+        const seedAry = [[3, 0], [4, 6], [0, 2]].map(([r, c]) => this[r][c])
+        const [regions] = this.findRegions(seedAry);
+        this.showRegions();
+      }
+    });
+  }
 
   override addToMapCont(hexC?: Constructor<T>): this {
     return super.addToMapCont(hexC ?? AnkhHex as any as HexConstructor<T>);
@@ -151,8 +159,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
 
   setTerrain([r, c]: hexSpec, terrain: Terrain, color = AnkhMap.tColor[terrain]) {
     const hex = this[r][c];
-    const hexShape = hex.cont.getChildAt(0) as HexShape;
     hex.terrain = terrain;
+    const hexShape = hex.hexShape;
     hexShape.paint(color);
     hex.cont.updateCache();
   }
@@ -162,7 +170,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       hex.borders[dir] = true;
     }
     const oHex = hex.links[dir], rdir = H.dirRev[dir];
-    oHex.borders[rdir] = true;
+    oHex && (oHex.borders[rdir] = true); // testing with ewTopo does not find oHex.
   }
 
   addRiver([row, col, ...e]: hexSpecr, rshape: Shape) {

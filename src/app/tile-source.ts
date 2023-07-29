@@ -33,6 +33,7 @@ export class TileSource<T extends Tile> {
     this.counter = counter;
   }
 
+  /** can override */
   makeCounter(name: string, initValue: number, color: string, fontSize: number, fontName?: string, textColor?: string) {
     return new NumCounter(name, initValue, color, fontSize, fontName, textColor);
   }

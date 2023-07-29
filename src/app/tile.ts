@@ -18,93 +18,6 @@ type BonusInfo<T extends DisplayObject> = {
   paint?: (s: T, info: BonusInfo<T>) => void
 }
 
-export class BonusMark extends Container {
-
-  static bonusInfo: BonusInfo<DisplayObject>[] = [
-    {
-      // mark the AdjBonus for Bank
-      bonusId: 'Bank', dtype: CenterText, x: 0, y: -1.9, size: TP.hexRad / 3, paint: (t: Text, info) => {
-        t.text = '$'
-        t.color = C.GREEN
-        t.font = F.fontSpec(info.size)
-        t.x = info.x * info.size
-        t.y = info.y * info.size
-      }
-    },
-    // mark the AdjBonus for Lake
-    {
-      bonusId: 'Lake', dtype: Shape, x: 0, y: -2.5, size: TP.hexRad / 4, paint: (s: Shape, info, tilt = 90) => {
-        s.graphics.f(C.briteGold).dp(info.x, info.y, 1, 5, 2, tilt)
-        s.scaleX = s.scaleY = info.size;
-      }
-    },
-    // drawStar when vp > 0
-    {
-      bonusId: 'Star', dtype: Shape, x: 0, y: 1.3, size: TP.hexRad / 3, paint: (s: Shape, info, tilt = -90) => {
-        s.graphics.f(C.briteGold).dp(info.x, info.y, 1, 5, 2, tilt)
-        s.scaleX = s.scaleY = info.size;
-      }
-    },
-    // drawEcon when econ > 0
-    {
-      bonusId: 'Econ', dtype: CenterText, x: 0, y: 1.3, size: TP.hexRad / 3, paint: (t: Text, info) => {
-        t.text = '$'
-        t.color = C.GREEN
-        t.font = F.fontSpec(info.size)
-        t.x = info.x * info.size
-        t.y = info.y * info.size
-      }
-    },
-    // Bonus mark for any ActionTile
-    {
-      bonusId: 'star', dtype: Shape, x: 0, y: 0, size: TP.hexRad / 3, paint: (s: Shape, info, tilt = -90) => {
-        s.graphics.f(C.briteGold).dp(info.x, info.y, 1, 5, 2, tilt)
-        s.scaleX = s.scaleY = info.size;
-      }
-    },
-    // Bonus mark for any AuctionTile
-    {
-      bonusId: 'econ', dtype: CenterText, x: 0, y: -1.1, size: TP.hexRad / 2, paint: (t: Text, info) => {
-        t.text = '$'
-        t.color = C.GREEN
-        t.font = F.fontSpec(info.size)
-        t.x = info.x * info.size
-        t.y = info.y * info.size
-      }
-    },
-    {
-      bonusId: 'infl', dtype: InfShape, x: 1.4, y: -1.3, size: TP.hexRad / 4, paint: (c: Container, info) => {
-        c.scaleX = c.scaleY = .25;
-        c.x = info.x * info.size;
-        c.y = info.y * info.size;
-      }
-    },
-    {
-      bonusId: 'actn', dtype: Shape, x: -1.4, y: -1.3, size: TP.hexRad / 4, paint: (s: Shape, info) => {
-        s.scaleX = s.scaleY = info.size / 4
-        let path: [x: number, y: number][] = [[-1, 4], [2, -1], [-2, 1], [1, -4]].map(([x, y]) => [x + info.x*4, y + info.y*4])
-        let g = s.graphics.ss(1).s(C.YELLOW).mt(...path.shift())
-        path.map((xy) => g.lt(...xy))
-        g.es()
-      }
-    },
-  ];
-  static bonusMap = new Map<BonusId, BonusInfo<DisplayObject>>()
-  static ignore = BonusMark.bonusInfo.map(info => BonusMark.bonusMap.set(info.bonusId, info));
-
-  constructor(
-    public bonusId?: BonusId,
-    rotation = 0,
-    ) {
-    super();            // this is a Container
-    const info = BonusMark.bonusMap.get(bonusId); // has a paint() function
-    const dobj = new info.dtype();             // Shape or Text
-    this.addChild(dobj) // dobj is a Shape or Text or other info.dtype()
-    info.paint(dobj, info); // paint dobj with polystar(tilt) or Text(...)
-    this.rotation = rotation;
-  }
-}
-
 class TileLoader {
   Uname = ['Univ0', 'Univ1'];
   imageMap = new Map<string, HTMLImageElement>();
@@ -167,66 +80,6 @@ class Tile0 extends Container {
   paint(pColor = this.player?.color, colorn = pColor ? TP.colorScheme[pColor] : C1.grey) {
     this.baseShape.paint(colorn); // recache baseShape
     this.updateCache();
-  }
-
-  vpStar: DisplayObject;
-  // Looks just like the Bonus star! ('Star' y0 = 1.3 * hexRad; 'star' y0 = 0 [center])
-  drawStar(star: BonusId = 'Star', show = true) {
-    const info = BonusMark.bonusMap.get(star);
-    let mark = this.vpStar;
-    if (!mark && show) {
-      const index = this.econEcon ? this.getChildIndex(this.econEcon) : this.numChildren - 1;
-      mark = this.vpStar = this.addChildAt(new info.dtype(), index);
-      info.paint(mark, info);
-    } else if (mark) {
-      mark.visible = show;
-    }
-    this.updateCache();
-    return mark;
-  }
-
-  econEcon: DisplayObject;
-  drawEcon(econ = 1, show = true) {
-    const info = BonusMark.bonusMap.get('Econ');
-    let mark = this.econEcon;
-    if (!mark && show) {
-      mark = this.econEcon = this.addChild(new info.dtype());
-      info.paint(mark, info);
-      if (econ < 0) (mark as Text).text  = `${econ}`; // show '-n' instead of '$'
-    } else if (mark) {
-      mark.visible = show;
-    }
-    this.updateCache();
-    return mark;
-  }
-
-  readonly bonus: BonusObj = { star: false, infl: false, actn: false, econ: false }
-  /** GamePlay.addBonus(tile) restricts this to (tile instanceof AuctionTile) */
-  addBonus(bonusId: AuctionBonus) {
-    this.bonus[bonusId] = true;
-  }
-
-  bonusInf(color = this.infColor) { return (color === this.infColor && this.bonus['infl']) ? 1 : 0; }
-
-  get bonusCount() {
-    let rv = 0;
-    Object.values(this.bonus).forEach(isBonus => rv += (isBonus ? 1 : 0));
-    return rv;
-  }
-
-  forEachBonus(f: (b: AuctionBonus, v: boolean) => void) {
-    Object.keys(this.bonus).forEach((k: AuctionBonus) => f(k, this.bonus[k]));
-  }
-
-  removeBonus(bonusId?: BonusId, crit = (c: BonusMark) => (c.bonusId === bonusId)) {
-    // console.log(stime(this, `.removeBonus: ${bonusId}`), this.bonus);
-    if (!bonusId) {
-      BonusMark.bonusInfo.forEach(info => this.removeBonus(info.bonusId));
-      return;
-    }
-    this.bonus[bonusId] = false;
-    this.removeChildType(BonusMark, crit);
-    this.paint();
   }
 
   removeChildType(type: Constructor<DisplayObject>, pred = (dobj: DisplayObject) => true ) {
@@ -341,7 +194,7 @@ export class Tile extends Tile0 {
   }
 
   /** Tile.dropFunc() --> placeTile (to Map, reserve, ~>auction; not Recycle); semantic move/action. */
-  placeTile(toHex: Hex1, payCost = true) {
+  placeTile(toHex: Hex1, payCost = false) {
     GP.gamePlay.placeEither(this, toHex, payCost);
   }
 
@@ -354,7 +207,6 @@ export class Tile extends Tile0 {
   }
 
   resetTile() {
-    this.removeBonus();
     this.x = this.y = 0;
   }
 
@@ -397,7 +249,6 @@ export class Tile extends Tile0 {
   dragShift(shiftKey: boolean, ctx: DragContext) { }
 
   markLegal(table: Table, setLegal = (hex: Hex2) => { hex.isLegal = false; }, ctx?: DragContext) {
-    table.homeRowHexes.forEach(setLegal);
     table.hexMap.forEachHex(setLegal);
   }
 

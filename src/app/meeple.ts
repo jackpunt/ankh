@@ -1,4 +1,4 @@
-import { C } from "@thegraid/common-lib";
+import { C, Constructor } from "@thegraid/common-lib";
 import { Shape } from "@thegraid/easeljs-module";
 import { GP, NamedObject } from "./game-play";
 import type { Hex, Hex1, Hex2 } from "./hex";
@@ -75,9 +75,9 @@ export class Meeple extends Tile {
     if (hex !== undefined) hex.meep = this;
   }
 
-  override get radius() { return TP.hexRad / 1.9 }
+  override get radius() { return TP.meepleRad } // 31.578 vs 60*.4 = 24
   override textVis(v: boolean) { super.textVis(true); }
-  override makeShape(): Paintable { return new MeepleShape(this.player); }
+  override makeShape(): Paintable { return new MeepleShape(this.player, this.radius); }
 
   /** location at start-of-turn; for Meeples.unMove() */
   startHex: Hex1;
@@ -193,11 +193,22 @@ export class Meeple extends Tile {
   }
 
 
-  static makeSource0<TS extends UnitSource<Meeple>, T extends Meeple>(stype: new(type, p, hex) => TS, type: new(p: Player, n: number) => T, player: Player, hex: Hex2, n = 0) {
-    const source = new stype(type, player, hex);
-    type['source'][player.index] = source; // static source: TS = [];
+  static makeSource0<T extends Meeple, TS extends UnitSource<T>>(
+    unitSource: new (type: Constructor<Meeple>, p: Player, hex: Hex2) => TS,
+    type: Constructor<T>,
+    player: Player,
+    hex: Hex2,
+    n = 0,
+  ) {
+    const source = new unitSource(type, player, hex);
+    // static source: TS = [];
+    if (player) {
+      type['source'][player.index] = source;
+    } else {
+      type['source'] = source;
+    }
     for (let i = 0; i < n; i++) source.newUnit(new type(player, i + 1))
     source.nextUnit();  // unit.moveTo(source.hex)
-    return source;
+    return source as TS;
   }
 }

@@ -1,4 +1,4 @@
-import { C, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
+import { C, Constructor, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { EBC, PidChoice } from "./choosers";
 import { GamePlay } from "./game-play";
@@ -9,6 +9,7 @@ import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { selectN } from "./functions";
 import { God } from "./god";
+import { Androsphinx, Apep, Figure, Satet } from "./ankk-figure";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
@@ -73,8 +74,9 @@ export class GameSetup {
     Player.allPlayers = [];
     const gods = ext.length > 2 ? ext : selectN(God.allNames, ngods);
     gods.length = Math.min(gods.length, 5);
+    const guards: Constructor<Figure>[] = [Satet, Apep, Androsphinx];
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
-    const gamePlay = new GamePlay(gods, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
+    const gamePlay = new GamePlay(gods, guards, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup

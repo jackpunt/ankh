@@ -173,6 +173,7 @@ export class Hex {
   }
 }
 
+/** Hex with tile & meep, occupied, piece */
 export class Hex1 extends Hex {
 
   _tile: MapTile;
@@ -245,7 +246,9 @@ export class Hex2 extends Hex1 {
     }
   }
 
-  /** Hex2 in hexMap.mapCont.hexCont; hex.cont contains:
+  /**
+   * add Hex2 to map?.mapCont.hexCont; not in map.hexAry!
+   * Hex2.cont contains:
    * - polyStar Shape of radius @ (XY=0,0)
    * - stoneIdText (user settable stoneIdText.text)
    * - rcText (r,c)
@@ -291,10 +294,11 @@ export class Hex2 extends Hex1 {
     cont.setBounds(-w / 2, -h / 2, w, h);
     const b = cont.getBounds();
     cont.cache(b.x, b.y, b.width, b.height);
+    // cont.rotation = this.map.topoRot;
   }
 
   makeHexShape(shape: Constructor<HexShape> = HexShape) {
-    const hs = new shape(this.radius);
+    const hs = new shape(this.radius, this.map.topoRot);
     this.cont.addChildAt(hs, 0);
     this.cont.hitArea = hs;
     hs.paint('grey');
@@ -337,17 +341,23 @@ export class Hex2 extends Hex1 {
 export class RecycleHex extends Hex2 { }
 
 /** for contrast paint it black AND white, leave a hole in the middle unpainted. */
-class HexMark extends Shape {
+export class HexMark extends HexShape {
   hex: Hex2;
   constructor(public hexMap: HexMap<Hex2>, radius: number, radius0: number = 0) {
-    super();
-    const mark = this, cb = "rgba(0,0,0,.3)", cw="rgba(255,255,255,.3)"
-    mark.mouseEnabled = false
-    mark.graphics.f(cb).dp(0, 0, radius, 6, 0, 30)
-    mark.graphics.f(cw).dp(0, 0, radius, 6, 0, 30)
-    mark.cache(-radius, -radius, 2*radius, 2*radius)
+    super(radius, hexMap.topoRot);
+    const mark = this;
+    const cm = "rgba(127,127,127,.3)";
+    this.graphics.f(cm).dp(0, 0, this.radius, 6, 0, this.tilt);
+    mark.cache(-radius, -radius, 2 * radius, 2 * radius)
     mark.graphics.c().f(C.BLACK).dc(0, 0, radius0)
     mark.updateCache("destination-out")
+    mark.setHexBounds();
+    mark.mouseEnabled = false;
+  }
+
+  override paint(color: string): Graphics {
+    this.setHexBounds();
+    return this.graphics;   // do not repaint.
   }
 
   // Fail: markCont to be 'above' tileCont...
@@ -463,10 +473,18 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     if (addToMapCont) this.addToMapCont(this.hexC);
   }
 
+  // the 'tilt' to apply to a HexShape to align with map.topo:
+  get topoRot() { return (this.topo === this.ewTopo) ? 30 : 0 }
+
+  makeMark() {
+    const mark = new HexMark(this.asHex2Map, this.radius, this.radius/2.5);
+    return mark;
+  }
+
   /** create/attach Graphical components for HexMap */
   addToMapCont(hexC?: Constructor<T>): this {
     if (hexC) this.hexC = hexC;
-    this.mark = new HexMark(this.asHex2Map, this.radius, this.radius/2.5)
+    this.mark = this.makeMark();
     const mapCont = this.mapCont;
     MapCont.cNames.forEach(cname => {
       const cont = new Container();

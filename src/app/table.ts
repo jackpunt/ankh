@@ -8,6 +8,9 @@ import { Player } from "./player";
 import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
+import { Guardian, Warrior } from "./ankk-figure";
+import { UnitSource } from "./tile-source";
+import { God } from "./god";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -134,7 +137,7 @@ export class Table extends EventDispatcher  {
   logText(line: string, from = '') {
     this.textLog.log(`#${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
   }
-  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = TP.nHexes, col = -8) {
+  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 4, col = -9) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
     this.setToRowCol(undoC, row, col);
     const progressBg = new Shape(), bgw = 200, bgym = 140, y0 = 0; // bgym = 240
@@ -174,7 +177,7 @@ export class Table extends EventDispatcher  {
     this.hexMap.update()
   }
   enableHexInspector(qY = 52, cont = this.undoCont) {
-    const qShape = new HexShape(TP.hexRad/3, 'N');
+    const qShape = new HexShape(TP.hexRad/3);
     qShape.paint(C.BLACK);
     qShape.y = qY;  // size of 'skip' Triangles
     cont.addChild(qShape);
@@ -195,17 +198,6 @@ export class Table extends EventDispatcher  {
     this.toggleText(false);         // set initial visibility
   }
 
-  set showCap(val) { (this.hexMap.mapCont.capCont.visible = val)}
-  get showCap() { return this.hexMap.mapCont.capCont.visible}
-
-  set showInf(val) { (this.hexMap.mapCont.infCont.visible = val) ? this.markAllSacrifice() : this.unmarkAllSacrifice() }
-  get showInf() { return this.hexMap.mapCont.infCont.visible }
-  _showSac = true
-  get showSac() { return this._showSac }
-  set showSac(val: boolean) { (this._showSac = val) ? this.markAllSacrifice() : this.unmarkAllSacrifice() }
-  markAllSacrifice() {}
-  unmarkAllSacrifice() {}
-
   downClick = false;
   isVisible = false;
   /** method invokes closure defined in enableHexInspector. */
@@ -213,7 +205,6 @@ export class Table extends EventDispatcher  {
     if (this.downClick) return (this.downClick = false, undefined) // skip one 'click' when pressup/dropfunc
     if (vis === undefined) vis = this.isVisible = !this.isVisible;
     Tile.allTiles.forEach(tile => tile.textVis(vis));
-    this.homeRowHexes.forEach(hex => hex.showText(vis));
     this.hexMap.forEachHex<Hex2>(hex => hex.showText(vis))
     this.hexMap.update()               // after toggleText & updateCache()
   }
@@ -250,10 +241,6 @@ export class Table extends EventDispatcher  {
     return bpanel
   }
 
-  // pIndex = 2 for non-player Hexes (auctionHexes, crimeHex)
-  readonly homeRowHexes: Hex2[] = [];
-  leaderHexes: Hex2[][] = [[], []]; // per player
-
   newHex2(row = 0, col = 0, name: string, claz: Constructor<Hex2> = Hex2, sy = 0) {
     const hex = new claz(this.hexMap, row, col, name);
     hex.distText.text = name;
@@ -266,15 +253,6 @@ export class Table extends EventDispatcher  {
   noRowHex(name: string, crxy: { row: number, col: number }, claz?: Constructor<Hex2>) {
     const { row, col } = crxy;
     const hex = this.newHex2(row, col, name, claz);
-    return hex;
-  }
-
-  // row typically 0 or -1; sy[row=0]: 0, -1, -2;
-  homeRowHex(name: string, crxy: { row: number, col: number }, sy = 0, claz?: Constructor<Hex2>) {
-    const { row, col } = crxy;
-    const hex = this.newHex2(row, col, name, claz, sy);
-    this.homeRowHexes.push(hex);
-    hex.legalMark.setOnHex(hex);
     return hex;
   }
 
@@ -302,46 +280,37 @@ export class Table extends EventDispatcher  {
     const pbr = this.scaleCont.localToLocal(bgr.w, bgr.h, hexCont);
     hexCont.cache(p00.x, p00.y, pbr.x - p00.x, pbr.y - p00.y); // cache hexCont (bounded by bgr)
 
-    this.homeRowHexes.length = 0;
+    const guards = this.gamePlay.guards;
+    // this.guardSources = guards.filter((g, i) => i > 0).map(guard => {
+    //   const hex = this.newHex2(0, 0, 'guardHex', AnkhHex); // Later, move to location of player Panel.
+    //   return Guardian.makeSource(hex, guard) as UnitSource<Guardian>;
+    //   // now we have instances, sitting on UnitSource.hex
+    // });
+    this.makeGuardSources();
 
     this.makeActionCont();
     this.makeEventCont();
     this.makeScoreCont();
     this.makePerPlayer();
 
-    this.gamePlay.recycleHex = this.makeRecycleHex(TP.nHexes, TP.nHexes);
+    this.gamePlay.recycleHex = this.makeRecycleHex();
     this.setupUndoButtons(55, 60, 45, bgr) // & enableHexInspector()
 
     this.hexMap.update();
     // position turnLog & turnText
     {
       const parent = this.scaleCont, n = TP.nHexes + 2;
-      const lhex = this.hexMap.getCornerHex('SW');
-      let rhex = lhex.links['N'] as Hex2;
-      const {x, y, w, h, dxdc, dydr } = this.hexMap.centerHex.xywh();
-      let rhpt = rhex.cont.parent.localToLocal(rhex.x - n * dxdc, rhex.y, parent)
-      this.bagLog.x = rhpt.x; this.bagLog.y = rhpt.y - this.turnLog.height(1);;
-      this.turnLog.x = rhpt.x; this.turnLog.y = rhpt.y;
-      this.textLog.x = rhpt.x; this.textLog.y = rhpt.y + this.turnLog.height(Player.allPlayers.length + 1);
+      this.setToRowCol(this.turnLog, 6, -13);
+      this.setToRowCol(this.bagLog, 6, -13);
+      this.setToRowCol(this.textLog, 6, -13);
+      this.bagLog.y -= this.turnLog.height(1);
+      this.textLog.y += this.turnLog.height(Player.allPlayers.length + 1);
 
       parent.addChild(this.bagLog, this.turnLog, this.textLog);
       parent.stage.update()
     }
 
     this.on(S.add, this.gamePlay.playerMoveEvent, this.gamePlay)[S.Aname] = "playerMoveEvent"
-  }
-
-  makeRecycleHex(row = TP.nHexes + 1.5, col = TP.nHexes) {
-    const name = 'Recycle'
-    const image = new Tile(name).addImageBitmap(name); // ignore Tile, get image.
-    image.y = -TP.hexRad / 2; // recenter
-
-    const rHex = this.newHex2(row, col, name, RecycleHex);
-    rHex.rcText.visible = rHex.distText.visible = false;
-    rHex.setHexColor(C.WHITE);
-    rHex.cont.addChild(image);
-    rHex.cont.updateCache();
-    return rHex;
   }
 
   // col locations, left-right mirrored:
@@ -351,114 +320,36 @@ export class Table extends EventDispatcher  {
     return { row, col };
   }
 
-  makePerPlayer() {
+  readonly panelForPlayer: Container[] = [];
+  makePerPlayer(c0 = -7.4, c1 = TP.nHexes +1, r0 = -.3, dr = 3.4) {
+    const panelLocs = [[r0, c0], [r0 + dr, c0], [r0 + 2 * dr, c0], [r0, c1], [r0 + dr, c1]];
+    const seq = [[], [0], [0, 3], [0, 3, 1], [0, 3, 4, 1], [0, 3, 4, 2, 1]];
+    const np = Player.allPlayers.length, seqn = seq[np];
     this.panelForPlayer.length = 0; // TODO: maybe deconstruct
     Player.allPlayers.forEach((p, pIndex) => {
-      this.makePlayerPanel(p);
+      const ndx = seqn[pIndex];
+      const [row, col] = panelLocs[ndx];
+      this.panelForPlayer[pIndex] = new PlayerPanel(this, p, row, col, ndx < 3 ? -1 : 1);
       p.makePlayerBits();
     });
   }
 
+  /** move cont to nominal [row, col] of hexCont */
   setToRowCol(cont: Container, row = 0, col = 0) {
     if (!cont.parent) this.scaleCont.addChild(cont);
-    const hexC = this.hexMap.centerHex;
+    const hexCont = this.hexMap.mapCont.hexCont;
+    const ewTopo = (this.hexMap.topo === this.hexMap.ewTopo);
+    //if (cont.parent === hexCont) debugger;
     const fcol = Math.floor((col)), ecol = fcol - fcol % 2, cresi = col - ecol;
     const frow = Math.floor((row)), erow = frow - frow % 2, rresi = row - erow;
-    const { x, y, w, h, dxdc, dydr } = hexC.xywh(undefined, undefined, erow, ecol);
+    const hexC = this.hexMap.centerHex;
+    const { x, y, w, h, dxdc, dydr } = hexC.xywh(undefined, ewTopo, erow, ecol);
     const xx = x + cresi * dxdc;
     const yy = y + rresi * dydr;
-    this.hexMap.mapCont.hexCont.localToLocal(xx, yy, cont.parent, cont);
-  }
-
-  readonly panelForPlayer: Container[] = [];
-  readonly panelLocs = [[0-.2, -6.5], [3.6, -6.5], [7.5, -6.5], [0-.2, TP.nHexes-.5], [3.6, TP.nHexes-.5]];
-  /** per player buttons to invoke GamePlay */
-  makePlayerPanel(player: Player) {
-    const index = player.index;
-    const god = player.god;
-    const row = this.panelLocs[index][0], col = this.panelLocs[index][1];
-    const panel = this.panelForPlayer[index] = new Container();
-    this.setToRowCol(panel, row , col);
-    const ankhPowers = [
-      ['Commanding', 'Inspiring', 'Omnipresent', 'Revered'],  // rank 0
-      ['Resplendent', 'Obelisk', 'Temple', 'Pyramid'],        // rank 1
-      ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
-    ];
-    const { x, y, w, h, dydr } = this.hexMap.centerHex.xywh();
-    const wide = 590, high = dydr * 3.7, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 190;
-    const g = new Graphics().ss(5);
-    const outline = new RectShape({ x: 0, y: -(brad + gap), w: wide, h: high }, '', god.color, g);
-    panel.addChild(outline);
-    const onClick = (evt: Object, info: AnkhPowerInfo) => {
-      const god = player.god, ankh = info.ankhs.shift();
-      if (!ankh) return;
-      ankh.x = 0; ankh.y = 0;
-      god.ankhPowers.push(info.name);
-      console.log(stime(this, `.onClick: ankhPowers =`), god.ankhPowers, info.button.id);
-      const parent = info.button.parent;
-      const powerCont = parent.parent as AnkhPowerCont;
-      parent.addChild(ankh);
-      parent.stage.update();
-      if (powerCont.guardian === info.ankhs.length) {
-        console.log(stime(this, `.onClick: takeGuardian powerCont =`), powerCont, powerCont.guardian, info.ankhs);
-        // TODO: take Guardian (move to god.stable)
-      }
+    hexCont.localToLocal(xx, yy, cont.parent, cont);
+    if (cont.parent === hexCont) {
+      cont.x = xx; cont.y = yy;
     }
-    // Ankh Powers: circle + text
-    ankhPowers.forEach((ary, rank) => {
-      const colCont = new Container() as AnkhPowerCont;
-      panel.addChild(colCont);
-      // TODO: take from god.ankhSource; store for multi-click
-      const ankhs = [god.getAnhkToken(), god.getAnhkToken()];
-      ankhs.forEach((ankh, i) => {
-        ankh.x = 30 + i * (2 * brad + gap);
-        ankh.y = 4 * rowh;
-      });
-      colCont.guardian = (rank < 2) ? 0 : 1;
-      colCont.ankhs = ankhs;
-      colCont.addChild(...ankhs);
-      colCont.x = rank * colWide;
-
-      // place powerLines:
-      ary.forEach((name, nth) => {
-        const powerLine = new Container();
-        const button = new CircleShape(brad, C.white, );
-        button.on(S.click, onClick as any, this, false, { button, name, ankhs });
-        powerLine.addChild(button);
-        const text = new CenterText(name, brad);
-        text.textAlign = 'left';
-        text.x = brad + gap;
-        powerLine.addChild(text);
-        powerLine.x = brad + gap;
-        powerLine.y = nth * rowh;
-        colCont.addChild(powerLine);
-      })
-    });
-    // Stable:
-    const stableCont = new Container();
-    const srad1 = TP.anhk1Rad, srad2 = TP.anhk2Rad, dir = (index < 3) ? -1 : 1;
-    const x0 = [wide - (srad1 + 3 * gap), srad1 + 2 * gap][(1 + dir) / 2];
-    const sgap = 1.25 * srad2;
-    const swide = 2 * (srad1 + srad2 + sgap + sgap);
-    stableCont.y = 5.5 * rowh;
-    panel.addChild(stableCont);
-    const sourceInfo = [srad1, srad1, srad2, srad2, ]; // size for each type: Warrior, G1, G2, G3
-    sourceInfo.forEach((radi, i) => {
-      const g0 = new Graphics().ss(1).sd([5, 5]);
-      const circle = new CircleShape(radi + 1, 'lightgrey', god.color, g0);
-      // circle.graphics.f('').dc(0, 0, radi + 1);
-      circle.x = x0 + dir * i * (radi + sgap);
-      stableCont.addChild(circle);
-    });
-    // Special:
-    const swidth = 200;
-    const specl = god.makeSpecial({ width: swidth, height: srad2 * 2 });
-    specl.y = 5.5 * rowh - srad2;
-    specl.x = ((dir + 1) / 2) * (wide - swide + brad) - (brad / 2); // [(wide-swide-brad/2) , -brad/2, ]
-    specl.x = [ gap, wide -swidth - (1*gap), ][(1 + dir) / 2]
-    panel.addChild(specl)
-    // amun special area
-
   }
 
   makeButton(color = C.WHITE, rad = 20, c?: string) {
@@ -473,13 +364,38 @@ export class Table extends EventDispatcher  {
     return button;
   }
 
+  makeRecycleHex(row = 7, col = TP.nHexes + 6) {
+    const name = 'Recycle'
+    const image = new Tile(name).addImageBitmap(name); // ignore Tile, get image.
+    image.y = -TP.hexRad / 2; // recenter
+
+    const rHex = this.newHex2(row, col, name, RecycleHex);
+    this.setToRowCol(rHex.cont, row, col);
+    rHex.rcText.visible = rHex.distText.visible = false;
+    rHex.setHexColor(C.WHITE);
+    rHex.cont.addChild(image);
+    rHex.cont.updateCache();
+    return rHex;
+  }
+  guardSources: UnitSource<Guardian>[];
+  makeGuardSources(row = 7, col = TP.nHexes + 1.7) {
+    const guards = this.gamePlay.guards;
+    guards.forEach((guard, i) => { // .filter((g, i) => i > 0)
+      const ci = col + i * 1.25, hex = this.newHex2(row, ci, `gs-${i}`, AnkhHex);
+      this.setToRowCol(hex.cont, row, ci);
+      const source = Guardian.makeSource(hex, guard, 2);
+    });
+  }
+
   actionPanels: { [index: string]: Container } = {};
-  makeActionCont(row = TP.nHexes - 2, col = TP.nHexes) {
-    const np = Player.allPlayers.length, rad = 30, wide = (2 * rad + 5) * (np + 1), rh = 2 * rad + 5;
+  makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.6) {
+    const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
+    const wide = 400;
     console.log(stime(this, `.makeActionCont`), np);
     // TODO: class actionCont, with slots to hold button & each circle/state (number activated)
     // or could use children[] and the color/visiblity of each shape/cont
     const actionCont = new Container()
+    this.hexMap.mapCont.resaCont.addChild(actionCont);
     this.setToRowCol(actionCont, row, col);
     const actionRows = [{ id: 'Move' }, { id: 'Summon ' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
     const selectAction = (id: string, button: Container) => {
@@ -491,7 +407,7 @@ export class Table extends EventDispatcher  {
     }
     //for (let rn = 0; rn < actionRows.length; rn++) {
     actionRows.forEach((action, rn) => {
-      const nc = np + 2 + (action.dn ?? 0), dx = wide/(nc-1), id = action.id;
+      const nc = np + 2 + (action.dn ?? 0), dx = wide / (nc - 1), id = action.id;
       const rowCont = new Container();
       rowCont.y = rn * rh;
       actionCont.addChild(rowCont);
@@ -510,8 +426,10 @@ export class Table extends EventDispatcher  {
     return actionCont;
   }
 
-  makeEventCont(row = TP.nHexes + 1.5, col = TP.nHexes) {
+  eventCells: Container[] = [];
+  makeEventCont(row = TP.nHexes + 0.5, col = 7.05) {
     const eventCont = new Container();
+    this.hexMap.mapCont.resaCont.addChild(eventCont);
     this.setToRowCol(eventCont, row, col);
     const events = [
       'claim', 'claim', 'claim', 'battle',
@@ -520,20 +438,20 @@ export class Table extends EventDispatcher  {
       'split', 'claim', 'claim', 'battle', 'redzone',
       'claim', 'battle',
     ];
-    const x0 = 0, y = 0, rad = TP.anhkRad, gap = 5, dx = 2 * rad + gap;
+    const lf = false, rad = TP.anhkRad, gap = 5, dx = 2 * rad + gap, bx = .5;
     let cx = 0;
     events.forEach((evt, nth) => {
       const icon = new Container();
       const k = firstChar(evt);
       const shape = new CircleShape(rad, 'rgb(240,240,240)');
       const text = new CenterText(k, rad * 1.8); text.y += 2;
-      if (Math.floor(cx) === 8) cx = Math.floor(cx);
-      const row = Math.min(1, Math.floor(Math.floor(cx) / 8));
+      if (lf && Math.floor(cx) === 8) cx = Math.floor(cx);
+      const row = lf ? Math.min(1, Math.floor(Math.floor(cx) / 8)) : 0;
       icon.y = row * dx;
-      icon.x = x0 + ((row == 0) ? cx : cx - 8 ) * dx;
+      icon.x = ((row == 0) ? cx : cx - 8 ) * dx;
       cx += 1;
       if (k === 'B') {
-        cx += .4;
+        cx += bx;  // extra gap after Battle
       }
       if (k === 'M' || k === 'R') {
         icon.y += dx;
@@ -548,14 +466,15 @@ export class Table extends EventDispatcher  {
     })
     return eventCont;
   }
-  eventCells: Container[] = [];
 
   readonly emptyColor = 'rgb(240,240,240)';
-  makeScoreCont(row = TP.nHexes + 1.5, col = -5, np = Player.allPlayers.length) {
+  makeScoreCont(row = TP.nHexes + .2, col = -7.2, np = Player.allPlayers.length, w = 34) {
     const redzone = 'rgb(230,100,100)', empty = this.emptyColor, win = C.lightgreen;
     const scoreCont = new Container()
+    this.hexMap.mapCont.resaCont.addChild(scoreCont);
     this.setToRowCol(scoreCont, row, col);
-    const w = 36, h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, rz = 20, ym = (np - 1) * h;
+    const h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, rz = 20, ym = (np - 1) * h;
+    scoreCont.y += (5 - np) * np * h / 5;
     const bg1 = new Shape();
     bg1.graphics.f(redzone).dr(x - gap, y - gap, rz * dx + gap, np * h + 2 * gap);
     scoreCont.addChild(bg1);
@@ -871,5 +790,113 @@ export class Table extends EventDispatcher  {
     KeyBinder.keyBinder.setKey("a", { func: () => setScaleXY(nsA, apt) });
     KeyBinder.keyBinder.setKey("p", { func: () => goup(), thisArg: this});
     KeyBinder.keyBinder.dispatchChar(char)
+  }
+}
+
+class PlayerPanel extends Container {
+  warriorSource: UnitSource<Warrior>;
+  constructor(
+    table: Table,
+    player: Player,
+    row: number,
+    col: number,
+    dir = -1, // +1 if to right side of table.
+   ) {
+    super();
+    const panel = this;
+    const god = player.god;
+    const index = player.index;
+    table.hexMap.mapCont.resaCont.addChild(panel);
+    table.setToRowCol(panel, row, col);
+    const ankhPowers = [
+      ['Commanding', 'Inspiring', 'Omnipresent', 'Revered'],  // rank 0
+      ['Resplendent', 'Obelisk', 'Temple', 'Pyramid'],        // rank 1
+      ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
+    ];
+    const dydr = table.hexMap.xywh.dydr;
+    const wide = 590, high = dydr * 3.2, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 190;
+    const g = new Graphics().ss(5);
+    const outline = new RectShape({ x: 0, y: -(brad + gap), w: wide, h: high }, '', god.color, g);
+    panel.addChild(outline);
+    // select AnkhPower:
+    const selectAnkhPower = (evt: Object, info?: AnkhPowerInfo) => {
+      const {button, name, ankhs } = info;
+      const god = player.god, ankh = ankhs.shift();
+      if (!ankh) return;
+      ankh.x = 0; ankh.y = 0;
+      god.ankhPowers.push(name);
+      console.log(stime(this, `.onClick: ankhPowers =`), god.ankhPowers, button.id);
+      const parent = button.parent;
+      const powerCont = parent.parent as AnkhPowerCont;
+      parent.addChild(ankh);
+      parent.stage.update();
+      if (powerCont.guardian === ankhs.length) {
+        console.log(stime(this, `.onClick: takeGuardian powerCont =`), powerCont, powerCont.guardian, ankhs);
+        // TODO: take Guardian (move to god.stable)
+      }
+    }
+    // Ankh Power line: circle + text
+    ankhPowers.forEach((ary, rank) => {
+      const colCont = new Container() as AnkhPowerCont;
+      panel.addChild(colCont);
+      // TODO: take from god.ankhSource; store for multi-click
+      const ankhs = [god.getAnhkToken(), god.getAnhkToken()];
+      ankhs.forEach((ankh, i) => {
+        ankh.x = 30 + i * (2 * brad + gap);
+        ankh.y = 4 * rowh;
+      });
+      colCont.guardian = (rank < 2) ? 0 : 1;
+      colCont.ankhs = ankhs;
+      colCont.addChild(...ankhs);
+      colCont.x = rank * colWide;
+
+      // place powerLines --> selectAnkhPower:
+      ary.forEach((name, nth) => {
+        const powerLine = new Container();
+        const button = new CircleShape(brad, C.white, );
+        button.on(S.click, selectAnkhPower, this, false, { button, name, ankhs });
+        powerLine.addChild(button);
+        const text = new CenterText(name, brad);
+        text.textAlign = 'left';
+        text.x = brad + gap;
+        powerLine.addChild(text);
+        powerLine.x = brad + gap;
+        powerLine.y = nth * rowh;
+        colCont.addChild(powerLine);
+      })
+    });
+    // Stable:
+    const stableCont = new Container();
+    const srad1 = TP.anhk1Rad, srad2 = TP.anhk2Rad;
+    const x0 = [wide - (srad1 + 3 * gap), srad1 + 2 * gap][(1 + dir) / 2];
+    const sgap = 1.25 * srad2;
+    const swide = 2 * (srad1 + srad2 + sgap + sgap);
+    stableCont.y = 5.5 * rowh;
+    panel.addChild(stableCont);
+
+    const warriorHex = table.newHex2(0, 0, `w-${index}`, AnkhHex);
+
+    const sourceInfo = [srad1, srad1, srad2, srad2, ]; // size for each type: Warrior, G1, G2, G3
+    sourceInfo.forEach((radi, i) => {
+      const g0 = new Graphics().ss(2).sd([5, 5]);
+      const circle = new CircleShape(radi - 1, '', god.color, g0);
+      // circle.graphics.f('').dc(0, 0, radi + 1);
+      circle.x = x0 + dir * i * (radi + sgap);
+      stableCont.addChild(circle);
+      if (i == 0) {
+        circle.parent.localToLocal(circle.x, circle.y, warriorHex.cont.parent, warriorHex.cont);
+        this.warriorSource = Warrior.makeSource(player, warriorHex);
+        this.warriorSource.counter.mouseEnabled = false;
+        warriorHex.legalMark.setOnHex(warriorHex);
+        warriorHex.cont.visible = false;
+      }
+    });
+    // Special:
+    const swidth = 200;
+    const specl = god.makeSpecial({ width: swidth, height: srad2 * 2 });
+    specl.y = 5.5 * rowh - srad2;
+    specl.x = ((dir + 1) / 2) * (wide - swide + brad) - (brad / 2); // [(wide-swide-brad/2) , -brad/2, ]
+    specl.x = [ gap, wide -swidth - (1*gap), ][(1 + dir) / 2]
+    panel.addChild(specl)
   }
 }
