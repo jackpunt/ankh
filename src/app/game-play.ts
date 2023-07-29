@@ -1,21 +1,20 @@
 import { Constructor, json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { Container } from "@thegraid/easeljs-module";
-import { CostIncCounter } from "./counters";
+import { EzPromise } from "@thegraid/ezpromise";
+import { AnkhHex, AnkhMap } from "./ankh-map";
+import { Figure } from "./ankk-figure";
 import { GameSetup } from "./game-setup";
-import { Hex, Hex1, Hex2, IHex } from "./hex";
-import { AnkhMap, AnkhHex } from "./ankh-map";
+import { GameState } from "./game-state";
+import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
 import { CenterText } from "./shapes";
 import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
-import { PlayerColor, PlayerColorRecord, TP, criminalColor, otherColor, playerColorRecord, playerColors, } from "./table-params";
+import { PlayerColor, TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
-import { EzPromise } from "@thegraid/ezpromise";
-import { GameState } from "./game-state";
-import { Figure, Guardian } from "./ankk-figure";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -51,7 +50,8 @@ export class GamePlay0 {
   static gpid = 0
   readonly id = GamePlay0.gpid++
   readonly gameState = new GameState();
-  get gamePhase() { return this.gameState.state.Aname; }
+  get gamePhase() { return this.gameState.state; }
+  isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
   readonly logWriter: LogWriter

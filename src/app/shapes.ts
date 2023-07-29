@@ -211,12 +211,13 @@ export class MeepCapMark extends CapMark {
 }
 
 export class LegalMark extends Shape {
+  hex2: Hex2;
   setOnHex(hex: Hex2) {
-    let parent = hex.mapCont.markCont;
-    this.mouseEnabled = false;
+    this.hex2 = hex;
+    const parent = hex.mapCont.markCont;
     this.graphics.f(C.legalGreen).dc(0, 0, TP.hexRad/2);
     hex.cont.parent.localToLocal(hex.x, hex.y, parent, this);
-    this.mouseEnabled = false;
+    this.mouseEnabled = true;
     this.visible = false;
     parent.addChild(this);
   }

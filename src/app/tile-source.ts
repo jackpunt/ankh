@@ -42,18 +42,16 @@ export class TileSource<T extends Tile> {
 
   /** mark unit available for later deployment */
   availUnit(unit: T) {
+    if (!this.allUnits.includes(unit)) {
+      this.allUnits.push(unit);
+      unit.source = this;
+    }
     if (!this.available.includes(unit)) {
       this.available.push(unit);
       unit.hex = undefined;
       unit.visible = false;
     }
     this.updateCounter();
-  }
-
-  /** enroll a new Unit to this source. */
-  newUnit(unit: T) {
-    this.allUnits.push(unit);
-    this.availUnit(unit);
   }
 
   protected isAvailable(unit: Tile) {

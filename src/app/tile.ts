@@ -6,6 +6,7 @@ import type { Player } from "./player";
 import { BalMark, C1, CapMark, CenterText, HexShape, InfShape, Paintable, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, PlayerColorRecord, TP, criminalColor, playerColorRecord, playerColorsC } from "./table-params";
+import { TileSource } from "./tile-source";
 
 export type AuctionBonus = 'star' | 'econ' | 'infl' | 'actn';
 export type AdjBonusId = 'Bank' | 'Lake';
@@ -105,6 +106,7 @@ export class Tile extends Tile0 {
   homeHex: Hex1 = undefined;
   /** location at start-of-drag */
   fromHex: Hex2;
+  source: TileSource<Tile>;
 
   _hex: Hex1 = undefined;
   /** the map Hex on which this Tile sits. */
@@ -249,6 +251,7 @@ export class Tile extends Tile0 {
   dragShift(shiftKey: boolean, ctx: DragContext) { }
 
   markLegal(table: Table, setLegal = (hex: Hex2) => { hex.isLegal = false; }, ctx?: DragContext) {
+    table.newHexes.forEach(setLegal);
     table.hexMap.forEachHex(setLegal);
   }
 

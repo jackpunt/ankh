@@ -8,7 +8,7 @@ import { Player } from "./player";
 import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
-import { Guardian, Warrior } from "./ankk-figure";
+import { Figure, Guardian, Warrior } from "./ankk-figure";
 import { UnitSource } from "./tile-source";
 import { God } from "./god";
 //import { TablePlanner } from "./planner";
@@ -240,13 +240,14 @@ export class Table extends EventDispatcher  {
     bpanel.addChild(bs)
     return bpanel
   }
-
+  newHexes: Hex2[] = [];
   newHex2(row = 0, col = 0, name: string, claz: Constructor<Hex2> = Hex2, sy = 0) {
     const hex = new claz(this.hexMap, row, col, name);
     hex.distText.text = name;
     if (row <= 0) {
       hex.y += (sy + row * .5 - .75) * (this.hexMap.radius);
     }
+    this.newHexes.push(hex);
     return hex
   }
 
@@ -280,12 +281,6 @@ export class Table extends EventDispatcher  {
     const pbr = this.scaleCont.localToLocal(bgr.w, bgr.h, hexCont);
     hexCont.cache(p00.x, p00.y, pbr.x - p00.x, pbr.y - p00.y); // cache hexCont (bounded by bgr)
 
-    const guards = this.gamePlay.guards;
-    // this.guardSources = guards.filter((g, i) => i > 0).map(guard => {
-    //   const hex = this.newHex2(0, 0, 'guardHex', AnkhHex); // Later, move to location of player Panel.
-    //   return Guardian.makeSource(hex, guard) as UnitSource<Guardian>;
-    //   // now we have instances, sitting on UnitSource.hex
-    // });
     this.makeGuardSources();
 
     this.makeActionCont();
@@ -352,6 +347,12 @@ export class Table extends EventDispatcher  {
     }
   }
 
+  sourceOnHex(source: UnitSource<Figure>, hex: Hex2) {
+    source.counter.mouseEnabled = false;
+    hex.legalMark.setOnHex(hex);
+    hex.cont.visible = false;
+  }
+
   makeButton(color = C.WHITE, rad = 20, c?: string) {
     const button = new Container();
     const shape = new CircleShape(rad, color, '');
@@ -377,13 +378,18 @@ export class Table extends EventDispatcher  {
     rHex.cont.updateCache();
     return rHex;
   }
-  guardSources: UnitSource<Guardian>[];
+  guardSources: UnitSource<Guardian>[] = [];
   makeGuardSources(row = 7, col = TP.nHexes + 1.7) {
     const guards = this.gamePlay.guards;
     guards.forEach((guard, i) => { // .filter((g, i) => i > 0)
-      const ci = col + i * 1.25, hex = this.newHex2(row, ci, `gs-${i}`, AnkhHex);
+      const ci = col + i * 1.25;
+      const hex = this.newHex2(row, ci, `gs-${i}`, AnkhHex);
       this.setToRowCol(hex.cont, row, ci);
-      const source = Guardian.makeSource(hex, guard, 2);
+      const np = Player.allPlayers.length;
+      const n = [[0],[1,1,1],[1,1,1],[2,2,2],[3,2,2],[3,2,2],[3,2,2]][np][i];
+      const source = Guardian.makeSource(hex, guard, n);
+      this.guardSources.push(source);
+      this.sourceOnHex(source, hex);
     });
   }
 
@@ -548,7 +554,7 @@ export class Table extends EventDispatcher  {
   }
 
   hexUnderObj(dragObj: DisplayObject) {
-    const pt = dragObj.parent.localToLocal(dragObj.x, dragObj.y, this.hexMap.mapCont.hexCont);
+    const pt = dragObj.parent.localToLocal(dragObj.x, dragObj.y, this.hexMap.mapCont.markCont);
     return this.hexMap.hexUnderPoint(pt.x, pt.y);
   }
 
@@ -842,7 +848,7 @@ class PlayerPanel extends Container {
       // TODO: take from god.ankhSource; store for multi-click
       const ankhs = [god.getAnhkToken(), god.getAnhkToken()];
       ankhs.forEach((ankh, i) => {
-        ankh.x = 30 + i * (2 * brad + gap);
+        ankh.x = (3 * brad + 2 * gap) + i * (2 * brad + gap);
         ankh.y = 4 * rowh;
       });
       colCont.guardian = (rank < 2) ? 0 : 1;
@@ -874,22 +880,16 @@ class PlayerPanel extends Container {
     stableCont.y = 5.5 * rowh;
     panel.addChild(stableCont);
 
-    const warriorHex = table.newHex2(0, 0, `w-${index}`, AnkhHex);
-
     const sourceInfo = [srad1, srad1, srad2, srad2, ]; // size for each type: Warrior, G1, G2, G3
     sourceInfo.forEach((radi, i) => {
       const g0 = new Graphics().ss(2).sd([5, 5]);
       const circle = new CircleShape(radi - 1, '', god.color, g0);
-      // circle.graphics.f('').dc(0, 0, radi + 1);
       circle.x = x0 + dir * i * (radi + sgap);
       stableCont.addChild(circle);
-      if (i == 0) {
-        circle.parent.localToLocal(circle.x, circle.y, warriorHex.cont.parent, warriorHex.cont);
-        this.warriorSource = Warrior.makeSource(player, warriorHex);
-        this.warriorSource.counter.mouseEnabled = false;
-        warriorHex.legalMark.setOnHex(warriorHex);
-        warriorHex.cont.visible = false;
-      }
+      const hex = player.stableHexes[i] = table.newHex2(0, 0, `w-${index}`, AnkhHex);
+      circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      const source = (i === 0) ? Warrior.makeSource(player, hex) : table.guardSources[i - 1];
+      table.sourceOnHex(source, hex);
     });
     // Special:
     const swidth = 200;

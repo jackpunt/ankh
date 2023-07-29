@@ -604,15 +604,21 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     });
   }
   /**
-   * The Hex under the given x,y coordinates.
+   * The [Legal] Hex under the given x,y coordinates.
    * If on the line, then the top (last drawn) Hex.
-   * @param x in local coordinates of this HexMap.cont
+   * @param x in local coordinates of this HexMap.mapCont
    * @param y
-   * @returns the Hex under mouse or false, if not a Hex (background)
+   * @param legal - returnn ONLY hex with LegalMark visible & mouseenabled.
+   * @returns the Hex2 under mouse or undefined, if not a Hex (background)
    */
-  hexUnderPoint(x: number, y: number): Hex2 {
-    let obj = this.mapCont.hexCont.getObjectUnderPoint(x, y, 1) // 0=all, 1=mouse-enabled (Hex, not Stone)
-    return (obj instanceof HexCont) ? obj.hex2 : undefined
+  hexUnderPoint(x: number, y: number, legal = true): Hex2 {
+    const mark = this.mapCont.markCont.getObjectUnderPoint(x, y, 1);
+    // Note: in theory, mark could be on a Hex2 that is NOT in hexCont!
+    if (mark instanceof LegalMark) return mark.hex2;
+    if (legal) return undefined;
+    const hexc = this.mapCont.hexCont.getObjectUnderPoint(x, y, 1); // 0=all, 1=mouse-enabled (Hex, not Stone)
+    if (hexc instanceof HexCont) return hexc.hex2;
+    return undefined;
   }
   /**
    *

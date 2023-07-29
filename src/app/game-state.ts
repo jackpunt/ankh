@@ -8,6 +8,9 @@ interface Phase {
 }
 
 export class GameState {
+  constructor() {
+     this.state = this.states['Move'];
+  }
   state: Phase;
   gamePlay: GamePlay;
   get table() { return this.gamePlay.table; }

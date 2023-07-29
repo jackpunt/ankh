@@ -1,7 +1,7 @@
 import { Constructor, stime } from "@thegraid/common-lib";
 import { DecimalCounter, NumCounter } from "./counters";
 import { GP, GamePlay, GamePlay0 } from "./game-play";
-import type { Hex, Hex1 } from "./hex";
+import type { Hex, Hex1, Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";
@@ -29,6 +29,7 @@ export class Player {
   god: God;
   score: number = 0;
   get color() { return this.god.color; }
+  readonly stableHexes: Hex2[] = [];
 
   allOf<T extends Tile>(claz: Constructor<T>) { return (Tile.allTiles as T[]).filter(t => t instanceof claz && t.player === this); }
   allOnMap<T extends Tile>(claz: Constructor<T>) { return this.allOf(claz).filter(t => t.hex?.isOnMap); }

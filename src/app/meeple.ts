@@ -183,7 +183,7 @@ export class Meeple extends Tile {
    }
 
   // from SourcedMeeple:
-  source: UnitSource<Meeple>;  // undefined unless/until constructor sets it.
+  override source: UnitSource<Meeple>;  // undefined unless/until constructor sets it.
   paintRings(colorn: string, rColor = C.BLACK, ss = 4, rs = 4) {
     const r = (this.baseShape as MeepleShape).radius;
     const g = (this.baseShape as MeepleShape).graphics;
@@ -207,7 +207,10 @@ export class Meeple extends Tile {
     } else {
       type['source'] = source;
     }
-    for (let i = 0; i < n; i++) source.newUnit(new type(player, i + 1))
+    for (let i = 0; i < n; i++) {
+      const unit = new type(player, i + 1);
+      source.availUnit(unit);
+    }
     source.nextUnit();  // unit.moveTo(source.hex)
     return source as TS;
   }
