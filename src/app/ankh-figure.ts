@@ -4,7 +4,7 @@ import { Player } from "./player";
 import { C1, CenterText, HexShape } from "./shapes";
 import { DragContext } from "./table";
 import { TP } from "./table-params";
-import { UnitSource } from "./tile-source";
+import { TileSource, UnitSource } from "./tile-source";
 import { Meeple } from "./meeple";
 import { AnkhHex } from "./ankh-map";
 import { GP } from "./game-play";
@@ -13,13 +13,24 @@ import { H } from "./hex-intfs";
 import { Container, Text } from "@thegraid/easeljs-module";
 
 class AnkhPiece extends MapTile {
-
+  constructor(player: Player, serial: number, Aname?: string) {
+    super(Aname ?? `${Aname}\n${serial}`, player);
+  }
 }
 
-export class Monument extends MapTile {
+export class Monument extends AnkhPiece {
+  private static source: TileSource<Monument>[] = [];
+
+  static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
+    return Tile.makeSource0(TileSource<Monument>, Monument, player, hex, n);
+  }
+  constructor(player: Player, serial: number) {
+    super(player, serial, 'Monument');
+  }
 
 }
 export class Pyramid extends Monument {
+
 }
 
 export class Obelisk extends Monument {
@@ -30,7 +41,9 @@ export class Temple extends Monument {
 
 // Figure == Meeple:
 export class Figure extends Meeple {
-
+  constructor(player: Player, serial: number, Aname?: string) {
+    super(Aname ?? `${Aname}\n${serial}`, player);
+  }
   override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.paintRings(colorn, colorn, 4, 4); // one fat ring...
   }
@@ -110,10 +123,9 @@ export class Figure extends Meeple {
     }
     return loop(hex, n);
   }
-
 }
 
-class GodFigure extends Figure {
+export class GodFigure extends Figure {
   override isLegalRecycle(ctx: DragContext): boolean {
     return false;
   }
@@ -136,7 +148,7 @@ export class Warrior extends Figure {
 
   // Warrior
   constructor(player: Player, serial: number) {
-    super(`W:${player.index}\n${serial}`, player);
+    super(player, serial, `W:${player.index}`, );
     this.nameText.y -= this.radius / 5;
   }
 }
@@ -185,20 +197,20 @@ class Guardian3 extends Guardian {
 
 export class Satet extends Guardian1 {
   constructor(player: Player, serial: number) {
-    super(`Satet\n${serial}`, player);
+    super(player, serial, `Satet`);
   }
 }
 
 export class MumCat extends Guardian1 {
   constructor(player: Player, serial: number) {
-    super(`MCat\n${serial}`, player);
+    super(player, serial, `MCat`);
   }
 
 }
 
 export class Apep extends Guardian2 {
   constructor(player: Player, serial: number) {
-    super(`Apep\n${serial}`, player);
+    super(player, serial, `Apep`);
   }
   override isLegalWater(hex: AnkhHex): boolean {
     // can Summon to water; but not move water-to-water!
@@ -209,18 +221,29 @@ export class Apep extends Guardian2 {
 
 export class Mummy extends Guardian2 {
   constructor(player: Player, serial: number) {
-    super(`Mummy\n${serial}`, player);
+    super(player, serial, `Mummy`);
   }
 }
 
 export class Scorpion extends Guardian3 {
+  // Constructed from Meeple.makeSource0()
+  constructor(player: Player, serial: number) {
+    super(player, serial, `Scorpion`);
+    this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
+    const { x, y, width, height } = H.hexBounds(TP.hexRad * 1.2, 30);
+    this.setBounds(x, y, width, height);
+    this.cache(x, y, width, height);
+    this.addDirDisk();
+  }
+
   dirDisk: Container;
-  dirTxt: Text = new CenterText('\u2191   \u2191', this.radius * .5, this.player?.colorn ?? C.black);
   dirRot = 0;
+  a1: CenterText;
+  a2: CenterText;
   addDirDisk() {
     const uparrow = '\u2191', ax = this.radius/2, ay = this.radius * .8, ang = 30;
-    const a1 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
-    const a2 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
+    const a1 = this.a1 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
+    const a2 = this.a2 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
     a1.rotation = -ang;
     a2.rotation = ang;
     a1.x = -ax; a2.x = ax;
@@ -237,7 +260,6 @@ export class Scorpion extends Guardian3 {
   }
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
-    //if (GP.gamePlay.curPlayer === this.player) {
     if (this.hex !== this.startHex) {
       this.diskRotate();
     }
@@ -248,30 +270,21 @@ export class Scorpion extends Guardian3 {
     return [H.nsDirs[rot1], H.nsDirs[rot2]];
   }
   override paint(pColor?: string, colorn?: string): void {
-    if (this.dirTxt) {
+    if (this.a1) {
       let color = colorn ?? C.black;
       if (C.dist(color, C.white) < 50) color = C.black;
-      this.dirTxt.color = color;
+      this.a1.color = color;
+      this.a2.color = color;
     }
     super.paint(pColor, colorn);
   }
 
-  // Constructed from Meeple.makeSource0()
-  constructor(player: Player, serial: number) {
-    super(`Scorpion\n${serial}`, player);
-    this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
-    const { x, y, width, height } = H.hexBounds(TP.hexRad * 1.2, 30);
-    this.setBounds(x, y, width, height);
-    this.cache(x, y, width, height);
-    this.addDirDisk();
-    //this.on(S.click, (evt) => this.diskRotate())
-  }
 
 }
 
 export class Androsphinx extends Guardian3 {
   constructor(player: Player, serial: number) {
-    super(`Andro\nsphinx\n${serial}`, player);
+    super(player, serial, `Andro\nsphinx\n${serial}`, );
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
   }
 }

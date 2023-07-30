@@ -1,7 +1,7 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { Guardian } from "./ankk-figure";
+import { Guardian } from "./ankh-figure";
 import { type GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";

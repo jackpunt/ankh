@@ -5,7 +5,7 @@ import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
 import { CenterText, CircleShape, RectShape } from "./shapes";
 import { TP } from "./table-params";
-import { Warrior } from "./ankk-figure";
+import { Warrior } from "./ankh-figure";
 import { TileSource } from "./tile-source";
 import { AnkhToken } from "./god";
 import { Table, AnkhPowerInfo, AnkhPowerCont } from "./table";

@@ -3,7 +3,7 @@ import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { Container } from "@thegraid/easeljs-module";
 import { EzPromise } from "@thegraid/ezpromise";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { Figure } from "./ankk-figure";
+import { Figure } from "./ankh-figure";
 import { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";

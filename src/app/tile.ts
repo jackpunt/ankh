@@ -1,23 +1,12 @@
-import { C, Constructor, F, ImageLoader, S, className, stime } from "@thegraid/common-lib";
-import { Bitmap, Container, DisplayObject, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
+import { C, Constructor, ImageLoader, S, className, stime } from "@thegraid/common-lib";
+import { Bitmap, Container, DisplayObject, MouseEvent, Text } from "@thegraid/easeljs-module";
 import { GP } from "./game-play";
-import { Hex, Hex1, Hex2, HexMap } from "./hex";
+import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { BalMark, C1, CapMark, CenterText, HexShape, InfShape, Paintable, TileShape } from "./shapes";
+import { BalMark, C1, CenterText, HexShape, Paintable, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
-import { PlayerColor, PlayerColorRecord, TP, criminalColor, playerColorRecord, playerColorsC } from "./table-params";
+import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
-
-export type AuctionBonus = 'star' | 'econ' | 'infl' | 'actn';
-export type AdjBonusId = 'Bank' | 'Lake';
-export type BonusId = 'Star' | 'Econ' | AdjBonusId | AuctionBonus;
-type BonusObj = { [key in AuctionBonus]: boolean}
-
-type BonusInfo<T extends DisplayObject> = {
-  bonusId: BonusId, dtype: Constructor<T>,
-  x: number, y: number, size: number,
-  paint?: (s: T, info: BonusInfo<T>) => void
-}
 
 class TileLoader {
   Uname = ['Univ0', 'Univ1'];

@@ -99,7 +99,7 @@ export class Meeple extends Tile {
   /** start of turn, faceUp(undefined) --> faceUp; moveTo(true|false) --> faceUp|faceDn */
   faceUp(up = true) {
     this.backSide.visible = !up;
-    if (up) this.startHex = this.hex; // set at start of turn.
+    if (up && this.hex) this.startHex = this.hex; // set at start of turn.
     this.updateCache();
     if (this.hex?.isOnMap) GP.gamePlay.hexMap.update();
   }
@@ -110,9 +110,9 @@ export class Meeple extends Tile {
       destMeep.x += 10; // make double occupancy apparent [until this.unMove()]
       destMeep.unMove();
     }
-    const fromHex = this.hex;
+    const fromHex = this.fromHex;
     super.moveTo(hex); // hex.set(meep) = this; this.x/y = hex.x/y
-    this.faceUp(!!hex && (!hex.isOnMap || !fromHex?.isOnMap || hex === this.startHex));
+    this.faceUp((!hex?.isOnMap || !fromHex?.isOnMap || hex === this.startHex));
     return hex;
   }
 

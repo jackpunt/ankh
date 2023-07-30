@@ -9,7 +9,7 @@ import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { selectN } from "./functions";
 import { God } from "./god";
-import { Androsphinx, Apep, Guardian, MumCat, Mummy, Satet, Scorpion } from "./ankk-figure";
+import { Androsphinx, Apep, Guardian, MumCat, Mummy, Satet, Scorpion } from "./ankh-figure";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
