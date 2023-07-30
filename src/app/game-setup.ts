@@ -91,7 +91,7 @@ export class GameSetup {
       // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
       console.groupEnd()
     }
-    table.startGame(); // allTiles.makeDragable(); placeStartTowns(); setNextPlayer();
+    table.startGame('MiddleKingdom'); // allTiles.makeDragable(); placeStartTowns(); setNextPlayer();
     return gamePlay
   }
   /** affects the rules of the game & board

@@ -12,7 +12,7 @@ import { MapTile, Tile } from "./tile";
 import { H } from "./hex-intfs";
 import { Container, Text } from "@thegraid/easeljs-module";
 
-class AnkhPiece extends MapTile {
+export class AnkhPiece extends MapTile {
   constructor(player: Player, serial: number, Aname?: string) {
     super(Aname ?? `${Aname}\n${serial}`, player);
   }

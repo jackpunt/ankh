@@ -1,7 +1,8 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
-import { AnkhHex, AnkhMap } from "./ankh-map";
 import { Guardian } from "./ankh-figure";
+import { AnkhHex, AnkhMap } from "./ankh-map";
+import { AnkhScenario } from "./ankh-scenario";
 import { type GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
@@ -532,7 +533,11 @@ export class Table extends EventDispatcher  {
     }
   }
 
-  startGame() {
+  startGame(sname: string) {
+    const np = Player.allPlayers.length;
+    const scenario = AnkhScenario[sname][np-2];
+    (this.hexMap as AnkhMap<AnkhHex>).parseScenario(scenario);
+
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {
       this.makeDragable(tile);
