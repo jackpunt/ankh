@@ -19,7 +19,7 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
   return `${scheme}://${host}.${domain}:${port}${path}`
 }
 export class TP {
-  static anhkRad = 20;
+  static ankhRad = 20;
   static ankh1Rad = 36;
   static ankh2Rad = 48;
   static warriorPerPlayer = 6;

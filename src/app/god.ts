@@ -1,14 +1,16 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
 import { Hex2 } from "./hex";
+import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape, Paintable } from "./shapes";
+import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile, Token } from "./tile";
 import { TileSource } from "./tile-source";
 
 class AnhkShape extends CircleShape {
-  constructor(rad = TP.anhkRad, color: string) {
+  constructor(rad = TP.ankhRad, color: string) {
     super(rad - 1, color);
   }
 }
@@ -18,7 +20,7 @@ export class AnkhToken extends Token {
   static makeSource(player: Player, hex: Hex2, token: Constructor<Token>, n: number) {
     return Tile.makeSource0(TileSource<Token>, token, player, hex, n);
   }
-  override get radius() { return TP.anhkRad; }
+  override get radius() { return TP.ankhRad; }
   override get isDragable() { return false; }
 
   constructor(player: Player, serial: number) {
@@ -30,7 +32,7 @@ export class AnkhToken extends Token {
   }
 
   override makeShape(): Paintable {
-    return new AnhkShape(TP.anhkRad, this.pColor);
+    return new AnhkShape(TP.ankhRad, this.pColor);
   }
 
 }
@@ -53,8 +55,8 @@ export class God {
   }
   ankhPowers: string[] = [];
 
-  radius = TP.anhkRad;
-  getAnhkToken(rad = this.radius) {
+  radius = TP.ankh2Rad;
+  getAnhkToken(rad = TP.ankhRad) {
     const cont = new Container();
     const shape = new CircleShape(rad, this.color, );
     const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
@@ -64,9 +66,10 @@ export class God {
     return cont;
   }
 
-  makeSpecial(wh: WH): Container {
-    const cont = new Container, rad = this.radius, y = wh.height/2 + rad/2;
-    const bg = new Shape(); bg.graphics.f('rgb(140,140,140)').dr(0, 0, wh.width, wh.height)
+  makeSpecial(cont: Container, wh: WH, table: Table): Container {
+    const fillc = 'rgb(140,140,140)';
+    const rad = TP.ankhRad, y = wh.height/2 + rad/2;
+    const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
     cont.addChild(bg);
     const tname = new CenterText(this.name, rad, this.color );
     tname.x = wh.width / 2; tname.textBaseline = 'top';
@@ -79,19 +82,43 @@ class Anubis extends God {
   constructor() { super('Anubis', 'green') }
 
 }
+
 class Amun extends God {
   constructor() { super('Amun', 'red') }
-  override makeSpecial(wh: WH): Container {
-    const cont = super.makeSpecial(wh), rad = this.radius, y = wh.height / 2 + rad / 2;;
-    const sgap = (wh.width - 6 * rad) / 4;
+  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont0, wh, table);
+    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AmunHex.scale;
+    cont0.addChild(cont);
+    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
+    const sgap = (wh.width / sc - 6 * rad) / 4;
     [rad, rad, rad].forEach((radi, i) => {
       const circle = new CircleShape(radi, 'lightgrey', this.color);
-      // circle.graphics.ss(1).f(C.black).sd([5, 5]).f('transparent').dc(0, 0, radi + 2);
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont.addChild(circle);
+      const hex = table.newHex2(0, 0, `amun-${i}`, AmunHex);
+      hex.cont.visible = false;
+      cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      hex.legalMark.setOnHex(hex);
     });
-    return cont;
+    return cont0;
+  }
+}
+/** AmunHex scales the Tile by .8 */
+class AmunHex extends Hex2 {
+  static scale = .8;
+  override get meep() { return super.meep; }
+
+  override set meep(meep: Meeple) {
+    if (meep === undefined && this.meep) {
+      this.meep.scaleX = this.meep.scaleY = 1;
+      this.meep.updateCache();
+    }
+    super.meep = meep;
+    if (meep !== undefined) {
+      meep.scaleX = meep.scaleY = AmunHex.scale;
+      meep.updateCache();
+    }
   }
 }
 

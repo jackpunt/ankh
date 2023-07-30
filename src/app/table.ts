@@ -444,7 +444,7 @@ export class Table extends EventDispatcher  {
       'split', 'claim', 'claim', 'battle', 'redzone',
       'claim', 'battle',
     ];
-    const lf = false, rad = TP.anhkRad, gap = 5, dx = 2 * rad + gap, bx = .5;
+    const lf = false, rad = TP.ankhRad, gap = 5, dx = 2 * rad + gap, bx = .5;
     let cx = 0;
     events.forEach((evt, nth) => {
       const icon = new Container();

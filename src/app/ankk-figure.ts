@@ -138,6 +138,7 @@ export class Warrior extends Figure {
     this.nameText.y -= this.radius / 5;
   }
 }
+
 export class Guardian extends Figure {
 
   static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = 0) {

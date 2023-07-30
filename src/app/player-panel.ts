@@ -33,7 +33,7 @@ export class PlayerPanel extends Container {
       ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
     ];
     const dydr = table.hexMap.xywh.dydr;
-    const wide = 590, high = dydr * 3.2, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 176;
+    const wide = 590, high = dydr * 3.2, brad = TP.ankhRad, gap = 6, rowh = 2 * brad + gap, colWide = 176;
     const ankhColx = wide - (2 * brad + gap), ankhRowy = 3.95 * rowh;
     this.setRect = (t1 = 2, bg = this.bg0) => {
       const t2 = t1 * 2 + 1, g = new Graphics().ss(t2);
@@ -100,7 +100,7 @@ export class PlayerPanel extends Container {
     const stableCont = new Container();
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
     const swide0 = 4 * (srad1 + srad2);
-    const swidth = 200;
+    const swidth = 210; // reserved for God's special Container
     const sgap = (wide - (gap + swidth + gap + gap + swide0 + 2 * gap)) / 3;
     const swide = (swide0 + 3 * sgap);
     stableCont.y = 5.5 * rowh;
@@ -121,11 +121,12 @@ export class PlayerPanel extends Container {
       table.sourceOnHex(source, hex);
     });
     // Special:
-    const specl = god.makeSpecial({ width: swidth, height: srad2 * 2 });
+    const specl = new Container();
     specl.y = 5.5 * rowh - srad2;
     specl.x = ((dir + 1) / 2) * (wide - swide + brad) - (brad / 2); // [(wide-swide-brad/2) , -brad/2, ]
     specl.x = [gap, wide - swidth - (1 * gap),][(1 + dir) / 2];
     panel.addChild(specl);
+    god.makeSpecial(specl, { width: swidth, height: srad2 * 2 }, table);
   }
   setRect;
   bg0 = 'rgba(255,255,255,.3)';
