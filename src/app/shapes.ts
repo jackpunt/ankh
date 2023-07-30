@@ -4,6 +4,7 @@ import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
 import type { Tile } from "./tile";
+import { NamedObject } from "./game-play";
 
 export class C1 {
   static GREY = 'grey';
@@ -56,6 +57,8 @@ export class HexShape extends Shape implements Paintable {
     return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
+
+
 export class CircleShape extends Shape implements Paintable {
   constructor(public rad = 30, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
     super(g0);
@@ -74,6 +77,7 @@ export class CircleShape extends Shape implements Paintable {
 
   }
 }
+
 export class RectShape extends Shape {
   constructor({ x = 0, y = 0, w = 30, h = 30 }, fillc = C.white, strokec = C.black, g0?: Graphics) {
     super(g0);

@@ -79,7 +79,7 @@ export class TileSource<T extends Tile> {
   }
 
   get availableUnit() {
-    return this.hex.tile || this.hex.meep; // moveTo puts it somewhere...
+    return (this.hex.tile || this.hex.meep) as T; // moveTo puts it somewhere...
   }
 
   takeUnit() {

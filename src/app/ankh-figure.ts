@@ -1,7 +1,7 @@
 import { C, Constructor, S, stime } from "@thegraid/common-lib";
 import { Hex2, Hex, Hex1 } from "./hex";
 import { Player } from "./player";
-import { C1, CenterText, HexShape } from "./shapes";
+import { C1, CenterText, HexShape, Paintable } from "./shapes";
 import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { TileSource, UnitSource } from "./tile-source";
@@ -10,7 +10,7 @@ import { AnkhHex } from "./ankh-map";
 import { GP } from "./game-play";
 import { MapTile, Tile } from "./tile";
 import { H } from "./hex-intfs";
-import { Container, Text } from "@thegraid/easeljs-module";
+import { Container, Shape, Text } from "@thegraid/easeljs-module";
 
 export class AnkhPiece extends MapTile {
   constructor(player: Player, serial: number, Aname?: string) {
@@ -20,23 +20,35 @@ export class AnkhPiece extends MapTile {
 
 export class Monument extends AnkhPiece {
   private static source: TileSource<Monument>[] = [];
+  override get radius() { return TP.ankh2Rad }
+  override textVis(vis?: boolean): void {
+      super.textVis(true);
+  }
 
   static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
     return Tile.makeSource0(TileSource<Monument>, Monument, player, hex, n);
   }
-  constructor(player: Player, serial: number) {
-    super(player, serial, 'Monument');
+  constructor(player: Player, serial: number, Aname = 'Monument') {
+    super(player, serial, Aname);
   }
 
 }
 export class Pyramid extends Monument {
-
+  constructor(player: Player, serial?: number) {
+    super(player, serial, 'Pyramid');
+  }
 }
 
 export class Obelisk extends Monument {
+  constructor(player: Player, serial?: number) {
+    super(player, serial, 'Obelisk');
+  }
 }
 
 export class Temple extends Monument {
+  constructor(player: Player, serial?: number) {
+    super(player, serial, 'Temple');
+  }
 }
 
 // Figure == Meeple:
@@ -126,9 +138,13 @@ export class Figure extends Meeple {
 }
 
 export class GodFigure extends Figure {
+
+  override get radius() { return TP.ankh2Rad; }
+
   override isLegalRecycle(ctx: DragContext): boolean {
     return false;
   }
+
 }
 
 export class Warrior extends Figure {

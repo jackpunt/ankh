@@ -98,7 +98,7 @@ export class Meeple extends Tile {
 
   /** start of turn, faceUp(undefined) --> faceUp; moveTo(true|false) --> faceUp|faceDn */
   faceUp(up = true) {
-    this.backSide.visible = !up;
+    if (this.backSide) this.backSide.visible = !up;
     if (up && this.hex) this.startHex = this.hex; // set at start of turn.
     this.updateCache();
     if (this.hex?.isOnMap) GP.gamePlay.hexMap.update();
@@ -156,7 +156,7 @@ export class Meeple extends Tile {
     if (!hex) return false;
     if (hex.meep) return false;    // no move onto meeple
     if (!hex.isOnMap) return false;
-    if (!ctx?.lastShift && this.backSide.visible) return false;
+    if (!ctx?.lastShift && this.backSide?.visible) return false;
     // TODO: Check distance <= 3
     return true;
   }

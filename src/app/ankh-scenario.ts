@@ -79,7 +79,7 @@ export class AnkhScenario {
           [7, 4, Warrior, 2],
           [8, 4, Temple, 2],
           [7, 0, Pyramid],
-          [3, 2, Obelisk],
+          [4, 1, Obelisk],
 
           [2, 5, GodFigure, 3],
           [3, 4, Warrior, 3],
@@ -90,7 +90,7 @@ export class AnkhScenario {
           [4, 7, GodFigure, 4],
           [5, 6, Warrior, 4],
           [5, 7, Pyramid, 4],
-          [3, 9, Obelisk],
+          [3, 8, Obelisk],
           [8, 6, Temple],
         ]
       }],
@@ -111,9 +111,9 @@ export class AnkhScenario {
           [7, 2, Warrior, 5],
           [8, 4, Temple],
           [7, 6, Obelisk],
-          [8, 7, Warrior, 4],
-          [8, 8, GodFigure, 4],
-          [8, 9, Temple, 4],
+          [8, 7, Warrior, 3],
+          [8, 8, GodFigure, 3],
+          [8, 9, Temple, 3],
 
           [6, 6, Pyramid],
           [4, 8, GodFigure, 2],

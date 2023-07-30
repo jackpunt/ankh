@@ -1,27 +1,27 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { Hex2 } from "./hex";
+import { Hex1, Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape, Paintable } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile, Token } from "./tile";
-import { TileSource } from "./tile-source";
+import { TileSource, UnitSource } from "./tile-source";
 
 class AnhkShape extends CircleShape {
   constructor(rad = TP.ankhRad, color: string) {
     super(rad - 1, color);
   }
 }
-export class AnkhToken extends Token {
-  static source: TileSource<AnkhToken>[] = [];
+export class AnkhToken extends Meeple {
+  static source: UnitSource<Meeple>[] = [];
 
-  static makeSource(player: Player, hex: Hex2, token: Constructor<Token>, n: number) {
-    return Tile.makeSource0(TileSource<Token>, token, player, hex, n);
+  static makeSource(player: Player, hex: Hex2, token: Constructor<Meeple>, n: number) {
+    return Tile.makeSource0(UnitSource<Meeple>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
-  override isDragable(arg: DragContext) { return false; }
+  // override isDragable(arg: DragContext) { return false; }
 
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);
@@ -29,10 +29,19 @@ export class AnkhToken extends Token {
     const ankh = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
     ankh.y += r * .1;
     this.addChild(ankh);
+    this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
   }
 
   override makeShape(): Paintable {
     return new AnhkShape(TP.ankhRad, this.pColor);
+  }
+
+  override moveTo(hex: Hex1): Hex1 {
+    const rv = super.moveTo(hex);
+    if (hex?.isOnMap) {
+      this.y -= TP.ankh2Rad - this.radius;
+    }
+    return rv;
   }
 
 }

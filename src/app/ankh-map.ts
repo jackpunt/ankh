@@ -1,12 +1,18 @@
 import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
 import { H, HexDir } from "./hex-intfs";
-import { HexShape } from "./shapes";
+import { HexShape, MeepCapMark } from "./shapes";
 import { HexConstructor, Hex2, Hex, HexMap, HexMark } from "./hex";
 import { TP } from "./table-params";
-import { God } from "./god";
+import { AnkhToken, God } from "./god";
 import { Scenario, RegionSpec, SplitSpec, PlaceSpec } from "./ankh-scenario";
 import { permute } from "./functions";
+import { Player } from "./player";
+import { TileSource, UnitSource } from "./tile-source";
+import { AnkhPiece, Figure, GodFigure } from "./ankh-figure";
+import { table } from "console";
+import { GP } from "./game-play";
+import { Meeple } from "./meeple";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
@@ -340,13 +346,22 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     })
     // console.log(stime(this, `.split adjRegions:`), this.regionList());
 
-    console.groupCollapsed('place');
+    //console.groupCollapsed('place');
     place0.place.forEach(elt => {
       const [row, col, cons, pid] = elt;
+      const hex = this[row][col];
+      const player = Player.allPlayers[pid-1];
       // find each piece, place on map
-      console.log(stime(this, `.place0:`), {row, col, cons: cons.name, pid});
+      console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
+      const source0 = cons['source'];
+      const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
+      const isGod = (cons.name === 'GodFigure');
+      const godFig = isGod ? new cons(player, 0, player.god.name) as GodFigure: undefined;
+      const piece = (source && (source instanceof TileSource)) ? source.takeUnit() : new cons(player, 0, cons.name);
+      (godFig ?? piece).moveTo(hex);
+      if (!(piece instanceof Meeple) && pid) AnkhToken.source[player.index].takeUnit().moveTo(hex);
     })
-    console.groupEnd();
+    //console.groupEnd();
   }
 
 
