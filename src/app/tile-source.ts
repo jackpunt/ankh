@@ -54,6 +54,7 @@ export class TileSource<T extends Tile> {
       this.available.push(unit);
       unit.hex = undefined;
       unit.visible = false;
+      unit.x = unit.y = 0;
     }
     this.updateCounter();
   }
@@ -83,6 +84,7 @@ export class TileSource<T extends Tile> {
 
   takeUnit() {
     const unit = this.availableUnit;
+    unit.moveTo(undefined);
     this.nextUnit();
     return unit;
   }

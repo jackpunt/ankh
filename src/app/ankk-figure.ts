@@ -121,7 +121,9 @@ class GodFigure extends Figure {
 
 export class Warrior extends Figure {
   private static source: UnitSource<Warrior>[] = [];
-
+  // override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
+  //   return true;
+  // }
   /**
    * invoke Warrior.makeSource(player, hex, n) to create all the Warriors for Player.
    * makeSource0 will invoke new Warrior(), etc.

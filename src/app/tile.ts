@@ -131,7 +131,7 @@ export class Tile extends Tile0 {
   homeHex: Hex1 = undefined;
   /** location at start-of-drag */
   fromHex: Hex2;
-  get isDragable() { return true; }
+  isDragable(ctx?: DragContext) { return true; }
 
   _hex: Hex1 = undefined;
   /** the map Hex on which this Tile sits. */
@@ -260,13 +260,13 @@ export class Tile extends Tile0 {
    */
   dragFunc0(hex: Hex2, ctx: DragContext) {
     ctx.targetHex = hex?.isLegal ? hex : this.fromHex;
-    ctx.targetHex.map.showMark(ctx.targetHex);
+    ctx.targetHex?.map.showMark(ctx.targetHex);
   }
 
   /** entry point from Table.dropFunc; delegate to this.dropFunc() */
   dropFunc0(hex: Hex2, ctx: DragContext) {
     this.dropFunc(ctx.targetHex, ctx);
-    ctx.targetHex.map.showMark(undefined);
+    ctx.targetHex?.map.showMark(undefined); // if (this.fromHex === undefined)
   }
 
   cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
@@ -327,11 +327,8 @@ export class Tile extends Tile0 {
   }
 }
 
-/** Marker class: a Tile that is not draggable */
-export class NoDragTile extends Tile {}
-
 /** A plain WHITE tile; for Debt */
-export class WhiteTile extends NoDragTile {
+export class WhiteTile extends Tile {
   // TileShape does not work here:
   override makeShape(): Paintable { return new HexShape(this.radius); }
 

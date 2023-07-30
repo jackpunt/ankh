@@ -4,7 +4,7 @@ import { Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape, Paintable } from "./shapes";
-import { Table } from "./table";
+import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile, Token } from "./tile";
 import { TileSource } from "./tile-source";
@@ -21,7 +21,7 @@ export class AnkhToken extends Token {
     return Tile.makeSource0(TileSource<Token>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
-  override get isDragable() { return false; }
+  override isDragable(arg: DragContext) { return false; }
 
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);

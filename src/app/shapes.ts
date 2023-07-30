@@ -226,6 +226,7 @@ export class LegalMark extends Shape {
     const parent = hex.mapCont.markCont;
     this.graphics.f(C.legalGreen).dc(0, 0, TP.hexRad/2);
     hex.cont.parent.localToLocal(hex.x, hex.y, parent, this);
+    this.hitArea = hex.hexShape; // legal mark is used for hexUnderObject, so need to cover whole hex.
     this.mouseEnabled = true;
     this.visible = false;
     parent.addChild(this);

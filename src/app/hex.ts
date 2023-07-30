@@ -238,7 +238,14 @@ export class Hex2 extends Hex1 {
   override set meep(meep: Meeple) {
     const cont: Container = this.map.mapCont.tileCont, x = this.x, y = this.y;
     let k = true;     // debug double meep; maybe overMeep.overSet(this)?
-    if (k && meep !== undefined && this.meep !== undefined) debugger;
+    if (meep !== undefined && this.meep !== undefined) {
+      if (this === this.meep.source?.hex && this === meep.source?.hex) {
+        // dragStart does moveTo(undefined); which triggers source.nextUnit()
+        // so if we drop to the startHex, we have this collision.
+        // put the 'nextHex' back in the source:
+        this.meep.source.availUnit(this.meep);
+      } else if (k) debugger;
+    }
     super.meep = meep // this._meep = meep    super.meep = meep
     if (meep !== undefined) {
       meep.x = x; meep.y = y;

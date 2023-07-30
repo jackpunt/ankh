@@ -81,6 +81,7 @@ class TextLog extends Container {
   }
 
   log(line: string, from = '', toConsole = true) {
+    line = line.replace("\n", "-");
     toConsole && console.log(stime(`${from}:`), line);
     if (line === this.lastLine) {
       this.lines[this.lines.length - 1].text = `[${++this.nReps}] ${line}`;
@@ -128,7 +129,7 @@ export class Table extends EventDispatcher  {
     this.scaleCont = this.makeScaleCont(!!this.stage.canvas) // scaleCont & background
   }
   bagLog = new TextLog('bagLog', 1);    // show 1 line of bag contents
-  turnLog = new TextLog('turnLog', 5);  // shows the last 2 start of turn lines
+  turnLog = new TextLog('turnLog', 2);  // shows the last 2 start of turn lines
   textLog = new TextLog('textLog', TP.textLogLines); // show other interesting log strings.
 
   logTurn(line: string) {
@@ -294,10 +295,10 @@ export class Table extends EventDispatcher  {
     this.hexMap.update();
     // position turnLog & turnText
     {
-      const parent = this.scaleCont, n = TP.nHexes + 2;
-      this.setToRowCol(this.turnLog, 6, -13);
-      this.setToRowCol(this.bagLog, 6, -13);
-      this.setToRowCol(this.textLog, 6, -13);
+      const parent = this.scaleCont, n = TP.nHexes + 2, colx = -14;
+      this.setToRowCol(this.turnLog, 6, colx);
+      this.setToRowCol(this.bagLog, 6, colx);
+      this.setToRowCol(this.textLog, 6, colx);
       this.bagLog.y -= this.turnLog.height(1);
       this.textLog.y += this.turnLog.height(Player.allPlayers.length + 1);
 
@@ -526,19 +527,14 @@ export class Table extends EventDispatcher  {
     for (let i = 0; i < np; i++) {
       if (stack1[i].color !== empty) continue;
       this.drawBox(stack1[i], plyr.color);
+      plyr.score = score + i / 10; // record decimal score, for sort order;
       break;
     }
   }
 
-  makeDragable(tile: Tile) {
-    const dragger = this.dragger;
-    dragger.makeDragable(tile, this, this.dragFunc, this.dropFunc);
-    dragger.clickToDrag(tile, true); // also enable clickToDrag;
-  }
-
   startGame() {
     // All Tiles (& Meeple) are Draggable:
-    Tile.allTiles.filter(tile => tile.isDragable).forEach(tile => {
+    Tile.allTiles.forEach(tile => {
       this.makeDragable(tile);
     })
 
@@ -550,6 +546,12 @@ export class Table extends EventDispatcher  {
       this.toggleText(false)
     })
     this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[0])
+  }
+
+  makeDragable(tile: Tile) {
+    const dragger = this.dragger;
+    dragger.makeDragable(tile, this, this.dragFunc, this.dropFunc);
+    dragger.clickToDrag(tile, true); // also enable clickToDrag;
   }
 
   hexUnderObj(dragObj: DisplayObject) {
@@ -577,13 +579,18 @@ export class Table extends EventDispatcher  {
       }
       const event = info.event?.nativeEvent;
       tile.fromHex = tile.hex as Hex2;  // dragStart: set tile.fromHex
-      ctx = this.dragContext = {
+      ctx = {
         tile: tile,                  // ASSERT: hex === tile.hex
         targetHex: tile.fromHex,     // last isLegalTarget() or fromHex
         lastShift: event?.shiftKey,
         lastCtrl:  event?.ctrlKey,
         info: info,
         nLegal: 0,
+      }
+      this.dragContext = ctx;
+      if (!tile.isDragable(ctx)) {
+        this.stopDragging(tile.fromHex); // just slide off this tile, no drag, no drop.
+        return;
       }
       this.dragStart(tile, ctx);     // canBeMoved, isLegalTarget, tile.dragStart(ctx);
       if (!ctx.tile) return;         // stopDragging() was invoked
@@ -617,6 +624,7 @@ export class Table extends EventDispatcher  {
       const hexIsLegal = (hex: Hex2) => ctx.nLegal += ((hex !== tile.hex) && (hex.isLegal = tile.isLegalTarget(hex, ctx)) ? 1 : 0);
       tile.markLegal(this, hexIsLegal, ctx);           // delegate to check each potential target
       this.gamePlay.recycleHex.isLegal = tile.isLegalRecycle(ctx); // do not increment ctx.nLegal!
+      tile.moveTo(undefined);
       tile.dragStart(ctx);  // which *could* reset nLegal ?
       this.hexMap.update();
       if (ctx.nLegal === 0) {

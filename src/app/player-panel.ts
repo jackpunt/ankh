@@ -9,6 +9,7 @@ import { Warrior } from "./ankk-figure";
 import { TileSource } from "./tile-source";
 import { AnkhToken } from "./god";
 import { Table, AnkhPowerInfo, AnkhPowerCont } from "./table";
+import { NumCounter, NumCounterBox } from "./counters";
 
 export class PlayerPanel extends Container {
   outline: RectShape;
@@ -34,7 +35,7 @@ export class PlayerPanel extends Container {
     ];
     const dydr = table.hexMap.xywh.dydr;
     const wide = 590, high = dydr * 3.2, brad = TP.ankhRad, gap = 6, rowh = 2 * brad + gap, colWide = 176;
-    const ankhColx = wide - (2 * brad + gap), ankhRowy = 3.95 * rowh;
+    const ankhColx = wide - (2 * brad), ankhRowy = 3.95 * rowh;
     this.setRect = (t1 = 2, bg = this.bg0) => {
       const t2 = t1 * 2 + 1, g = new Graphics().ss(t2);
       this.removeChild(this.outline);
@@ -48,7 +49,7 @@ export class PlayerPanel extends Container {
     const ankhSource = this.ankhSource = AnkhToken.makeSource(player, ankhHex, AnkhToken, 16);
     table.sourceOnHex(ankhSource, ankhHex);
 
-    // select AnkhPower:
+    // select AnkhPower: onClick->selectAnkhPower(info)
     const selectAnkhPower = (evt: Object, info?: AnkhPowerInfo) => {
       const { button, name, ankhs } = info;
       const god = player.god, ankh = ankhs.shift();
@@ -56,6 +57,7 @@ export class PlayerPanel extends Container {
       ankh.x = 0; ankh.y = 0;
       god.ankhPowers.push(name);
       console.log(stime(this, `.onClick: ankhPowers =`), god.ankhPowers, button.id);
+      // mark power as taken:
       const parent = button.parent;
       const powerCont = parent.parent as AnkhPowerCont;
       parent.addChild(ankh);
@@ -96,18 +98,33 @@ export class PlayerPanel extends Container {
       });
     });
 
+    // Followers/Coins counter
+    const counterCont = panel, cont = panel;
+    const layoutCounter = (name: string, color: string, rowy: number, colx = 0, incr: boolean | NumCounter = true,
+      claz = NumCounterBox) => {
+      //: new (name?: string, iv?: string | number, color?: string, fSize?: number) => NumCounter
+      const cname = `${name}Counter`, fSize = TP.hexRad * .75;
+      const counter = player[cname] = new claz(`${cname}:${index}`, 0, color, fSize)
+      counter.setLabel(`${name}s`, { x: 0, y: fSize/2 }, 12);
+      const pt = cont.localToLocal(colx, rowy, counterCont);
+      counter.attachToContainer(counterCont, pt);
+      counter.clickToInc(incr);
+      return counter;
+    }
+    layoutCounter('coin', C.coinGold, gap, ankhColx, true, );
+
     // Stable:
     const stableCont = new Container();
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
     const swide0 = 4 * (srad1 + srad2);
     const swidth = 210; // reserved for God's special Container
-    const sgap = (wide - (gap + swidth + gap + gap + swide0 + 2 * gap)) / 3;
-    const swide = (swide0 + 3 * sgap);
+    const sgap = (wide - (gap + swidth + gap + gap + swide0 + 0 * gap)) / 3;
+    const swide = (swide0 + 2 * sgap);
     stableCont.y = 5.5 * rowh;
     panel.addChild(stableCont);
 
     const sourceInfo = [srad1, srad1, srad2, srad2,]; // size for each type: Warrior, G1, G2, G3
-    let x0 = [wide, 0][(1 + dir) / 2] + dir * (2 * gap); // edge of next circle
+    let x0 = [wide, 0][(1 + dir) / 2] + dir * (1 * gap); // edge of next circle
     sourceInfo.forEach((radi, i) => {
       const g0 = new Graphics().ss(2).sd([5, 5]);
       const circle = new CircleShape(radi - 1, '', god.color, g0);
