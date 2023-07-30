@@ -301,6 +301,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.autoPlay, argVal: 0})
     KeyBinder.keyBinder.setKey('v', { thisArg: this, func: this.autoPlay, argVal: 1})
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
+    KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn2 })
 
     // diagnostics:
     //KeyBinder.keyBinder.setKey('x', { thisArg: this, func: () => {this.table.enableHexInspector(); }})
@@ -417,12 +418,14 @@ export class GamePlay extends GamePlay0 {
 
 
   override endTurn2(): void {
-    this.table.panelForPlayer[this.curPlayerNdx].visible = false;
-    super.endTurn2();   // shift(), roll(); totalVps += vps
+    // this.table.panelForPlayer[this.curPlayerNdx].visible = false;
+    super.endTurn2();
   }
 
   override setNextPlayer(plyr?: Player) {
+    this.table.panelForPlayer[this.curPlayerNdx].showPlayer(false);
     super.setNextPlayer(plyr); // update player.coins
+    this.table.panelForPlayer[this.curPlayerNdx].showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...
     this.table.panelForPlayer[this.curPlayerNdx].visible = true;
@@ -437,7 +440,6 @@ export class GamePlay extends GamePlay0 {
   }
 
   paintForPlayer() {
-
   }
 
   /** dropFunc | eval_sendMove -- indicating new Move attempt */

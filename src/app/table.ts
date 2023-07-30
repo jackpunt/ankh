@@ -1,6 +1,6 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Event, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
-import type { GamePlay } from "./game-play";
+import { GP, type GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { AnkhMap, AnkhHex } from "./ankh-map";
 import { XYWH } from "./hex-intfs";
@@ -9,8 +9,8 @@ import { CenterText, CircleShape, HexShape, RectShape } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { NoDragTile, Tile } from "./tile";
 import { Figure, Guardian, Warrior } from "./ankk-figure";
-import { UnitSource } from "./tile-source";
-import { God } from "./god";
+import { TileSource, UnitSource } from "./tile-source";
+import { AnkhToken, God } from "./god";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -27,7 +27,7 @@ interface AnkhPowerInfo {
 
 interface AnkhPowerCont extends Container {
   ankhs: DisplayObject[];
-  guardian: number;
+  guardianSlot: number;
 }
 
 /** to own file... */
@@ -128,7 +128,7 @@ export class Table extends EventDispatcher  {
     this.scaleCont = this.makeScaleCont(!!this.stage.canvas) // scaleCont & background
   }
   bagLog = new TextLog('bagLog', 1);    // show 1 line of bag contents
-  turnLog = new TextLog('turnLog', 2);  // shows the last 2 start of turn lines
+  turnLog = new TextLog('turnLog', 5);  // shows the last 2 start of turn lines
   textLog = new TextLog('textLog', TP.textLogLines); // show other interesting log strings.
 
   logTurn(line: string) {
@@ -315,8 +315,8 @@ export class Table extends EventDispatcher  {
     return { row, col };
   }
 
-  readonly panelForPlayer: Container[] = [];
-  makePerPlayer(c0 = -7.4, c1 = TP.nHexes +1, r0 = -.3, dr = 3.4) {
+  readonly panelForPlayer: PlayerPanel[] = [];
+  makePerPlayer(c0 = -7.4, c1 = TP.nHexes + .9, r0 = -.3, dr = 3.4) {
     const panelLocs = [[r0, c0], [r0 + dr, c0], [r0 + 2 * dr, c0], [r0, c1], [r0 + dr, c1]];
     const seq = [[], [0], [0, 3], [0, 3, 1], [0, 3, 4, 1], [0, 3, 4, 2, 1]];
     const np = Player.allPlayers.length, seqn = seq[np];
@@ -347,7 +347,7 @@ export class Table extends EventDispatcher  {
     }
   }
 
-  sourceOnHex(source: UnitSource<Figure>, hex: Hex2) {
+  sourceOnHex(source: TileSource<Tile>, hex: Hex2) {
     source.counter.mouseEnabled = false;
     hex.legalMark.setOnHex(hex);
     hex.cont.visible = false;
@@ -599,7 +599,7 @@ export class Table extends EventDispatcher  {
     ctx.lastCtrl = nativeEvent?.ctrlKey;
     // track shiftKey because we don't pass 'event' to isLegalTarget(hex)
     const shiftKey = nativeEvent?.shiftKey;
-    if (shiftKey !== ctx.lastShift || ctx.targetHex !== hex) {
+    if (shiftKey !== ctx.lastShift || (hex && ctx.targetHex !== hex)) {
       ctx.lastShift = shiftKey;
       // do shift-down/shift-up actions...
       this.dragShift(ctx.tile, shiftKey, ctx); // was interesting for hexmarket
@@ -800,10 +800,12 @@ export class Table extends EventDispatcher  {
 }
 
 class PlayerPanel extends Container {
-  warriorSource: UnitSource<Warrior>;
+  outline: RectShape;
+  ankhSource: TileSource<AnkhToken>;
+
   constructor(
-    table: Table,
-    player: Player,
+    public table: Table,
+    public player: Player,
     row: number,
     col: number,
     dir = -1, // +1 if to right side of table.
@@ -820,10 +822,21 @@ class PlayerPanel extends Container {
       ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
     ];
     const dydr = table.hexMap.xywh.dydr;
-    const wide = 590, high = dydr * 3.2, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 190;
-    const g = new Graphics().ss(5);
-    const outline = new RectShape({ x: 0, y: -(brad + gap), w: wide, h: high }, '', god.color, g);
-    panel.addChild(outline);
+    const wide = 590, high = dydr * 3.2, brad = god.radius, gap = 6, rowh = 2 * brad + gap, colWide = 176;
+    const ankhColx = wide - (2 * brad + gap), ankhRowy = 3.95 * rowh;
+    this.setRect = (t1 = 2, bg = this.bg0) => {
+      const t2 = t1 * 2 + 1, g = new Graphics().ss(t2);
+      this.removeChild(this.outline);
+      this.outline = new RectShape({ x: -t1, y: -(brad + gap + t1), w: wide + t2, h: high + t2 }, bg, god.color, g);
+      this.addChildAt(this.outline, 0);
+    }
+    this.setRect(2);
+    // AnkkSource:
+    const ankhHex = table.newHex2(0, 0, `AnkSource:${index}`, AnkhHex);
+    panel.localToLocal(ankhColx, ankhRowy, ankhHex.cont.parent, ankhHex.cont);
+    const ankhSource = this.ankhSource = AnkhToken.makeSource(player, ankhHex, AnkhToken, 16);
+    table.sourceOnHex(ankhSource, ankhHex)
+
     // select AnkhPower:
     const selectAnkhPower = (evt: Object, info?: AnkhPowerInfo) => {
       const {button, name, ankhs } = info;
@@ -836,22 +849,22 @@ class PlayerPanel extends Container {
       const powerCont = parent.parent as AnkhPowerCont;
       parent.addChild(ankh);
       parent.stage.update();
-      if (powerCont.guardian === ankhs.length) {
-        console.log(stime(this, `.onClick: takeGuardian powerCont =`), powerCont, powerCont.guardian, ankhs);
+      if (powerCont.guardianSlot === ankhs.length) {
+        console.log(stime(this, `.onClick: takeGuardian powerCont =`), powerCont, powerCont.guardianSlot, ankhs);
         // TODO: take Guardian (move to god.stable)
       }
     }
-    // Ankh Power line: circle + text
+    // Ankh Power line: circle + text; Ankhs
     ankhPowers.forEach((ary, rank) => {
       const colCont = new Container() as AnkhPowerCont;
       panel.addChild(colCont);
       // TODO: take from god.ankhSource; store for multi-click
-      const ankhs = [god.getAnhkToken(), god.getAnhkToken()];
+      const ankhs = [ankhSource.takeUnit(), ankhSource.takeUnit(), ];
       ankhs.forEach((ankh, i) => {
-        ankh.x = (3 * brad + 2 * gap) + i * (2 * brad + gap);
-        ankh.y = 4 * rowh;
+        ankh.x = (3 * brad + gap) + i * (2 * brad + gap);
+        ankh.y = ankhRowy;
       });
-      colCont.guardian = (rank < 2) ? 0 : 1;
+      colCont.guardianSlot = (rank < 2) ? 0 : 1;
       colCont.ankhs = ankhs;
       colCont.addChild(...ankhs);
       colCont.x = rank * colWide;
@@ -871,20 +884,25 @@ class PlayerPanel extends Container {
         colCont.addChild(powerLine);
       })
     });
+
     // Stable:
     const stableCont = new Container();
-    const srad1 = TP.anhk1Rad, srad2 = TP.anhk2Rad;
-    const x0 = [wide - (srad1 + 3 * gap), srad1 + 2 * gap][(1 + dir) / 2];
-    const sgap = 1.25 * srad2;
-    const swide = 2 * (srad1 + srad2 + sgap + sgap);
+    const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
+    const swide0 = 4 * (srad1 + srad2);
+    const swidth = 200;
+    const sgap = (wide - (gap + swidth + gap + gap + swide0 + 2 * gap)) / 3;
+    const swide = (swide0 + 3 * sgap);
     stableCont.y = 5.5 * rowh;
     panel.addChild(stableCont);
 
     const sourceInfo = [srad1, srad1, srad2, srad2, ]; // size for each type: Warrior, G1, G2, G3
+    let x0 = [wide, 0][(1 + dir) / 2] + dir * (2 * gap); // edge of next circle
     sourceInfo.forEach((radi, i) => {
       const g0 = new Graphics().ss(2).sd([5, 5]);
       const circle = new CircleShape(radi - 1, '', god.color, g0);
-      circle.x = x0 + dir * i * (radi + sgap);
+      circle.y += (srad2 - radi);
+      circle.x = x0 + dir * radi;
+      x0 += dir * (2 * radi + sgap);
       stableCont.addChild(circle);
       const hex = player.stableHexes[i] = table.newHex2(0, 0, `w-${index}`, AnkhHex);
       circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
@@ -892,11 +910,16 @@ class PlayerPanel extends Container {
       table.sourceOnHex(source, hex);
     });
     // Special:
-    const swidth = 200;
     const specl = god.makeSpecial({ width: swidth, height: srad2 * 2 });
     specl.y = 5.5 * rowh - srad2;
     specl.x = ((dir + 1) / 2) * (wide - swide + brad) - (brad / 2); // [(wide-swide-brad/2) , -brad/2, ]
     specl.x = [ gap, wide -swidth - (1*gap), ][(1 + dir) / 2]
     panel.addChild(specl)
+  }
+  setRect;
+  bg0 = 'rgba(255,255,255,.3)';
+  bg1 = 'rgba(255,255,255,.5)';
+  showPlayer(show = (this.player === GP.gamePlay.curPlayer)) {
+    this.setRect(show ? 4 : 2, show ? this.bg1 : this.bg0);
   }
 }

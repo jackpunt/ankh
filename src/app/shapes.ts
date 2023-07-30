@@ -47,7 +47,7 @@ export class HexShape extends Shape implements Paintable {
 
   /**
    * Draw a Hexagon 1/60th inside the given radius.
-   * overrides shlould include call to setHexBounds(radius, angle)
+   * overrides should include call to setHexBounds(radius, angle)
    * or in other way setBounds().
    */
   paint(color: string) {
@@ -56,13 +56,22 @@ export class HexShape extends Shape implements Paintable {
     return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
-export class CircleShape extends Shape {
-  constructor(rad = 30, fillc = C.white, strokec = C.black, g0?: Graphics) {
+export class CircleShape extends Shape implements Paintable {
+  constructor(public rad = 30, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
     super(g0);
+    this.paint(fillc);
     const g = this.graphics;
     (fillc ? g.f(fillc) : g.ef());
     (strokec ? g.s(strokec) : g.es());
     g.dc(0, 0, rad);
+  }
+
+  paint(fillc: string) {
+    const g = this.graphics;
+    (fillc ? g.f(fillc) : g.ef());
+    (this.strokec ? g.s(this.strokec) : g.es());
+    g.dc(0, 0, this.rad);
+
   }
 }
 export class RectShape extends Shape {

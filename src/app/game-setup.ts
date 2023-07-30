@@ -9,7 +9,7 @@ import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { selectN } from "./functions";
 import { God } from "./god";
-import { Androsphinx, Apep, Figure, Satet } from "./ankk-figure";
+import { Androsphinx, Apep, Guardian, MumCat, Mummy, Satet, Scorpion } from "./ankk-figure";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
@@ -64,17 +64,22 @@ export class GameSetup {
     setTimeout(() => this.netState = netState, 100) // onChange-> ("new", "join", "ref") initiate a new connection
     return rv
   }
+  ext: string[] = [];
+  ngods: number = 4;
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param ext Extensions from URL
    */
-  startup(ext: string[] = [], ngods = 4) {
+  startup(ext = this.ext, ngods = this.ngods) {
+    this.ext = ext;
+    this.ngods = ngods;
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
     const gods = ext.length > 2 ? ext : selectN(God.allNames, ngods);
     gods.length = Math.min(gods.length, 5);
-    const guards: Constructor<Figure>[] = [Satet, Apep, Androsphinx];
+    const guardsC: Constructor<Guardian>[][] = [[Satet, MumCat], [Apep, Mummy], [Scorpion, Androsphinx]];
+    const guards: Constructor<Guardian>[] = guardsC.map(gs => selectN(gs, 1)[0]);
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
     const gamePlay = new GamePlay(gods, guards, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay

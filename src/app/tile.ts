@@ -47,7 +47,7 @@ class Tile0 extends Container {
   // constructor() { super(); }
 
   public player: Player | undefined;
-  get infColor() { return this.player?.color }
+  get pColor() { return this.player?.color }
   get recycleVerb(): string { return 'demolished'; }
 
   /** name in set of filenames loaded in GameSetup */
@@ -94,8 +94,33 @@ class Tile0 extends Container {
 /** all the [Hexagonal] game pieces that appear; can be dragged/dropped. */
 export class Tile extends Tile0 {
   static allTiles: Tile[] = [];
-
   static textSize = 20;
+
+  static makeSource0<T extends Tile, TS extends TileSource<T>>(
+    unitSource: new (type: Constructor<Tile>, p: Player, hex: Hex2) => TS,
+    type: Constructor<T>,
+    player: Player,
+    hex: Hex2,
+    n = 0,
+  ) {
+    const source = new unitSource(type, player, hex);
+    if (player) {
+      // static source: TS = [];
+      type['source'][player.index] = source;
+    } else {
+      // static source: TS;
+      type['source'] = source;
+    }
+    // Create initial Tile/Units:
+    for (let i = 0; i < n; i++) {
+      const unit = new type(player, i + 1, );
+      source.availUnit(unit);
+    }
+    source.nextUnit();  // unit.moveTo(source.hex)
+    return source as TS;
+  }
+  source: TileSource<Tile>;
+
   nameText: Text;
   get nB() { return 0; }
   get nR() { return 0; }
@@ -106,7 +131,6 @@ export class Tile extends Tile0 {
   homeHex: Hex1 = undefined;
   /** location at start-of-drag */
   fromHex: Hex2;
-  source: TileSource<Tile>;
 
   _hex: Hex1 = undefined;
   /** the map Hex on which this Tile sits. */
@@ -126,18 +150,18 @@ export class Tile extends Tile0 {
   ) {
     super()
     Tile.allTiles.push(this);
-    if (!Aname) this.Aname = `${className(this)}-${Tile.allTiles.length}`;
+    if (!Aname) this.Aname = `${className(this)}\n${Tile.allTiles.length}`;
     const rad = this.radius;
     this.cache(-rad, -rad, 2 * rad, 2 * rad);
     this.addChild(this.baseShape);
     this.addChild(new BalMark(this));
     this.setPlayerAndPaint(player);
-    this.nameText = this.addTextChild(rad / 4);
+    this.nameText = this.addTextChild(rad / 2);
   }
 
   setPlayerAndPaint(player: Player) {
     this.player = player;
-    this.paint();
+    this.paint(undefined, player?.color);
   }
 
   override toString(): string {
@@ -220,6 +244,11 @@ export class Tile extends Tile0 {
     this.resetTile();
     this.moveTo(this.homeHex) // override for AuctionTile.tileBag & UnitSource<Meeple>
     if (!this.homeHex) this.parent?.removeChild(this);
+    const source = this.source;
+    if (source) {
+      source.availUnit(this);
+      if (!source.hex.tile) source.nextUnit();
+    }
   }
 
   /**

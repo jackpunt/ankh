@@ -20,8 +20,8 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
 }
 export class TP {
   static anhkRad = 20;
-  static anhk1Rad = 32;
-  static anhk2Rad = 40;
+  static ankh1Rad = 36;
+  static ankh2Rad = 48;
   static warriorPerPlayer = 6;
   static textLogLines = 6;
   static placeAdjacent = true;

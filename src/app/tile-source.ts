@@ -9,7 +9,10 @@ import { TP } from "./table-params";
 import type { Tile } from "./tile";
 import { ValueEvent } from "@thegraid/easeljs-lib";
 
-/** a Dispenser of a set of Tiles. */
+/** a Dispenser of a set of Tiles.
+ *
+ * Source.hex.tile or Source.hex.meep holds an available Tile, placed by moveTo()
+ */
 export class TileSource<T extends Tile> {
   static update = 'update';
   readonly Aname: string
@@ -38,6 +41,7 @@ export class TileSource<T extends Tile> {
     return new NumCounter(name, initValue, color, fontSize, fontName, textColor);
   }
 
+  /** length of available[] plus unit on this.hex */
   get numAvailable() { return this.available.length + (this.hex?.tile || this.hex?.meep ? 1 : 0); }
 
   /** mark unit available for later deployment */
@@ -54,6 +58,7 @@ export class TileSource<T extends Tile> {
     this.updateCounter();
   }
 
+  /** is the top available unit, next to be picked. */
   protected isAvailable(unit: Tile) {
     return this.hex.tile === unit;
   }
@@ -64,9 +69,22 @@ export class TileSource<T extends Tile> {
       unit.parent?.removeChild(unit);
     }
     const ndx = this.allUnits.indexOf(unit);
-    if (ndx >= 0) {
-      this.allUnits.splice(ndx, 1);
+    if (ndx >= 0) this.allUnits.splice(ndx, 1);
+    const adx = this.available.indexOf(unit);
+    if (adx > 0) {
+      this.available.splice(adx, 1);
+      this.updateCounter();
     }
+  }
+
+  get availableUnit() {
+    return this.hex.tile || this.hex.meep; // moveTo puts it somewhere...
+  }
+
+  takeUnit() {
+    const unit = this.availableUnit;
+    this.nextUnit();
+    return unit;
   }
 
   /** move next available unit to source.hex, make visible */
@@ -74,7 +92,6 @@ export class TileSource<T extends Tile> {
     if (unit) {
       unit.visible = true;
       unit.moveTo(this.hex);     // and try push to available
-      if (!unit.player) unit.paint(GP.gamePlay.curPlayer?.color); // TODO: paint where nextUnit() is invoked?;
     }
     this.updateCounter();
     return unit;

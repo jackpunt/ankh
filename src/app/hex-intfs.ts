@@ -28,6 +28,12 @@ export namespace H {
   export const SE: HexDir = "SE"
   export const SW: HexDir = "SW"
   export const NW: HexDir = "NW"
+  export function hexBounds(r = this.radius, tilt = 0) {
+    // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
+    const w = r * Math.cos(H.degToRadians * tilt);
+    const h = r * Math.cos(H.degToRadians * (tilt - 30));
+    return { x: -w, y: -h, width: 2 * w, height: 2 * h };
+  }
 
   /** EW topo dirs! */
   export const dirs: HexDir[] = [NE, E, SE, SW, W, NW]; // standard direction signifiers () ClockWise

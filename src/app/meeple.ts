@@ -7,7 +7,7 @@ import { C1, Paintable } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { UnitSource } from "./tile-source";
+import { TileSource, UnitSource } from "./tile-source";
 
 class MeepleShape extends Shape implements Paintable {
   static fillColor = 'rgba(225,225,225,.7)';
@@ -32,11 +32,11 @@ class MeepleShape extends Shape implements Paintable {
 
   /** stroke a ring of colorn, stroke-width = 2, r = radius-2; fill disk with (~WHITE,.7) */
   paint(colorn = this.player?.colorn ?? C1.grey) {
-    const x0 = 0, y0 = 0, r = this.radius, ss = 2, rs = 1;
-    const g = this.graphics.c().ss(ss).s(colorn).dc(x0, y0, r - rs);
-    g.f(MeepleShape.fillColor).dc(x0, y0, r - 1)  // disk
-    this.setBounds(x0 - r, y0 - r, 2 * r, 2 * r)
-    return g
+    const r = this.radius, ss = 2, rs = 1;
+    const g = this.graphics.c().ss(ss).s(colorn).dc(0, 0, r - rs);
+    g.f(MeepleShape.fillColor).dc(0, 0, r - 1);  // disk
+    this.setBounds(-r, -r, 2 * r, 2 * r);
+    return g;
   }
 }
 
@@ -139,7 +139,7 @@ export class Meeple extends Tile {
     // return !!fromHex.findLinkHex((hex, dir) => !!hex.findInDir(dir, hex => hex === hex0));
   }
 
-  get canAutoUnmove() { return this.player.allOnMap(Meeple).filter(meep => meep.hex !== meep.startHex).length == 1 }
+  get canAutoUnmove() { return this.player?.allOnMap(Meeple).filter(meep => meep.hex !== meep.startHex).length == 1 }
 
   /** override markLegal(), if *this* is the only meeple to have moved,
    * unMove it to reset influence; can always move back to startHex; */
@@ -167,33 +167,27 @@ export class Meeple extends Tile {
     return false;
   }
 
-  // override sendHome(): void { // Meeple
-  //   this.faceUp();
-  //   super.sendHome();
-  // }
-
   override sendHome(): void { // Criminal
     this.faceUp();
-     super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
-     const source = this.source;
-     if (source) {
-       source.availUnit(this);
-       if (!source.hex.meep) source.nextUnit();
-     }
-   }
+    super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
+    const source = this.source;
+    if (source) {
+      source.availUnit(this);
+      if (!source.hex.meep) source.nextUnit();
+    }
+  }
 
   // from SourcedMeeple:
-  override source: UnitSource<Meeple>;  // undefined unless/until constructor sets it.
   paintRings(colorn: string, rColor = C.BLACK, ss = 4, rs = 4) {
-    const r = (this.baseShape as MeepleShape).radius;
-    const g = (this.baseShape as MeepleShape).graphics;
-    this.baseShape.paint(colorn);       // [2, 1]
+    const meepleShape = this.baseShape as MeepleShape;
+    const r = meepleShape.radius;
+    const g = meepleShape.paint(colorn);       // [2, 1]
     g.ss(ss).s(rColor).dc(0, 0, r - rs) // stroke a colored ring inside black ring
     this.updateCache();
   }
 
 
-  static makeSource0<T extends Meeple, TS extends UnitSource<T>>(
+  static xmakeSource0<T extends Meeple, TS extends UnitSource<T>>(
     unitSource: new (type: Constructor<Meeple>, p: Player, hex: Hex2) => TS,
     type: Constructor<T>,
     player: Player,
