@@ -131,6 +131,7 @@ export class Tile extends Tile0 {
   homeHex: Hex1 = undefined;
   /** location at start-of-drag */
   fromHex: Hex2;
+  get isDragable() { return true; }
 
   _hex: Hex1 = undefined;
   /** the map Hex on which this Tile sits. */
@@ -208,7 +209,7 @@ export class Tile extends Tile0 {
   }
 
   overSet(tile: Tile) {
-    tile.parent && console.log(stime(this, `.overSet: removeChild: ${tile}`))
+    tile.parent && console.log(stime(this, `.overSet: removeChild: ${tile}`), tile)
     tile.parent?.removeChild(tile);         // moveBonusTo/sendHome may do this.
   }
 

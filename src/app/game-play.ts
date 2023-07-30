@@ -93,7 +93,6 @@ export class GamePlay0 {
   curPlayerNdx: number = 0  // curPlayer defined in GamePlay extends GamePlay0
   curPlayer: Player;
   preGame = true;
-  curPlayerMapTiles: Tile[] = [];
 
   nextPlayer(plyr: Player = this.curPlayer) {
     const nxt = (plyr.index + 1) % Player.allPlayers.length;
@@ -168,7 +167,6 @@ export class GamePlay0 {
     this.turnNumber += 1 // this.history.length + 1
     this.curPlayer = plyr
     this.curPlayerNdx = plyr.index
-    this.curPlayerMapTiles = this.curPlayer.allOnMap(MapTile);
     this.curPlayer.newTurn();
   }
 

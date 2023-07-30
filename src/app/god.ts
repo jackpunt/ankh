@@ -8,8 +8,8 @@ import { Tile, Token } from "./tile";
 import { TileSource } from "./tile-source";
 
 class AnhkShape extends CircleShape {
-  constructor(rad = 30, color: string) {
-    super(rad, color);
+  constructor(rad = TP.anhkRad, color: string) {
+    super(rad - 1, color);
   }
 }
 export class AnkhToken extends Token {
@@ -19,11 +19,13 @@ export class AnkhToken extends Token {
     return Tile.makeSource0(TileSource<Token>, token, player, hex, n);
   }
   override get radius() { return TP.anhkRad; }
+  override get isDragable() { return false; }
 
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);
-    const ankh = new CenterText(`${'\u2625'}`, this.radius * 2.2, C.black);
-    ankh.y += this.radius * .1;
+    const r = this.radius;
+    const ankh = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
+    ankh.y += r * .1;
     this.addChild(ankh);
   }
 
