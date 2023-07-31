@@ -3,10 +3,10 @@ import { Container, Shape } from "@thegraid/easeljs-module";
 import { Hex1, Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { CenterText, CircleShape, Paintable } from "./shapes";
-import { DragContext, Table } from "./table";
+import { CenterText, CircleShape, ColorGraphics, Paintable, PaintableShape } from "./shapes";
+import { Table } from "./table";
 import { TP } from "./table-params";
-import { Tile, Token } from "./tile";
+import { Tile } from "./tile";
 import { TileSource, UnitSource } from "./tile-source";
 
 class AnhkShape extends CircleShape {
@@ -30,16 +30,17 @@ export class AnkhToken extends Meeple {
     ankh.y += r * .1;
     this.addChild(ankh);
     this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
-  }
-
-  override makeShape(): Paintable {
-    return new AnhkShape(TP.ankhRad, this.pColor);
+    this.baseShape.cgf = ColorGraphics.circleShape();
   }
 
   override moveTo(hex: Hex1): Hex1 {
     const rv = super.moveTo(hex);
     if (hex?.isOnMap) {
-      this.y -= TP.ankh2Rad - this.radius;
+      this.y += TP.ankh2Rad - this.radius;
+      if (hex.tile) {
+        hex.tile.player = this.player
+        hex.tile.paint()
+      }
     }
     return rv;
   }

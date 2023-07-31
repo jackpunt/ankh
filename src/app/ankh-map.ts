@@ -1,8 +1,8 @@
 import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
 import { H, HexDir } from "./hex-intfs";
-import { HexShape, MeepCapMark } from "./shapes";
-import { HexConstructor, Hex2, Hex, HexMap, HexMark } from "./hex";
+import { HexShape  } from "./shapes";
+import { HexConstructor, Hex2, Hex, HexMap } from "./hex";
 import { TP } from "./table-params";
 import { AnkhToken, God } from "./god";
 import { Scenario, RegionSpec, SplitSpec, PlaceSpec } from "./ankh-scenario";
@@ -10,18 +10,16 @@ import { permute } from "./functions";
 import { Player } from "./player";
 import { TileSource, UnitSource } from "./tile-source";
 import { AnkhPiece, Figure, GodFigure } from "./ankh-figure";
-import { table } from "console";
-import { GP } from "./game-play";
 import { Meeple } from "./meeple";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC);
-    this.topo = this.nsTopo;
+    this.topo = TP.useEwTopo ? H.ewTopo : H.nsTopo;
   }
 
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): T[] {
-    if (false && this.topo === this.ewTopo) return super.makeAllDistricts();
+    if (TP.useEwTopo) return super.makeAllDistricts();
     else {
       const hexAry = this.makeRect(nh, nh + 1);
       this.mapCont.hexCont && this.centerOnContainer();
@@ -166,7 +164,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   setTerrain([r, c]: hexSpec, terrain: Terrain, color = AnkhMap.tColor[terrain]) {
-    const hex = this[r][c];
+    const hex = this[r]?.[c];
+    if (!hex) return;
     hex.terrain = terrain;
     const hexShape = hex.hexShape;
     hexShape.paint(color);
@@ -184,7 +183,9 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   addEdge([row, col, ...e]: hexSpecr, rshape: Shape) {
-    const hex = this[row][col], x = hex.x, y = hex.y, r = hex.radius;
+    const hex = this[row][col];
+    if (!hex) return;
+    const x = hex.x, y = hex.y, r = hex.radius;
     e.forEach((dir: HexDir) => {
       // 0-degrees is North
       const a = H.nsDirRot[dir], a0 = a - 30, a1 = a + 30;

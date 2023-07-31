@@ -61,7 +61,7 @@ export class Hex {
    * @param col [this.col]
    * @returns \{ x, y, w, h, dxdc, dydr } of cell at [row, col]
    */
-  xywh(radius = TP.hexRad, ewTopo = true, row = this.row, col = this.col) {
+  xywh(radius = TP.hexRad, ewTopo = TP.useEwTopo, row = this.row, col = this.col) {
     if (ewTopo) { // tiltDir = 'NE'; tilt = 30-degrees; nsTOPO
       const h = 2 * radius, w = radius * H.sqrt3;  // h height of hexagon (long-vertical axis)
       const dxdc = w;
@@ -293,8 +293,8 @@ export class Hex2 extends Hex1 {
   }
 
   private initCont(row: number, col: number) {
-    const cont = this.cont, ewTopo = this.map.topo === this.map.ewTopo;
-    const { x, y, w, h } = this.xywh(this.radius, ewTopo, row, col); // include margin space between hexes
+    const cont = this.cont;
+    const { x, y, w, h } = this.xywh(this.radius, TP.useEwTopo, row, col); // include margin space between hexes
     cont.x = x;
     cont.y = y;
     // initialize cache bounds:
@@ -445,7 +445,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
 
   readonly radius = TP.hexRad
   /** return this.centerHex.xywh() for this.topo */
-  get xywh() { return this.centerHex.xywh(undefined, this.topo === this.ewTopo); }
+  get xywh() { return this.centerHex.xywh(undefined, TP.useEwTopo); }
 
   private minCol: number | undefined = undefined               // Array.forEach does not look at negative indices!
   private maxCol: number | undefined = undefined               // used by rcLinear
@@ -481,7 +481,7 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   }
 
   // the 'tilt' to apply to a HexShape to align with map.topo:
-  get topoRot() { return (this.topo === this.ewTopo) ? 30 : 0 }
+  get topoRot() { return TP.useEwTopo ? 30 : 0 }
 
   makeMark() {
     const mark = new HexMark(this.asHex2Map, this.radius, this.radius/2.5);
@@ -571,25 +571,11 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
   }
 
   /** neighborhood topology, E-W & N-S orientation; even(n0) & odd(n1) rows: */
-  ewEvenRow: TopoEW = {
-    NE: { dc: 0, dr: -1 }, E: { dc: 1, dr: 0 }, SE: { dc: 0, dr: 1 },
-    SW: { dc: -1, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: -1, dr: -1 }}
-  ewOddRow: TopoEW = {
-    NE: { dc: 1, dr: -1 }, E: { dc: 1, dr: 0 }, SE: { dc: 1, dr: 1 },
-    SW: { dc: 0, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: 0, dr: -1 }}
-  nsEvenCol: TopoNS = {
-    NE: { dc: +1, dr: -1 }, N: { dc: 0, dr: -1 }, SE: { dc: +1, dr: 0 },
-    SW: { dc: -1, dr: 0 }, S: { dc: 0, dr: +1 }, NW: { dc: -1, dr: -1 }}
-  nsOddCol: TopoNS = {
-    NE: { dc: 1, dr: 0 }, N: { dc: 0, dr: -1 }, SE: { dc: 1, dr: 1 },
-    SW: { dc: -1, dr: 1 }, S: { dc: 0, dr: 1 }, NW: { dc: -1, dr: 0 }}
-  nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? this.nsEvenCol : this.nsOddCol };
-  ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? this.ewEvenRow : this.ewOddRow };
-  topo: (rc: RC) => (TopoEW | TopoNS) = this.ewTopo;
+  topo: (rc: RC) => (TopoEW | TopoNS) = H.ewTopo;
 
   /** see also: Hex.linkDirs */
   get linkDirs(): HexDir[] {
-    return (this.topo === this.ewTopo) ? H.ewDirs : H.nsDirs;
+    return TP.useEwTopo ? H.ewDirs : H.nsDirs;
   }
 
   nextRowCol(hex: RC, dir: HexDir, nt: Topo = this.topo(hex)): RC {

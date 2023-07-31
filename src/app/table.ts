@@ -335,12 +335,11 @@ export class Table extends EventDispatcher  {
   setToRowCol(cont: Container, row = 0, col = 0) {
     if (!cont.parent) this.scaleCont.addChild(cont);
     const hexCont = this.hexMap.mapCont.hexCont;
-    const ewTopo = (this.hexMap.topo === this.hexMap.ewTopo);
     //if (cont.parent === hexCont) debugger;
     const fcol = Math.floor((col)), ecol = fcol - fcol % 2, cresi = col - ecol;
     const frow = Math.floor((row)), erow = frow - frow % 2, rresi = row - erow;
     const hexC = this.hexMap.centerHex;
-    const { x, y, w, h, dxdc, dydr } = hexC.xywh(undefined, ewTopo, erow, ecol);
+    const { x, y, w, h, dxdc, dydr } = hexC.xywh(undefined, undefined, erow, ecol);
     const xx = x + cresi * dxdc;
     const yy = y + rresi * dydr;
     hexCont.localToLocal(xx, yy, cont.parent, cont);

@@ -30,6 +30,7 @@ export class Monument extends AnkhPiece {
   }
   constructor(player: Player, serial: number, Aname = 'Monument') {
     super(player, serial, Aname);
+    this.nameText.y -= this.radius/2;
   }
 
 }

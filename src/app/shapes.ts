@@ -4,7 +4,6 @@ import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
 import type { Tile } from "./tile";
-import { NamedObject } from "./game-play";
 
 export class C1 {
   static GREY = 'grey';
@@ -23,19 +22,61 @@ export class CenterText extends Text {
 
 export interface Paintable extends DisplayObject {
   /** paint with new player color; updateCache() */
-  paint(colorn: string): void;
+  paint(colorn: string): Graphics;
+}
+
+/** Color Graphics Function */
+export type CGF = (color?: string) => Graphics;
+
+export class ColorGraphics extends Graphics {
+
+  static circleShape(rad = 30, fillc0 = C.white, strokec = C.black, g0?: Graphics): CGF {
+    return (fillc = fillc0) => {
+      const g = g0.clone() ?? new Graphics();
+      (fillc ? g.f(fillc) : g.ef());
+      (strokec ? g.s(strokec) : g.es());
+      g.dc(0, 0, rad);
+      return g;
+    }
+  }
+}
+/**
+ * Usage:
+ * - ps = super.makeShape(); // ISA PaintableShape
+ * - ps.gf = (color) => new CG(color);
+ * - ...
+ * - ps.paint(red); --> ps.graphics = gf(red) --> new CG(red);
+ * -
+ * - const cgf: CGF = (color: string) => {
+ * -     return new Graphics().f(this.color).dc(0, 0, rad);
+ * -   }
+ * - }
+ */
+
+export class PaintableShape extends Shape implements Paintable {
+  constructor(public cgf: CGF, public colorn?: string) {
+    super();
+  }
+  cgfGraphics: Graphics;
+  paint(colorn: string = this.colorn): Graphics {
+    if (colorn !== this.colorn || this.graphics !== this.cgfGraphics) {
+      // need to repaint, even if same color:
+      this.graphics = this.cgfGraphics = this.cgf(this.colorn = colorn);
+    }
+    return this.graphics;
+  }
 }
 
 /**
  * The colored PaintableShape that fills a Hex.
  * @param radius in call to drawPolyStar()
  */
-export class HexShape extends Shape implements Paintable {
+export class HexShape extends PaintableShape {
   constructor(
     readonly radius = TP.hexRad,
     readonly tilt = 30,  // ewTopo->30, nsTopo->0
   ) {
-    super();
+    super((color: string) => this.hscgf(color));
   }
 
   setHexBounds(r = this.radius, tilt = this.tilt) {
@@ -51,30 +92,28 @@ export class HexShape extends Shape implements Paintable {
    * overrides should include call to setHexBounds(radius, angle)
    * or in other way setBounds().
    */
-  paint(color: string) {
+  hscgf(color: string) {
     this.setHexBounds();
-    const g = this.graphics.c();
+    const g = new Graphics();
     return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
 
 
-export class CircleShape extends Shape implements Paintable {
+export class CircleShape extends PaintableShape {
+  g0: Graphics;
   constructor(public rad = 30, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
-    super(g0);
+    super((fillc) => this.cscgf(fillc));
+    this.g0 = g0?.clone();
     this.paint(fillc);
-    const g = this.graphics;
-    (fillc ? g.f(fillc) : g.ef());
-    (strokec ? g.s(strokec) : g.es());
-    g.dc(0, 0, rad);
   }
 
-  paint(fillc: string) {
-    const g = this.graphics;
+  cscgf(fillc: string) {
+    const g = this.g0 ? this.g0.clone() : new Graphics();
     (fillc ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
     g.dc(0, 0, this.rad);
-
+    return g;
   }
 }
 
@@ -135,7 +174,14 @@ export class InfShape extends Shape implements Paintable {
 
 export class TileShape extends HexShape {
   static fillColor = C1.lightgrey_8;// 'rgba(200,200,200,.8)'
-
+  constructor(radius?: number, tilt: number = 0) {
+    super(radius, tilt); // sets this.cgf
+    const hscgf = this.cgf;     // oka: super.paint()
+    this.cgf = (colorn: string) => {
+      this.graphics = hscgf.call(this, 'rgba(255,255,255,.8)'); // paint HexShape(White)
+      return this.tscgf(colorn);
+    }
+  }
   replaceDisk(colorn: string, r2 = this.radius) {
     const g = this.graphics;
     // g.c().f(C.BLACK).dc(0, 0, r2);       // bits to remove
@@ -146,12 +192,11 @@ export class TileShape extends HexShape {
   }
 
   /** colored HexShape filled with very-lightgrey disk: */
-  override paint(colorn: string) {
-    super.paint('rgba(255,255,255,.8)');                 // solid hexagon
+  tscgf(colorn: string) {
     // calculate bounds of hexagon for cache:
     const { x, y, width, height } = this.getBounds();
     this.cache(x, y, width, height);
-    const fillColor = C.nameToRgbaString(colorn, .2); // was TileShape.fillcolor
+    const fillColor = C.nameToRgbaString(colorn, .8);
     this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
     return this.graphics;
   }

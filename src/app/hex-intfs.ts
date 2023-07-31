@@ -1,9 +1,16 @@
+import { RC } from "@thegraid/common-lib"
+
 /** Hexagonal canonical directions */
 export enum Dir { C, NE, E, SE, SW, W, NW }
 export type HexDir = 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW' | 'N'
 export type XYWH = { x: number, y: number, w: number, h: number } // like a Rectangle
 export type EwDir = Exclude<HexDir, 'N' | 'S'>
 export type NsDir = Exclude<HexDir, 'E' | 'W'>
+
+type DCR    = { [key in "dc" | "dr"]: number }  // Delta for Col & Row
+export type TopoEW = { [key in EwDir]: DCR }
+export type TopoNS = { [key in NsDir]: DCR }
+export type Topo = TopoEW | TopoNS
 
 // export type InfDir = EwDir; // for hexline & hextown
 // export type HexAxis = Exclude<InfDir, 'SW' | 'W' | 'NW'>; // reduced to 3 visual axies
@@ -34,6 +41,25 @@ export namespace H {
     const h = r * Math.cos(H.degToRadians * (tilt - 30));
     return { x: -w, y: -h, width: 2 * w, height: 2 * h };
   }
+  /** neighborhood topology, E-W & N-S orientation; even(n0) & odd(n1) rows: */
+  export const ewEvenRow: TopoEW = {
+    NE: { dc: 0, dr: -1 }, E: { dc: 1, dr: 0 }, SE: { dc: 0, dr: 1 },
+    SW: { dc: -1, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: -1, dr: -1 }
+  }
+  export const ewOddRow: TopoEW = {
+    NE: { dc: 1, dr: -1 }, E: { dc: 1, dr: 0 }, SE: { dc: 1, dr: 1 },
+    SW: { dc: 0, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: 0, dr: -1 }
+  }
+  export const nsEvenCol: TopoNS = {
+    NE: { dc: +1, dr: -1 }, N: { dc: 0, dr: -1 }, SE: { dc: +1, dr: 0 },
+    SW: { dc: -1, dr: 0 }, S: { dc: 0, dr: +1 }, NW: { dc: -1, dr: -1 }
+  }
+  export const nsOddCol: TopoNS = {
+    NE: { dc: 1, dr: 0 }, N: { dc: 0, dr: -1 }, SE: { dc: 1, dr: 1 },
+    SW: { dc: -1, dr: 1 }, S: { dc: 0, dr: 1 }, NW: { dc: -1, dr: 0 }
+  }
+  export function nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? H.nsEvenCol : H.nsOddCol };
+  export function ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? H.ewEvenRow : H.ewOddRow };
 
   /** EW topo dirs! */
   export const dirs: HexDir[] = [NE, E, SE, SW, W, NW]; // standard direction signifiers () ClockWise

@@ -3,7 +3,7 @@ import { Bitmap, Container, DisplayObject, MouseEvent, Text } from "@thegraid/ea
 import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { BalMark, C1, CenterText, HexShape, Paintable, TileShape } from "./shapes";
+import { BalMark, C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
@@ -53,13 +53,13 @@ class Tile0 extends Container {
   }
 
   get radius() { return TP.hexRad };
-  readonly baseShape: Paintable = this.makeShape();
+  readonly baseShape: PaintableShape = this.makeShape();
 
   /** Default is TileShape; a HexShape with translucent disk.
    * add more graphics with paint(colorn)
    * also: addBitmapImage()
    */
-  makeShape(): Paintable {
+  makeShape(): PaintableShape {
     return new TileShape(this.radius);
   }
 
@@ -67,7 +67,7 @@ class Tile0 extends Container {
    * @param pColor the 'short' PlayerColor
    * @param colorn the actual color (default = TP.colorScheme[pColor])
    */
-  paint(pColor = this.player?.color, colorn = pColor ? TP.colorScheme[pColor] : C1.grey) {
+  paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.baseShape.paint(colorn); // recache baseShape
     this.updateCache();
   }
@@ -319,17 +319,17 @@ export class Tile extends Tile0 {
 /** A plain WHITE tile; for Debt */
 export class WhiteTile extends Tile {
   // TileShape does not work here:
-  override makeShape(): Paintable { return new HexShape(this.radius); }
+  override makeShape() { return new HexShape(this.radius); }
 
   override paint(pColor?: PlayerColor, colorn?: string): void {
-    super.paint(pColor, C.WHITE);
+    super.paint(pColor, C.WHITE); // TODO: using cgf
   }
 }
 
 /** a half-sized Tile. */
 export class Token extends Tile {
 
-  override makeShape(): Paintable {
+  override makeShape() {
     return new HexShape(this.radius * .5);
   }
 

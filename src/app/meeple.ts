@@ -3,20 +3,20 @@ import { Shape } from "@thegraid/easeljs-module";
 import { GP, NamedObject } from "./game-play";
 import type { Hex, Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { C1, Paintable } from "./shapes";
+import { C1, PaintableShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource, UnitSource } from "./tile-source";
 
-class MeepleShape extends Shape implements Paintable {
+class MeepleShape extends PaintableShape {
   static fillColor = 'rgba(225,225,225,.7)';
   static backColor = 'rgba(210,210,120,.5)'; // transparent light green
 
   constructor(public player: Player, public radius = TP.meepleRad) {
-    super();
+    super((color) => this.mscgf(color));
     this.y = TP.meepleY0;
-    this.paint();
+    this.mscgf();
     this.backSide = this.makeOverlay(this.y);
   }
 
@@ -31,7 +31,7 @@ class MeepleShape extends Shape implements Paintable {
   }
 
   /** stroke a ring of colorn, stroke-width = 2, r = radius-2; fill disk with (~WHITE,.7) */
-  paint(colorn = this.player?.colorn ?? C1.grey) {
+  mscgf(colorn = this.player?.colorn ?? C1.grey) {
     const r = this.radius, ss = 2, rs = 1;
     const g = this.graphics.c().ss(ss).s(colorn).dc(0, 0, r - rs);
     g.f(MeepleShape.fillColor).dc(0, 0, r - 1);  // disk
@@ -77,7 +77,7 @@ export class Meeple extends Tile {
 
   override get radius() { return TP.meepleRad } // 31.578 vs 60*.4 = 24
   override textVis(v: boolean) { super.textVis(true); }
-  override makeShape(): Paintable { return new MeepleShape(this.player, this.radius); }
+  override makeShape(): PaintableShape { return new MeepleShape(this.player, this.radius); }
 
   /** location at start-of-turn; for Meeples.unMove() */
   startHex: Hex1;

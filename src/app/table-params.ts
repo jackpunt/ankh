@@ -19,6 +19,7 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
   return `${scheme}://${host}.${domain}:${port}${path}`
 }
 export class TP {
+  static useEwTopo = false;
   static ankhRad = 20;
   static ankh1Rad = 36;
   static ankh2Rad = 48;
