@@ -1,4 +1,4 @@
-import { C, F, XY } from "@thegraid/common-lib";
+import { C, F, XY, XYWH } from "@thegraid/common-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
@@ -116,7 +116,7 @@ export class HexShape extends PaintableShape {
 
 export class CircleShape extends PaintableShape {
   g0: Graphics;
-  constructor(public rad = 30, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
+  constructor(public fillc = C.white, public rad = 30, public strokec = C.black, g0?: Graphics) {
     super((fillc) => this.cscgf(fillc));
     this.g0 = g0?.clone();
     this.paint(fillc);
@@ -124,20 +124,45 @@ export class CircleShape extends PaintableShape {
 
   cscgf(fillc: string) {
     const g = this.g0 ? this.g0.clone() : new Graphics();
-    (fillc ? g.f(fillc) : g.ef());
+    ((this.fillc = fillc) ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
     g.dc(0, 0, this.rad);
     return g;
   }
 }
 
-export class RectShape extends Shape {
-  constructor({ x = 0, y = 0, w = 30, h = 30 }, fillc = C.white, strokec = C.black, g0?: Graphics) {
-    super(g0);
+export class RectShape extends PaintableShape {
+  static rectWHXY(w: number, h: number, x = -w / 2, y = -h / 2, g0 = new Graphics()) {
+    return g0.dr(x, y, w, h)
+  }
+  static rectText(t: Text | string, fs?: number, b?: number, g0 = new Graphics()) {
+    const txt = (t instanceof Text) ? t : new CenterText(t, fs ?? 30);
+    if (fs === undefined) fs = txt.getMeasuredHeight();
+    if (b === undefined) b = fs * .1;
+    const txtw = txt.getMeasuredWidth(), w = txtw + b + b, h = fs + b;
+    return RectShape.rectWHXY(w, h, -w/2, -h/2, g0);
+  }
+
+  g0: Graphics;
+  rect: XYWH;
+  constructor({ x = 0, y = 0, w = 30, h = 30 }: XYWH, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
+    super((fillc) => this.cscgf(fillc));
+    this.rect = { x, y, w: w, h: h }
+    this.g0 = g0?.clone();
+    this.paint(fillc);
     const g = this.graphics;
     if (fillc) g.f(fillc);
     if (strokec) g.s(strokec);
     g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+  }
+
+  cscgf(fillc: string) {
+    const g = this.g0 ? this.g0.clone() : new Graphics();
+    const { x, y, w, h } = this.rect;
+    (fillc ? g.f(fillc) : g.ef());
+    (this.strokec ? g.s(this.strokec) : g.es());
+    g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+    return g;
   }
 }
 
@@ -294,5 +319,48 @@ export class LegalMark extends Shape {
     this.mouseEnabled = true;
     this.visible = false;
     parent.addChild(this);
+  }
+}
+
+export class UtilButton extends Container implements Paintable {
+  blocked: boolean = false
+  shape: PaintableShape;
+  label: CenterText;
+  get text() { return this.label.text; }
+  set text(t: string) { this.label.text = t; }
+
+  constructor(color: string, text: string, public fontSize = 30, public textColor = C.black, cgf?: CGF) {
+    super();
+    this.label = new CenterText(text, fontSize, textColor);
+    this.shape = new PaintableShape(cgf ?? ((c: string) => this.ubcsf(c)));
+    this.shape.paint(color);
+    this.addChild(this.shape, this.label);
+  }
+
+  ubcsf(color: string) {
+    const g = RectShape.rectText(this.label.text, this.fontSize, undefined, new Graphics().f(color))
+    return g;
+  }
+
+  paint(color: string) {
+    return this.shape.paint(color);
+  }
+
+  /**
+   * Repaint the stage with button visible or not.
+   *
+   * Allow Chrome to finish stage.update before proceeding with afterUpdate().
+   *
+   * Other code can watch this.blocked; then call updateWait(false) to reset.
+   * @param hide true to hide and disable the turnButton
+   * @param afterUpdate callback ('drawend') when stage.update is done [none]
+   * @param scope thisArg for afterUpdate [this TurnButton]
+   */
+  updateWait(hide: boolean, afterUpdate?: (evt?: Object, ...args: any) => void, scope: any = this) {
+    this.blocked = hide;
+    this.visible = this.mouseEnabled = !hide
+    // using @thegraid/easeljs-module@^1.1.8: on(once=true) will now 'just work'
+    afterUpdate && this.stage.on('drawend', afterUpdate, scope, true)
+    this.stage.update()
   }
 }

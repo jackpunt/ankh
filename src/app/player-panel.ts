@@ -1,9 +1,9 @@
 import { C, S, stime } from "@thegraid/easeljs-lib";
-import { Container, Graphics } from "@thegraid/easeljs-module";
+import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { GP } from "./game-play";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
-import { CenterText, CircleShape, RectShape } from "./shapes";
+import { CenterText, CircleShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { TP } from "./table-params";
 import { Warrior } from "./ankh-figure";
 import { TileSource } from "./tile-source";
@@ -14,45 +14,84 @@ import { NumCounter, NumCounterBox } from "./counters";
 export class PlayerPanel extends Container {
   outline: RectShape;
   ankhSource: TileSource<AnkhToken>;
+  get god() { return this.player.god; }
 
   constructor(
     public table: Table,
     public player: Player,
     row: number,
     col: number,
-    dir = -1
+    public dir = -1
   ) {
     super();
-    const panel = this;
-    const god = player.god;
-    const index = player.index;
-    table.hexMap.mapCont.resaCont.addChild(panel);
-    table.setToRowCol(panel, row, col);
-    const ankhPowers = [
-      ['Commanding', 'Inspiring', 'Omnipresent', 'Revered'],
-      ['Resplendent', 'Obelisk', 'Temple', 'Pyramid'],
-      ['Glorious', 'Magnanimous', 'Bountiful', 'Worshipful'], // rank 2
-    ];
-    const dydr = table.hexMap.xywh.dydr;
-    const wide = 590, high = dydr * 3.2, brad = TP.ankhRad, gap = 6, rowh = 2 * brad + gap, colWide = 176;
-    const ankhColx = wide - (2 * brad), ankhRowy = 3.95 * rowh;
+    table.hexMap.mapCont.resaCont.addChild(this);
+    table.setToRowCol(this, row, col);
+    this.makeAnkhPanel();
+    this.makeAnkhSource();
+    this.makeAnkhPower();
+    this.makeFollowers();
+    this.makeStable();
+  }
+  readonly ankhPowers = [
+    [
+      ['Commanding', '+3 Followers when win battle'],
+      ['Inspiring', 'Monument cost is 0'],
+      ['Omnipresent', '+1 Follower per occupied region in Conflict'],
+      ['Revered', '+1 Follower in Gain action']
+    ],
+    [
+      ['Resplendent', '+3 Strength when 3 of a kind'],
+      ['Obelisk', 'Teleport to Obelisk in conflict'],
+      ['Temple', '+2 strength when adjacent to Temple'],
+      ['Pyramid', 'Summon to Temple']
+    ],
+    [
+      ['Glorious', '+3 Devotion when win by 3 Strength'],
+      ['Magnanimous', '+2 Devotion when lose with 2 Figures'],
+      ['Bountiful', '+1 Devotion when gain Devotion in Red'],
+      ['Worshipful', '+1 Devotion when sacrifice 2 after Battle']
+    ], // rank 2
+  ];
+  get metrics() {
+    const dydr = this.table.hexMap.xywh.dydr, dir = this.dir;
+    const wide = 590, high = dydr * 3.2, brad = TP.ankhRad, gap = 6, rowh = 2 * brad + gap;
+    const colWide = 176, ankhColx = wide - (2 * brad), ankhRowy = 3.95 * rowh;
+    return {dir, dydr, wide, high, brad, gap, rowh, colWide, ankhColx, ankhRowy}
+  }
+  get objects() {
+    const player = this.player, index = player.index, panel = this, god = this.player.god;
+    const table  = this.table;
+    return { panel, player, index, god, table }
+  }
+
+  makeAnkhPanel() {
+    const { wide, high, brad, gap } = this.metrics;
     this.setRect = (t1 = 2, bg = this.bg0) => {
       const t2 = t1 * 2 + 1, g = new Graphics().ss(t2);
       this.removeChild(this.outline);
-      this.outline = new RectShape({ x: -t1, y: -(brad + gap + t1), w: wide + t2, h: high + t2 }, bg, god.color, g);
+      this.outline = new RectShape({ x: -t1, y: -(brad + gap + t1), w: wide + t2, h: high + t2 }, bg, this.god.color, g);
       this.addChildAt(this.outline, 0);
     };
     this.setRect(2);
-    // AnkkSource:
-    const ankhHex = table.newHex2(0, 0, `AnkSource:${index}`, AnkhHex);
-    panel.localToLocal(ankhColx, ankhRowy, ankhHex.cont.parent, ankhHex.cont);
-    const ankhSource = this.ankhSource = AnkhToken.makeSource(player, ankhHex, AnkhToken, 16);
-    table.sourceOnHex(ankhSource, ankhHex);
+  }
 
+  makeAnkhSource() {
+    const table = this.table;
+    const index = this.player.index;
+    const ankhHex = table.newHex2(0, 0, `AnkSource:${index}`, AnkhHex);
+    const { ankhColx, ankhRowy } = this.metrics;
+    this.localToLocal(ankhColx, ankhRowy, ankhHex.cont.parent, ankhHex.cont);
+    const ankhSource = this.ankhSource = AnkhToken.makeSource(this.player, ankhHex, AnkhToken, 16);
+    table.sourceOnHex(ankhSource, ankhHex);
+  }
+
+  makeAnkhPower() {
+    const { rowh } = this.metrics;
+    const { player, god, panel } = this.objects;
     // select AnkhPower: onClick->selectAnkhPower(info)
     const selectAnkhPower = (evt: Object, info?: AnkhPowerInfo) => {
       const { button, name, ankhs } = info;
-      const god = player.god, ankh = ankhs.shift();
+      const ankh = ankhs.shift();
       if (!ankh) return;
       ankh.x = 0; ankh.y = 0;
       god.ankhPowers.push(name);
@@ -68,11 +107,12 @@ export class PlayerPanel extends Container {
       }
     };
     // Ankh Power line: circle + text; Ankhs
-    ankhPowers.forEach((ary, rank) => {
+    const { brad, gap, ankhRowy, colWide, dir } = this.metrics;
+    this.ankhPowers.forEach((ary, rank) => {
       const colCont = new Container() as AnkhPowerCont;
       panel.addChild(colCont);
       // TODO: take from god.ankhSource; store for multi-click
-      const ankhs = [ankhSource.takeUnit(), ankhSource.takeUnit(),];
+      const ankhs = [this.ankhSource.takeUnit(), this.ankhSource.takeUnit(),];
       ankhs.forEach((ankh, i) => {
         ankh.x = (3 * brad + gap) + i * (2 * brad + gap);
         ankh.y = ankhRowy;
@@ -83,22 +123,50 @@ export class PlayerPanel extends Container {
       colCont.x = rank * colWide;
 
       // place powerLines --> selectAnkhPower:
-      ary.forEach((name, nth) => {
+      ary.forEach(([name, val], nth) => {
         const powerLine = new Container();
-        const button = new CircleShape(brad, C.white);
+        powerLine.x = brad + gap;
+        powerLine.y = nth * rowh;
+        colCont.addChild(powerLine);
+
+        const button = new CircleShape(C.white, brad, );
         button.on(S.click, selectAnkhPower, this, false, { button, name, ankhs });
         powerLine.addChild(button);
+
         const text = new CenterText(name, brad);
         text.textAlign = 'left';
         text.x = brad + gap;
         powerLine.addChild(text);
-        powerLine.x = brad + gap;
-        powerLine.y = nth * rowh;
-        colCont.addChild(powerLine);
+
+        const [w, h] = [text.getMeasuredWidth(), text.getMeasuredHeight()];
+        const hitArea = new Shape(new Graphics().f(C.black).dr(0, -brad / 2, w, h));
+        hitArea.x = text.x;
+        hitArea.visible = false;
+        text.hitArea = hitArea;
+
+        const doctext = new UtilButton('rgb(240,240,240)', val, 2 * brad);
+        doctext.visible = false;
+        doctext.x = text.x - dir * (60 + doctext.label.getMeasuredWidth()/2); doctext.y = text.y;
+        this.table.overlayCont.addChild(doctext);
+        powerLine.localToLocal(doctext.x, doctext.y, this.table.overlayCont.parent, doctext);
+        const showDocText = (doctext: UtilButton) => {
+          if (doctext.visible) {
+            this.table.overlayCont.children.forEach(doctext => doctext.visible = false)
+          } else {
+            doctext.visible = true;
+          }
+          doctext.stage.update();
+        }
+        doctext.on(S.click, () => showDocText(doctext) );
+        text.on(S.click, () => showDocText(doctext));
       });
     });
+  }
 
+  makeFollowers() {
     // Followers/Coins counter
+    const { panel, player, index } = this.objects;
+    const { gap, ankhColx, wide, rowh, dir } = this.metrics;
     const counterCont = panel, cont = panel;
     const layoutCounter = (name: string, color: string, rowy: number, colx = 0, incr: boolean | NumCounter = true,
       claz = NumCounterBox) => {
@@ -112,8 +180,13 @@ export class PlayerPanel extends Container {
       return counter;
     }
     layoutCounter('coin', C.coinGold, gap, ankhColx, true, );
+  }
+
 
     // Stable:
+  makeStable() {
+    const { wide, gap, rowh, dir, brad } = this.metrics
+    const { panel, god, player, index, table} = this.objects
     const stableCont = new Container();
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
     const swide0 = 4 * (srad1 + srad2);
@@ -127,7 +200,7 @@ export class PlayerPanel extends Container {
     let x0 = [wide, 0][(1 + dir) / 2] + dir * (1 * gap); // edge of next circle
     sourceInfo.forEach((radi, i) => {
       const g0 = new Graphics().ss(2).sd([5, 5]);
-      const circle = new CircleShape(radi - 1, '', god.color, g0);
+      const circle = new CircleShape('', radi - 1, god.color, g0);
       circle.y += (srad2 - radi);
       circle.x = x0 + dir * radi;
       x0 += dir * (2 * radi + sgap);

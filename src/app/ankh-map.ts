@@ -356,7 +356,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.name) as GodFigure: undefined;
+      const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.Aname) as GodFigure: undefined;
       let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);

@@ -4,10 +4,11 @@ import { Hex1, Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape } from "./shapes";
-import { Table } from "./table";
+import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { UnitSource } from "./tile-source";
+import { GP } from "./game-play";
 export class AnkhToken extends Meeple {
   static source: UnitSource<Meeple>[] = [];
 
@@ -15,7 +16,9 @@ export class AnkhToken extends Meeple {
     return Tile.makeSource0(UnitSource<AnkhToken>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
-  // override isDragable(arg: DragContext) { return false; }
+  override isDragable(arg: DragContext) {
+    return this.hex && GP.gamePlay.isPhase('Claim');
+  }
 
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);
@@ -50,7 +53,18 @@ export class AnkhToken extends Meeple {
     }
     return rv;
   }
+}
 
+/** Looks like AnkhToken, but is just a marker for Actions & Events */
+export class AnkhMarker extends Container {
+  constructor(color: string, rad = TP.ankhRad) {
+    super();
+    const shape = new CircleShape(color, rad, );
+    const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
+    ankh.y += rad * .1;
+    this.addChild(shape);
+    this.addChild(ankh);
+  }
 }
 export class God {
   static byName = new Map<string, God>();
@@ -63,23 +77,17 @@ export class God {
   }
 
   constructor(
-    public  name: string,
+    public Aname: string,
     public color: string,
   ) {
     // constructor here:
-    God.byName.set(name, this);
+    God.byName.set(Aname, this);
   }
   ankhPowers: string[] = [];
 
   radius = TP.ankh2Rad;
   getAnkhToken(rad = TP.ankhRad) {
-    const cont = new Container();
-    const shape = new CircleShape(rad, this.color, );
-    const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
-    ankh.y += rad * .1;
-    cont.addChild(shape);
-    cont.addChild(ankh);
-    return cont;
+    return new AnkhMarker(this.color, rad);
   }
 
   makeSpecial(cont: Container, wh: WH, table: Table): Container {
@@ -87,7 +95,7 @@ export class God {
     const rad = TP.ankhRad, y = wh.height/2 + rad/2;
     const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
     cont.addChild(bg);
-    const tname = new CenterText(this.name, rad, this.color );
+    const tname = new CenterText(this.Aname, rad, this.color );
     tname.x = wh.width / 2; tname.textBaseline = 'top';
     cont.addChild(tname);
     return cont;
@@ -108,7 +116,7 @@ class Amun extends God {
     const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
     const sgap = (wh.width / sc - 6 * rad) / 4;
     [rad, rad, rad].forEach((radi, i) => {
-      const circle = new CircleShape(radi, 'lightgrey', this.color);
+      const circle = new CircleShape('lightgrey', radi, this.color);
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont.addChild(circle);

@@ -49,15 +49,19 @@ export class GamePlay0 {
   static gamePlay: GamePlay0;
   static gpid = 0
   readonly id = GamePlay0.gpid++
-  readonly gameState = new GameState();
+
+  readonly gameState: GameState = (this instanceof GamePlay) ? new GameState(this) : undefined;
   get gamePhase() { return this.gameState.state; }
   isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
+  phaseDone() { this.gameState.done(); }
+
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
   readonly logWriter: LogWriter
 
   get allPlayers() { return Player.allPlayers; }
   selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
+  actionIsEvent: string;
 
   readonly hexMap = new AnkhMap<AnkhHex>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
@@ -139,13 +143,10 @@ export class GamePlay0 {
   }
 
 
-  /** when Player has completed their Action & maybe a hire.
-   * { shiftAuction, processEvent }* -> endTurn2() { roll dice, set Bonus, NextPlayer }
+  /**
+   * When player has completed Actions and Event, do next player.
    */
   endTurn() {
-  }
-  endTurn2() {
-    // this.rollDiceForBonus();
     // Jubilee if win condition:
     if (this.isEndOfGame()) {
       this.endGame();
@@ -299,7 +300,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.autoPlay, argVal: 0})
     KeyBinder.keyBinder.setKey('v', { thisArg: this, func: this.autoPlay, argVal: 1})
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
-    KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn2 })
+    KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn })
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: Tile.reCacheTiles })
 
     // diagnostics:
@@ -416,9 +417,9 @@ export class GamePlay extends GamePlay0 {
   }
 
 
-  override endTurn2(): void {
+  override endTurn(): void {
     // this.table.panelForPlayer[this.curPlayerNdx].visible = false;
-    super.endTurn2();
+    super.endTurn();
   }
 
   override setNextPlayer(plyr?: Player) {

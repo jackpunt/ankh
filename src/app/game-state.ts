@@ -1,5 +1,6 @@
-import { Container } from "@thegraid/easeljs-module";
 import { GamePlay, GP } from "./game-play";
+import { stime } from "@thegraid/common-lib";
+import { UtilButton } from "./shapes";
 
 interface Phase {
   Aname?: string,
@@ -8,18 +9,21 @@ interface Phase {
 }
 
 export class GameState {
-  constructor() {
-     this.state = this.states['Move'];
+  constructor(public gamePlay: GamePlay) {
+    Object.keys(this.states).forEach((key) => this.states[key].Aname = key);
   }
+
   state: Phase;
-  gamePlay: GamePlay;
-  get table() { return this.gamePlay.table; }
+  get table() { return this.gamePlay?.table; }
+  get actionIsEvent() { return this.gamePlay.actionIsEvent; }
+  get selectedAction() { return this.gamePlay.selectedAction; }
+  set selectedAction(val) { this.gamePlay.selectedAction = val; }
+  doneButton: UtilButton;
 
-  selectedAction: string;
-
-  firstAction: boolean = true;
-  chooseAction(val: boolean) {
-    this.firstAction = val;
+  actionsDone = 0;
+  bastetEnabled = false;
+  chooseAction(val = 0) {
+    this.actionsDone = val;
     return 'ChooseAction';
   }
   isEvent(action: string) {
@@ -28,22 +32,58 @@ export class GameState {
   }
 
   findGod(name: string) {
-    return GP.gamePlay.allPlayers.find(p => p.god.name == name);
+    return GP.gamePlay.allPlayers.find(p => p.god.Aname == name);
+  }
+
+  start(phase = 'BeginTurn') {
+    this.doneButton = this.gamePlay.table?.doneButton;
+    this.phase(phase);
+  }
+
+  phase(phase: string) {
+    this.state = this.states[phase];
+    console.log(stime(this, `.phase:`), phase);
+    this.state.start();
+  }
+
+  /** invoked when 'Done' button clicked. [or otherwise we determine phase is done] */
+  done() {
+    console.log(stime(this, `.done: ${this.state.Aname}`), this.state);
+    this.state.done();
   }
 
   readonly states: { [index: string]: Phase } = {
-    Begin: {
+    BeginTurn: {
       start: () => {
-        this.phase(this.findGod('Bastet') ? 'Bastet' : this.chooseAction(true));
-      }
+        this.bastetEnabled = !!this.findGod('Bastet');
+        this.selectedAction = undefined;
+        this.actionsDone = 0;
+        this.phase('ChooseAction');
+      },
     },
-    Bastet: { start: () => { /* enable cats */; }, done: () => { this.phase(this.chooseAction(true)) } },
     ChooseAction: {
       start: () => {
-        // enable and highlight open spot on Action Panel
-      }, done: () => {
-        const action = 'findIndicatedAction';
+        if (this.bastetEnabled) {
+          /* enable 'Cats' button; onClick --> phase('Bastet') */
+        }
+        if (this.actionsDone >= 2) this.phase('EndTurn')
+        // enable and highlight open spots on Action Panel
+        const active = this.table.activateActionSelect(true, this.selectedAction);
+        if (!active) this.phase('EndTurn');
+        this.doneButton.visible = this.doneButton.mouseEnabled = true;
+      },
+      done: () => {
+        const action = this.gamePlay.selectedAction;
         this.phase(action);
+      }
+    },
+    Bastet: {
+      start: () => {
+        // enable Cats on the board; onClick-> {gamePlay.bastetCat(cat); curState.done()}
+      },
+      done: () =>  {
+        this.bastetEnabled = false;
+        this.phase('ChooseAction');
       }
     },
     Move: {
@@ -56,7 +96,7 @@ export class GameState {
     },
     Summon: {
       start: () => { },
-      // mouse enable summonable Meeples
+      // mouse enable summonable Meeples (Stable)
       // Mark legal hexes
       // Drag & Drop;
       done: () => { this.phase('EndAction') },
@@ -73,23 +113,25 @@ export class GameState {
       // mouse disable button
       done: () => { this.phase('EndAction') },
     },
-    EndActon: {
+    EndAction: {
       start: () => {
-        const next = this.firstAction ? 'ChooseAction' : 'EndTurn';
-        this.firstAction = false;
-        this.phase(this.isEvent(this.selectedAction) ? 'Event' : next);
+        // [player can select Bastet Cat for disarming]
+        this.actionsDone += 1;
+        if (!!this.actionIsEvent) this.phase('Event');
+        this.phase('ChooseAction');
       },
     },
     Event: {
-      start: () => { },
-      // event = (Event marked)
-      // phase(event)
+      start: () => {
+        console.log(stime(this, `.Event: ${this.actionIsEvent}`));
+        this.phase(this.actionIsEvent);
+      },
     },
     EventDone: {
       start: () => { },
       // phase(EndTurn)
     },
-    Camel: {
+    Split: {
       start: () => { },
       // mouse enable edges (of land tiles)
       // disable edges of hexes in region of < 12 hexes!
@@ -98,7 +140,7 @@ export class GameState {
       // click Done(assign number, phase(Swap))
     },
     Swap: {
-      start: () => { }, // after Camel
+      start: () => { }, // after Split
       // mark startRegion of each marker
       // mouse enable all region markers
       // dragStart: mark legal (either of 2 split regions that contain new/old markers)
@@ -198,20 +240,17 @@ export class GameState {
       start: () => { },
       // coins from Scales to Toth, add Devotion(Scales)
       // mark on Event panel
-      // phase TurnDone
+      // phase EndTurn
     },
-    TurnDone: {
+    EndTurn: {
       start: () => {
+        this.selectedAction = undefined;
         this.gamePlay.endTurn();
+        this.phase('BeginTurn');
       },
     },
 
   };
-
-  phase(phase?: string) {
-    this.state = this.states[phase];
-    this.state.start();
-  }
 
   setup() {
 

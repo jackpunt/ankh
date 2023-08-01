@@ -84,11 +84,11 @@ export class Figure extends Meeple {
     console.log(stime(this, `.dragStart:`), ctx.tile, ctx.targetHex);
     super.dragStart(ctx);
   }
+
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
-    const hex2 = this.hex?.map?.centerHex;
-    console.log(stime(this, `.dropFunc:`), !!hex2 && this.distWithin(targetHex, hex2, 3));
   }
+
   isPhase(name: string) {
     return GP.gamePlay.isPhase(name);
   }
@@ -115,7 +115,7 @@ export class Figure extends Meeple {
     // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
     // TODO: also apply when teleporting to Temple: if gameState.phase == Battle
     if (this.hex.isOnMap) {
-      if (this.isPhase('Conflict')) {
+      if (this.isPhase('Summon')) {
         if (!(hex.findAdjHex(adj => (adj.tile instanceof Pyramid) && adj.tile.player === this.player))) return false;
         return true;
       }

@@ -22,7 +22,7 @@ export class Player {
   ) {
     this.god = God.byName.get(godName);
     Player.allPlayers[index] = this;
-    this.Aname = `P${index}-${this.god.name}:${this.god.color}`;
+    this.Aname = `P${index}-${this.god.Aname}:${this.god.color}`;
     console.log(stime(this, `.new:`), this.Aname);
   }
 
