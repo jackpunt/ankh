@@ -300,6 +300,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('v', { thisArg: this, func: this.autoPlay, argVal: 1})
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
     KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn2 })
+    KeyBinder.keyBinder.setKey('c', { thisArg: this, func: Tile.reCacheTiles })
 
     // diagnostics:
     //KeyBinder.keyBinder.setKey('x', { thisArg: this, func: () => {this.table.enableHexInspector(); }})

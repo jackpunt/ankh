@@ -1,16 +1,16 @@
-import { C, Constructor, S, stime } from "@thegraid/common-lib";
-import { Hex2, Hex, Hex1 } from "./hex";
-import { Player } from "./player";
-import { C1, CenterText, HexShape, Paintable } from "./shapes";
-import { DragContext } from "./table";
-import { TP } from "./table-params";
-import { TileSource, UnitSource } from "./tile-source";
-import { Meeple } from "./meeple";
+import { C, Constructor, stime } from "@thegraid/common-lib";
+import { Container, Graphics } from "@thegraid/easeljs-module";
 import { AnkhHex } from "./ankh-map";
 import { GP } from "./game-play";
-import { MapTile, Tile } from "./tile";
+import { Hex, Hex1, Hex2 } from "./hex";
 import { H } from "./hex-intfs";
-import { Container, Shape, Text } from "@thegraid/easeljs-module";
+import { Meeple } from "./meeple";
+import { Player } from "./player";
+import { C1, CenterText } from "./shapes";
+import { DragContext } from "./table";
+import { TP } from "./table-params";
+import { MapTile, Tile } from "./tile";
+import { TileSource, UnitSource } from "./tile-source";
 
 export class AnkhPiece extends MapTile {
   constructor(player: Player, serial: number, Aname?: string) {
@@ -37,18 +37,25 @@ export class Monument extends AnkhPiece {
 export class Pyramid extends Monument {
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Pyramid');
+    this.baseShape.cgf = (color) =>  new Graphics().f(color).dp(0, 0, this.radius, 3, 0, 30);;
   }
 }
 
 export class Obelisk extends Monument {
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Obelisk');
+    this.baseShape.cgf = (color) =>  {
+      const r = this.radius, h = 1.8 * r, w = h/8;
+      return new Graphics().f(color).dr(-w/2, -h / 2, w, h);
+    }
   }
 }
 
 export class Temple extends Monument {
+  static deg45 = H.degToRadians * 45;
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Temple');
+    this.baseShape.cgf = (color) =>  new Graphics().f(color).dp(0, 0, this.radius, 4, 0, 45);;
   }
 }
 
@@ -165,8 +172,8 @@ export class Warrior extends Figure {
 
   // Warrior
   constructor(player: Player, serial: number) {
-    super(player, serial, `W:${player.index}`, );
-    this.nameText.y -= this.radius / 5;
+    super(player, serial, `W:${player.index+1}`, );
+    // this.nameText.y -= this.radius / 5;
   }
 }
 
@@ -247,8 +254,8 @@ export class Scorpion extends Guardian3 {
   constructor(player: Player, serial: number) {
     super(player, serial, `Scorpion`);
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
-    const { x, y, width, height } = H.hexBounds(TP.hexRad * 1.2, 30);
-    this.setBounds(x, y, width, height);
+    const { x, y, width, height } = H.hexBounds(TP.hexRad, TP.useEwTopo ? 0 : 30);
+    this.setBounds(x, y, width, height * 1.1);
     this.cache(x, y, width, height);
     this.addDirDisk();
   }

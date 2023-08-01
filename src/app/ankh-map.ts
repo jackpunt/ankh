@@ -1,16 +1,15 @@
 import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import { H, HexDir } from "./hex-intfs";
-import { HexShape  } from "./shapes";
-import { HexConstructor, Hex2, Hex, HexMap } from "./hex";
-import { TP } from "./table-params";
-import { AnkhToken, God } from "./god";
-import { Scenario, RegionSpec, SplitSpec, PlaceSpec } from "./ankh-scenario";
+import { AnkhPiece, GodFigure, Monument } from "./ankh-figure";
+import { PlaceSpec, RegionSpec, Scenario, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
+import { AnkhToken, God } from "./god";
+import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
+import { H, HexDir } from "./hex-intfs";
 import { Player } from "./player";
-import { TileSource, UnitSource } from "./tile-source";
-import { AnkhPiece, Figure, GodFigure } from "./ankh-figure";
-import { Meeple } from "./meeple";
+import { HexShape } from "./shapes";
+import { TP } from "./table-params";
+import { TileSource } from "./tile-source";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
@@ -63,6 +62,7 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
 }
 
 class AnkhHexShape extends HexShape {
+  // TODO: use cgf?
   override paint(color: string): Graphics {
     this.setHexBounds();
     const g = this.graphics.c();
@@ -80,7 +80,7 @@ export class AnkhHex extends Hex2 {
   get piece() { return this.tile ?? this.meep }
 
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
-    if (!this.overlay) this.overlay = new HexShape(undefined, 0); // for showRegion()
+    if (!this.overlay) this.overlay = new HexShape(undefined); // for showRegion()
     this.overlay.paint('rgba(250,250,250,.3)');
     this.overlay.visible = false;
     this.cont.addChild(this.overlay);
@@ -351,16 +351,17 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     place0.place.forEach(elt => {
       const [row, col, cons, pid] = elt;
       const hex = this[row][col];
-      const player = Player.allPlayers[pid-1];
+      const player = Player.allPlayers[pid-1], pNdx = player?.index;
       // find each piece, place on map
       console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const isGod = (cons.name === 'GodFigure');
-      const godFig = isGod ? new cons(player, 0, player.god.name) as GodFigure: undefined;
-      const piece = (source && (source instanceof TileSource)) ? source.takeUnit() : new cons(player, 0, cons.name);
-      (godFig ?? piece).moveTo(hex);
-      if (!(piece instanceof Meeple) && pid) AnkhToken.source[player.index].takeUnit().moveTo(hex);
+      const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.name) as GodFigure: undefined;
+      let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
+      const piece = piece0 ?? new cons(player, 0, cons.name);
+      piece.moveTo(hex);
+      // if a Claimed Monument, add AnkhToken:
+      if ((piece instanceof Monument) && (pNdx !== undefined)) AnkhToken.source[pNdx].takeUnit().moveTo(hex);
     })
     //console.groupEnd();
   }

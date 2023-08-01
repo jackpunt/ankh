@@ -106,7 +106,6 @@ export class Table extends EventDispatcher  {
   }
   gamePlay: GamePlay;
   stage: Stage;
-  scaleCont: Container
   bgRect: Shape
   hexMap: HexMap<Hex2>; // from gamePlay.hexMap
 
@@ -407,7 +406,7 @@ export class Table extends EventDispatcher  {
     const actionRows = [{ id: 'Move' }, { id: 'Summon ' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
     const selectAction = (id: string, button: Container) => {
       this.gamePlay.selectedAction = id;
-      const ankh = this.gamePlay.curPlayer.god.getAnhkToken(rad);
+      const ankh = this.gamePlay.curPlayer.god.getAnkhToken(rad);
       button.addChild(ankh);
       button.mouseEnabled = false;
       button.stage.update();
@@ -745,12 +744,14 @@ export class Table extends EventDispatcher  {
     target.y -= dxy.y
     target.stage.update()            // move and show new position
   }
+
+  readonly scaleCont: ScaleableContainer2;
   /** makeScaleableBack and setup scaleParams
    * @param bindkeys true if there's a GUI/user/keyboard
    */
-  makeScaleCont(bindKeys: boolean): ScaleableContainer {
+  makeScaleCont(bindKeys: boolean) {
     /** scaleCont: a scalable background */
-    const scaleC = new ScaleableContainer(this.stage, this.scaleParams);
+    const scaleC = new ScaleableContainer2(this.stage, this.scaleParams);
     this.dragger = new Dragger(scaleC);
     this.dragger.dragTarget = this.dragTargetPatch; // PATCH until next easeljs-lib
     if (!!scaleC.stage.canvas) {
@@ -759,7 +760,7 @@ export class Table extends EventDispatcher  {
       //this.scaleUp(Dragger.dragCont, 1.7); // Items being dragged appear larger!
     }
     if (bindKeys) {
-      this.bindKeysToScale("a", scaleC, 820, 10);
+      this.bindKeysToScale(scaleC, "a", 436, 2);
       KeyBinder.keyBinder.setKey('Space',   { thisArg: this, func: () => this.dragTarget() });
       KeyBinder.keyBinder.setKey('S-Space', { thisArg: this, func: () => this.dragTarget() });
     }
@@ -774,38 +775,91 @@ export class Table extends EventDispatcher  {
     parent.addChildAt(bgRect, 0);
     return bgRect
   }
+
+  zoom(z = 1.1) {
+    const stage = this.stage;
+    const pxy = { x: stage.mouseX / stage.scaleX, y: stage.mouseY / stage.scaleY };
+    this.scaleCont.setScale(this.scaleCont.scaleX * z, pxy);
+    // would require adjusting x,y offsets, so we just scale directly:
+    // TODO: teach ScaleableContainer to check scaleC.x,y before scroll-zooming.
+
+    // this.scaleCont.scaleX = this.scaleCont.scaleY = this.scaleCont.scaleX * z;
+    this.stage?.update();
+  }
+  pan(xy: XY) {
+    this.scaleCont.x += xy.x;
+    this.scaleCont.y += xy.y;
+    this.stage?.update();
+  }
+
   /**
-   * @param xos x-offset-to-center in Original Scale
-   * @param xos y-offset-to-center in Original Scale
-   * @param scale Original Scale
+   * invoked before this.scaleC has been set
+   * @param scaleC same Container as this.scaleC
+   * @param char keybinding to set initial scale
+   * @param xos x-offset of scaleC in screen coords (pre-scale)
+   * @param yos y-offset of scaleC in screen coords (pre-scale)
+   * @param scale0 imitial scale [.5]
    */
-  // bindKeysToScale(scaleC, 800, 0, scale=.324)
-  bindKeysToScale(char: string, scaleC: ScaleableContainer, xos: number, yos: number) {
-    let ns0 = scaleC.getScale(), sXY = { x: -scaleC.x, y: -scaleC.y } // generally == 0,0
-    let nsA = scaleC.findIndex(.5), apt = { x: -xos, y: -yos }
-    let nsZ = scaleC.findIndex(ns0), zpt = { x: -xos, y: -yos }
+  // bindKeysToScale('a', scaleC, 436, 0, .5)
+  bindKeysToScale(scaleC: ScaleableContainer2, char: string, xos: number, yos: number, scale0 = .5) {
+      const nsA = scale0;
+    const apt = { x: xos, y: yos }
+    let nsZ = 0.647; //
+    const zpt = { x: 120, y: 104 }
 
     // set Keybindings to reset Scale:
-    /** xy in [unscaled] model coords; sxy in screen coords */
-    const setScaleXY = (si?: number, xy?: XY, sxy: XY = sXY) => {
-      let ns = scaleC.setScaleXY(si, xy, sxy)
+    /** save scale & offsets for later: */
+    const saveScaleZ = () => {
+      nsZ = scaleC.scaleX;
+      zpt.x = scaleC.x; zpt.y = scaleC.y;
+    }
+    // xy is the fixed point, but is ignored because we set xy directly.
+    // sxy is the final xy offset, saved by saveScaleZ()
+    const setScaleXY = (ns?: number, sxy: XY = { x: 0, y: 0 }) => {
+      scaleC.setScale(ns);
       //console.log({si, ns, xy, sxy, cw: this.canvas.width, iw: this.map_pixels.width})
+      scaleC.x = sxy.x; scaleC.y = sxy.y;
       this.stage.update()
     }
-    let setScaleZ = () => {
-      ns0 = scaleC.getScale()
-      nsZ = scaleC.findIndex(ns0)
-      zpt = { x: -scaleC.x/ns0, y: -scaleC.y/ns0 }
-    };
-    let goup = () => {
+    const getOop = () => {
       this.stage.getObjectsUnderPoint(500, 100, 1)
     }
 
     // Scale-setting keystrokes:
-    KeyBinder.keyBinder.setKey("x", { func: () => setScaleZ() });
-    KeyBinder.keyBinder.setKey("z", { func: () => setScaleXY(nsZ, zpt) });
     KeyBinder.keyBinder.setKey("a", { func: () => setScaleXY(nsA, apt) });
-    KeyBinder.keyBinder.setKey("p", { func: () => goup(), thisArg: this});
+    KeyBinder.keyBinder.setKey("z", { func: () => setScaleXY(nsZ, zpt) });
+    KeyBinder.keyBinder.setKey("x", { func: () => saveScaleZ() });
+    KeyBinder.keyBinder.setKey("p", { func: () => getOop(), thisArg: this});
+    KeyBinder.keyBinder.setKey('S-ArrowUp', { thisArg: this, func: this.zoom, argVal: 1.03 })
+    KeyBinder.keyBinder.setKey('S-ArrowDown', { thisArg: this, func: this.zoom, argVal: 1/1.03 })
+    KeyBinder.keyBinder.setKey('S-ArrowLeft', { thisArg: this, func: this.pan, argVal: {x: -10, y:0} })
+    KeyBinder.keyBinder.setKey('ArrowRight', { thisArg: this, func: this.pan, argVal: {x: 10, y: 0} })
+    KeyBinder.keyBinder.setKey('ArrowLeft', { thisArg: this, func: this.pan, argVal: {x: -10, y:0} })
+    KeyBinder.keyBinder.setKey('S-ArrowRight', { thisArg: this, func: this.pan, argVal: {x: 10, y: 0} })
+    KeyBinder.keyBinder.setKey('ArrowUp', { thisArg: this, func: this.pan, argVal: { x: 0, y: -10 } })
+    KeyBinder.keyBinder.setKey('ArrowDown', { thisArg: this, func: this.pan, argVal: { x: 0, y: 10 } })
+
     KeyBinder.keyBinder.dispatchChar(char)
+  }
+}
+
+class ScaleableContainer2 extends ScaleableContainer {
+  /**
+   * set scale exactly; set scale index approximately and return it.
+   * @param ns new scale
+   * @param xy scale around this point (so 'p' does not move on display) = {0,0}
+   * @param sxy move to offset? in new coords?
+   * @returns the nearby scaleNdx
+   */
+  setScale(ns = 1.0, xy: XY = { x: 0, y: 0 }, sxy: XY = { x: 0, y: 0 }): number {
+    this.getScale(this.findIndex(ns)); // close appx, no side effects.
+    this.scaleInternal(this.scaleX, ns, xy);
+    return ns;
+  }
+  override scaleContainer(di: number, xy?: XY): number {
+    let os = this.scaleX;   // current -> old / original scale
+    let ns = this.incScale(di);
+    if (di == 0) { os = 0; ns = this.getScale(this.initIndex) }
+    return this.scaleInternal(os, ns, xy);
   }
 }

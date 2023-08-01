@@ -1,24 +1,18 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
-import { Container, Shape } from "@thegraid/easeljs-module";
+import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { Hex1, Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { CenterText, CircleShape, ColorGraphics, Paintable, PaintableShape } from "./shapes";
+import { CenterText, CircleShape } from "./shapes";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { TileSource, UnitSource } from "./tile-source";
-
-class AnhkShape extends CircleShape {
-  constructor(rad = TP.ankhRad, color: string) {
-    super(rad - 1, color);
-  }
-}
+import { UnitSource } from "./tile-source";
 export class AnkhToken extends Meeple {
   static source: UnitSource<Meeple>[] = [];
 
   static makeSource(player: Player, hex: Hex2, token: Constructor<Meeple>, n: number) {
-    return Tile.makeSource0(UnitSource<Meeple>, token, player, hex, n);
+    return Tile.makeSource0(UnitSource<AnkhToken>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
   // override isDragable(arg: DragContext) { return false; }
@@ -26,11 +20,24 @@ export class AnkhToken extends Meeple {
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);
     const r = this.radius;
-    const ankh = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
-    ankh.y += r * .1;
-    this.addChild(ankh);
-    this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
-    this.baseShape.cgf = ColorGraphics.circleShape();
+    const ankhChar = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
+    ankhChar.y += r * .1;
+    this.addChild(ankhChar);
+    this.nameText.text = '';
+    // this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
+    this.baseShape.cgf = (color) => this.atcgf(color);
+  }
+  override cache(x, y, w, h) {
+    //this.scaleX = this.scaleY = 8;
+    super.cache(x, y, w, h, 5)
+    // this.scaleX = this.scaleY = 1;
+  }
+
+  atcgf(color: string) {
+      const g = new Graphics(), r = this.radius;
+      g.ss(1).s(C.black).dc(0, 0, r - 1);
+      g.f(color).dc(0, 0, r - 1);
+      return g;
   }
 
   override moveTo(hex: Hex1): Hex1 {
@@ -38,8 +45,7 @@ export class AnkhToken extends Meeple {
     if (hex?.isOnMap) {
       this.y += TP.ankh2Rad - this.radius;
       if (hex.tile) {
-        hex.tile.player = this.player
-        hex.tile.paint()
+        hex.tile.setPlayerAndPaint(this.player);
       }
     }
     return rv;
@@ -66,7 +72,7 @@ export class God {
   ankhPowers: string[] = [];
 
   radius = TP.ankh2Rad;
-  getAnhkToken(rad = TP.ankhRad) {
+  getAnkhToken(rad = TP.ankhRad) {
     const cont = new Container();
     const shape = new CircleShape(rad, this.color, );
     const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);

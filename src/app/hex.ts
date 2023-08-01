@@ -351,7 +351,7 @@ export class RecycleHex extends Hex2 { }
 export class HexMark extends HexShape {
   hex: Hex2;
   constructor(public hexMap: HexMap<Hex2>, radius: number, radius0: number = 0) {
-    super(radius, hexMap.topoRot);
+    super(radius);
     const mark = this;
     const cm = "rgba(127,127,127,.3)";
     this.graphics.f(cm).dp(0, 0, this.radius, 6, 0, this.tilt);

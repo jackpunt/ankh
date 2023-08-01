@@ -31,6 +31,7 @@ export class GameSetup {
   constructor(canvasId: string, ext?: string[], ngods = 4) {
     stime.fmt = "MM-DD kk:mm:ss.SSS"
     this.stage = makeStage(canvasId, false)
+    this.stage.snapToPixel = TP.snapToPixel;
     Tile.loader.loadImages(() => this.startup(ext, ngods));
   }
   _netState = " " // or "yes" or "ref"

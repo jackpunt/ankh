@@ -16,8 +16,11 @@ class MeepleShape extends PaintableShape {
   constructor(public player: Player, public radius = TP.meepleRad) {
     super((color) => this.mscgf(color));
     this.y = TP.meepleY0;
-    this.mscgf();
+    this.setMeepleBounds();
     this.backSide = this.makeOverlay(this.y);
+  }
+  setMeepleBounds(r = this.radius) {
+    this.setBounds(-r, -r, 2 * r, 2 * r);
   }
 
   backSide: Shape;  // visible when Meeple is 'faceDown' after a move.
@@ -35,7 +38,6 @@ class MeepleShape extends PaintableShape {
     const r = this.radius, ss = 2, rs = 1;
     const g = this.graphics.c().ss(ss).s(colorn).dc(0, 0, r - rs);
     g.f(MeepleShape.fillColor).dc(0, 0, r - 1);  // disk
-    this.setBounds(-r, -r, 2 * r, 2 * r);
     return g;
   }
 }
@@ -62,7 +64,7 @@ export class Meeple extends Tile {
     this.player = player;
     this.nameText.visible = true;
     this.nameText.y = this.baseShape.y;
-    this.paint();
+    // this.paint();
     Meeple.allMeeples.push(this);
   }
 

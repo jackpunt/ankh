@@ -68,8 +68,8 @@ class Tile0 extends Container {
    * @param colorn the actual color (default = TP.colorScheme[pColor])
    */
   paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
-    this.baseShape.paint(colorn); // recache baseShape
-    this.updateCache();
+    this.baseShape.paint(colorn); // set or update baseShape.graphics
+    this.updateCache();           // push graphics to bitmapCache
   }
 
   removeChildType(type: Constructor<DisplayObject>, pred = (dobj: DisplayObject) => true ) {
@@ -84,6 +84,21 @@ class Tile0 extends Container {
 export class Tile extends Tile0 {
   static allTiles: Tile[] = [];
   static textSize = 20;
+  static cacheScale = TP.cacheTiles;
+  static reCacheTiles() {
+    Tile.cacheScale = Math.max(1, GP.gamePlay.table.scaleCont.scaleX);
+    TP.cacheTiles = (TP.cacheTiles == 0) ? Tile.cacheScale : 0;
+    console.log(stime('Tile', `.reCacheTiles: TP.cacheTiles=`), TP.cacheTiles, GP.gamePlay.table.scaleCont.scaleX);
+    Tile.allTiles.forEach(tile => {
+      if (tile.cacheID) {
+        tile.uncache();
+      } else {
+        const rad = tile.radius;
+        tile.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
+      }
+    });
+    GP.gamePlay.hexMap.update();
+  }
 
   static makeSource0<T extends Tile, TS extends TileSource<T>>(
     unitSource: new (type: Constructor<Tile>, p: Player, hex: Hex2) => TS,
@@ -142,11 +157,16 @@ export class Tile extends Tile0 {
     Tile.allTiles.push(this);
     if (!Aname) this.Aname = `${className(this)}\n${Tile.allTiles.length}`;
     const rad = this.radius;
-    this.cache(-rad, -rad, 2 * rad, 2 * rad);
+    if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
     this.addChild(this.baseShape);
     this.addChild(new BalMark(this));
     this.setPlayerAndPaint(player);
     this.nameText = this.addTextChild(rad / 2);
+  }
+
+  override updateCache(compositeOperation?: string): void {
+    if (!this.cacheID) return;
+    super.updateCache(compositeOperation)
   }
 
   setPlayerAndPaint(player: Player) {

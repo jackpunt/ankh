@@ -54,14 +54,23 @@ export class ColorGraphics extends Graphics {
  */
 
 export class PaintableShape extends Shape implements Paintable {
-  constructor(public cgf: CGF, public colorn?: string) {
+  constructor(public _cgf: CGF, public colorn?: string) {
     super();
+  }
+  get cgf() { return this._cgf; }
+  set cgf(cgf: CGF) {
+    this._cgf = cgf;
+    if (this.cgfGraphics) {
+      this.cgfGraphics = undefined;
+      this.paint(this.colorn);
+    }
   }
   cgfGraphics: Graphics;
   paint(colorn: string = this.colorn): Graphics {
-    if (colorn !== this.colorn || this.graphics !== this.cgfGraphics) {
+    if (this.graphics !== this.cgfGraphics || this.colorn !== colorn) {
       // need to repaint, even if same color:
       this.graphics = this.cgfGraphics = this.cgf(this.colorn = colorn);
+      if (this.cacheID) this.updateCache();
     }
     return this.graphics;
   }
@@ -74,9 +83,15 @@ export class PaintableShape extends Shape implements Paintable {
 export class HexShape extends PaintableShape {
   constructor(
     readonly radius = TP.hexRad,
-    readonly tilt = 30,  // ewTopo->30, nsTopo->0
+    readonly tilt = TP.useEwTopo ? 30 : 0,  // ewTopo->30, nsTopo->0
   ) {
     super((color: string) => this.hscgf(color));
+    this.setHexBounds(); // Assert radius & tilt are readonly, so bounds never changes!
+  }
+
+  setCacheID() {
+    const b = this.getBounds();              // Bounds are set
+    this.cache(b.x, b.y, b.width, b.height);
   }
 
   setHexBounds(r = this.radius, tilt = this.tilt) {
@@ -93,7 +108,6 @@ export class HexShape extends PaintableShape {
    * or in other way setBounds().
    */
   hscgf(color: string) {
-    this.setHexBounds();
     const g = new Graphics();
     return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
@@ -174,15 +188,16 @@ export class InfShape extends Shape implements Paintable {
 
 export class TileShape extends HexShape {
   static fillColor = C1.lightgrey_8;// 'rgba(200,200,200,.8)'
-  constructor(radius?: number, tilt: number = 0) {
-    super(radius, tilt); // sets this.cgf
-    const hscgf = this.cgf;     // oka: super.paint()
+  constructor(radius?: number, tilt?: number) {
+    super(radius, tilt); // sets Bounnds & this.cgf
+    const super_cgf = this.cgf;
     this.cgf = (colorn: string) => {
-      this.graphics = hscgf.call(this, 'rgba(255,255,255,.8)'); // paint HexShape(White)
-      return this.tscgf(colorn);
+      return this.tscgf(colorn, super_cgf);
     }
   }
   replaceDisk(colorn: string, r2 = this.radius) {
+    if (!this.cacheID) this.setCacheID();
+    else this.updateCache();               // write curent graphics to cache
     const g = this.graphics;
     // g.c().f(C.BLACK).dc(0, 0, r2);       // bits to remove
     // this.updateCache("destination-out"); // remove disk from solid hexagon
@@ -191,14 +206,14 @@ export class TileShape extends HexShape {
     return g;
   }
 
+  readonly bgColor = C.nameToRgbaString(C.WHITE, .8);
   /** colored HexShape filled with very-lightgrey disk: */
-  tscgf(colorn: string) {
-    // calculate bounds of hexagon for cache:
-    const { x, y, width, height } = this.getBounds();
-    this.cache(x, y, width, height);
+  tscgf(colorn: string, super_cgf = () => new Graphics()) {
+    // HexShape.cgf(rgba(C.WHITE, .8))
+    const g = this.graphics = super_cgf.call(this, this.bgColor); // paint HexShape(White)
     const fillColor = C.nameToRgbaString(colorn, .8);
-    this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
-    return this.graphics;
+    //this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
+    return this.graphics = g;
   }
 }
 
