@@ -31,16 +31,22 @@ class ActionContainer extends Container {
   highlight: PaintableShape;
   active: DisplayObject; // most recently activated button
 
+  /** activate the first button witout a AnkhMarker */
   activate() {
     const hl = this.highlight;
     const buttons = this.children.filter(c => (c instanceof Container)) as Container[]; // minus highlight;
-    const button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker)));
+    let button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker)));
+    if (!button) { // reset after Event!
+      buttons.forEach(b => b.removeChildType(AnkhMarker));
+      button = buttons[0];
+    }
     hl.x = button.x;
     hl.y = button.y;
     hl.visible = button.mouseEnabled = true;
     this.active = button;
     this.stage.update();
   }
+
   deactivate() {
     if (this.active) this.highlight.visible = this.active.mouseEnabled = false;
     this.stage.update();
@@ -48,17 +54,6 @@ class ActionContainer extends Container {
 }
 interface ScoreShape extends Shape {
   color: string;
-}
-export interface AnkhPowerInfo {
-  button: Shape;
-  ankhs: AnkhToken[];
-  radius?: number;
-  name?: string;
-}
-
-export interface AnkhPowerCont extends Container {
-  ankhs: AnkhToken[];
-  guardianSlot: number;
 }
 
 /** to own file... */
@@ -469,10 +464,12 @@ export class Table extends EventDispatcher  {
     });
     this.addDoneButton(actionCont, rh)
   }
+  /** mark Action as selected, inform GamePlay & phaseDone() */
   selectAction (id: string, button: EventButton) {
     this.gamePlay.selectedAction = id;
     if (button.isEvent) {
-      const cell = this.eventCells.find(ec => ec.children.find(c => !(c instanceof AnkhMarker)));
+      const doneCells = this.eventCells.filter(ec => ec.children.find(c => c instanceof AnkhMarker));
+      const cell = this.eventCells[doneCells.length];
       const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(TP.ankhRad);
       cell.addChild(ankhToken)
       this.gamePlay.actionIsEvent = cell.event;
@@ -482,7 +479,7 @@ export class Table extends EventDispatcher  {
     const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(width / 2);
     button.addChild(ankhToken);
     button.stage.update();
-    GP.gamePlay.phaseDone();
+    GP.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
   doneButton: UtilButton
   addDoneButton(actionCont: Container, rh: number) {
@@ -499,6 +496,7 @@ export class Table extends EventDispatcher  {
     return actionCont;
   }
 
+  /** On each row: activate or deactivate the first button without an AnkhMarker on each line  */
   activateActionSelect(activate: boolean, after?: string, cat = false) {
     let isAfter = (after === undefined);
     let active = 0;
@@ -541,8 +539,8 @@ export class Table extends EventDispatcher  {
       icon.y = row * dx;
       icon.x = ((row == 0) ? cx : cx - 8 ) * dx;
       cx += 1;
-      if (k === 'B') {
-        cx += bx;  // extra gap after Battle
+      if (evt === 'Conflict') {
+        cx += bx;  // extra gap after Conflict
       }
       if (k === 'M' || k === 'R') {
         icon.y += dx;

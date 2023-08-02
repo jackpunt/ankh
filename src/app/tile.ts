@@ -7,6 +7,15 @@ import { BalMark, C1, CenterText, HexShape, PaintableShape, TileShape } from "./
 import type { DragContext, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
+import { removeChildType } from "./functions";
+
+
+declare module "@thegraid/easeljs-module" {
+  interface Container {
+    removeChildType<T extends DisplayObject>(type: Constructor<T>, pred?: (dobj: T) => true ): T[];
+  }
+}
+Container.prototype.removeChildType = removeChildType;
 
 class TileLoader {
   Uname = ['Univ0', 'Univ1'];
@@ -70,12 +79,6 @@ class Tile0 extends Container {
   paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.baseShape.paint(colorn); // set or update baseShape.graphics
     this.updateCache();           // push graphics to bitmapCache
-  }
-
-  removeChildType(type: Constructor<DisplayObject>, pred = (dobj: DisplayObject) => true ) {
-    const rems = this.children.filter(c => (c instanceof type) && pred(c));
-    this.removeChild(...rems);
-    this.updateCache()
   }
 
 }

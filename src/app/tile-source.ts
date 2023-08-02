@@ -84,7 +84,7 @@ export class TileSource<T extends Tile> {
 
   takeUnit() {
     const unit = this.availableUnit;
-    unit.moveTo(undefined);
+    unit?.moveTo(undefined);
     this.nextUnit();
     return unit;
   }

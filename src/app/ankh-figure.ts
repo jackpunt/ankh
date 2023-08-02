@@ -64,6 +64,7 @@ export class Figure extends Meeple {
   constructor(player: Player, serial: number, Aname?: string) {
     super(Aname ?? `${Aname}\n${serial}`, player);
   }
+
   override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.paintRings(colorn, colorn, 4, 4); // one fat ring...
   }

@@ -74,7 +74,7 @@ export class GameState {
       },
       done: () => {
         const action = this.gamePlay.selectedAction;
-        this.phase(action);
+        this.phase(action ?? 'EndTurn');
       }
     },
     Bastet: {
@@ -107,8 +107,12 @@ export class GameState {
       done: () => { this.phase('EndAction') },
     },
     Ankh: {
-      start: () => { },
-      // mouse enable next Upgrades;
+      start: () => {
+        const ndx = this.gamePlay.curPlayerNdx;
+        const panel = this.gamePlay.table.panelForPlayer[ndx];
+        panel.activateSelectAnkhPower();
+      },
+      // mouseEnable next Upgrades;
       // on click: move Anhk to button (cover: now unclickable), set bit on Player.
       // mouse disable button
       done: () => { this.phase('EndAction') },
@@ -128,7 +132,9 @@ export class GameState {
       },
     },
     EventDone: {
-      start: () => { },
+      start: () => {
+
+      },
       // phase(EndTurn)
     },
     Split: {
