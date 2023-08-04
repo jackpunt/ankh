@@ -1,17 +1,17 @@
 import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhPiece, Figure, GodFigure, Monument } from "./ankh-figure";
-import { PlaceSpec, RegionSpec, Scenario, SplitSpec } from "./ankh-scenario";
+import type { AnkhPiece, Figure, GodFigure } from "./ankh-figure";
+import { PlaceSpec, RegionSpec, Scenario, SetupSpec, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { AnkhToken, God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
-import { Meeple } from "./meeple";
+import type { Meeple } from "./meeple";
 import { Player } from "./player";
 import { HexShape } from "./shapes";
 import { TP } from "./table-params";
+import type { Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import { Tile } from "./tile";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
@@ -303,99 +303,4 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   battleOrder: number[] = [];
-  parseScenario(scenario: Scenario) {
-    const region0 = scenario.find(elt => elt['region']) as RegionSpec;
-    const splits = scenario.filter(elt => elt['split']) as SplitSpec[];
-    const place0 = scenario.find(elt => elt['place']) as PlaceSpec;
-
-    region0.region.forEach(elt => {
-      // assign battleOrder for region[seed]
-      // we will simply permute the regions array.
-      const [row, col, bid] = elt, hex = this[row][col];
-      const rindex = this.regionOfHex(row, col, hex);
-      const xregion = this.regions[bid-1];
-      this.regions[bid-1] = this.regions[rindex];
-      this.regions[bid-1].forEach(hex => hex.district = bid);
-      this.regions[rindex] = xregion;
-      this.regions[rindex]?.forEach(hex => hex.district = rindex+1);
-
-      this.regions[bid-1]['Aname'] = `${hex}`
-    });
-    // console.log(stime(this, `.regions: input`), region0.region);
-    // console.log(stime(this, `.regions: result`), this.regionList());
-
-    splits.forEach((splitElt, i) => {
-      // console.log(stime(this, `.splits[${i}]`), splitElt, splitElt.split);
-      const splitN = (splitElt.split as any as number[][]);
-      const splitD = (splitElt.split as any as (number|string)[][]);
-      // hex[row,col] will be in the NEW region, with NEW bid.
-      const split0 = splitN[0];
-      const [row, col, bid] = split0; //(split as any as (number)[][]).shift();
-      const newHex = this[row][col];
-      const origNdx = this.regionOfHex(row, col, newHex);
-      // console.log(stime(this, `.splits[${i}] hex: ${newHex} origNdx: ${origNdx} bid: ${bid}`))
-      //splitD.shift();
-      const splitShape = this.edgeShape('#4D5656'); // grey
-      this.mapCont.infCont.addChild(splitShape);
-      splitD.forEach((elt, i) => {
-        if (i === 0) return undefined;
-        const [row, col, d0, d1, d2, d3, d4, d5] = elt as [number, number, HexDir, HexDir, HexDir, HexDir, HexDir, HexDir];
-        const dirs = [d0, d1, d2, d3, d4, d5].filter(dir => dir !== undefined);
-        // add border on each edge of [row, col]
-        const hex = this[row][col];
-        // console.log(stime(this, `.split: border ${hex}`), dirs);
-        dirs.forEach(dir => this.addEdge([row, col, dir], splitShape));
-        return hex;
-      });
-      this.update();
-
-      // region will split to 2 region IDs: [regions.length, origNdx]
-      const ids = [bid - 1, origNdx,]; // given hex gets NEW region;
-      const [newRs, adjRs] = this.findRegions(this.regions[origNdx], newHex, ids.concat());
-      // console.log(stime(this, `.split: newRs`), this.regionList(newRs), ids);
-      this.regions[ids[0]] = newRs[0]; // rid = len
-      this.regions[ids[1]] = newRs[1]; // rid = original
-      this.regions[ids[0]].forEach(hex => hex.district = ids[0]+1);
-      this.regions[ids[1]].forEach(hex => hex.district = ids[1]+1);
-    })
-    // console.log(stime(this, `.split adjRegions:`), this.regionList());
-
-    //console.groupCollapsed('place');
-    place0.place.forEach(elt => {
-      const [row, col, cons, pid] = elt;
-      const hex = this[row][col];
-      const player = Player.allPlayers[pid-1], pNdx = player?.index;
-      // find each piece, place on map
-      // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
-      const source0 = cons['source'];
-      const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.Aname) as GodFigure: undefined;
-      let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
-      const piece = piece0 ?? new cons(player, 0, cons.name);
-      piece.moveTo(hex);
-      // if a Claimed Monument, add AnkhToken:
-      if ((piece instanceof Monument) && (pNdx !== undefined)) AnkhToken.source[pNdx].takeUnit().moveTo(hex);
-    })
-    //console.groupEnd();
-  }
-
-
-  identCells() {
-    this.forEachHex(hex => {
-      const h2 = (hex as any as Hex2);
-      const hc = h2.cont;
-      hc.mouseEnabled = true;
-      hc.on(S.click, () => {
-        h2.isLegal = !h2.isLegal;
-        this.update();
-      });
-    });
-    KeyBinder.keyBinder.setKey('x', {
-      func: () => {
-        const cells = this.filterEachHex(hex => hex.isLegal);
-        const list = cells.map(hex => `${hex.rcs},`);
-        console.log(''.concat(...list));
-      }
-    });
-  }
 }

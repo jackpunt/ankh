@@ -165,7 +165,8 @@ export class Figure extends Meeple {
     return underlay;
   }
 
-  highlight(show = true, color = C.WHITE, rad = this.radius + 4 ?? TP.ankhRad) {
+  highlight(show = true, color = C.WHITE, dr = 4) {
+    const rad = this.radius + dr;
     if (show) {
       // cgf with color *and* rad:
       this.underlay.cgf = (color) => new Graphics().f(color).dc(0, 0, rad);
@@ -193,7 +194,7 @@ export class Figure extends Meeple {
     return rv;
   }
   override dragStart(ctx: DragContext): void {
-    console.log(stime(this, `.dragStart:`), ctx.tile, ctx.targetHex);
+    // console.log(stime(this, `.dragStart:`), ctx.tile, ctx.targetHex);
     super.dragStart(ctx);
   }
 

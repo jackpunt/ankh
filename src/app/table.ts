@@ -2,7 +2,7 @@ import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContai
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { AnkhScenario } from "./ankh-scenario";
+import { AnkhScenario, ScenarioParser } from "./ankh-scenario";
 import { GP, type GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
@@ -471,7 +471,7 @@ export class Table extends EventDispatcher  {
 
   undoActionSelection(action: string, index: number) {
     const rowCont = this.actionPanels[action] as ActionContainer;
-    if (!rowCont) debugger;
+    if (!rowCont) debugger;    // TODO: undo 'Ankh' [isEvent!] -> 'Gain' -> direct to Event!
     const button = rowCont.children.filter(ch => ch instanceof Container)[index] as EventButton;
     button.removeChildType(AnkhMarker);
     if (button.isEvent) {
@@ -653,7 +653,7 @@ export class Table extends EventDispatcher  {
   startGame(sname: string) {
     const np = Player.allPlayers.length;
     const scenario = AnkhScenario[sname][np-2];
-    (this.hexMap as AnkhMap<AnkhHex>).parseScenario(scenario);
+    new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>).parseScenario(scenario);
 
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {

@@ -30,17 +30,27 @@ interface AnkhPowerCont extends Container {
 
 export class PlayerPanel extends Container {
   strength: any;
-  isPlayerInRegion(conflictRegion: number): unknown {
-    throw new Error("Method not implemented.");
+  isPlayerInRegion(conflictRegion: number) {
+    const region = this.table.gamePlay.hexMap.regions[conflictRegion];
+    return region.find(hex => hex.meep?.player === this.player) ?? false;
   }
+  plagueBid = 0;
   enablePlagueBid(region: number): void {
-    throw new Error("Method not implemented.");
+    this.plagueBid = 0;
+    GP.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
+  // really: detectBuild.
   enableBuild(region: number): void {
-    throw new Error("Method not implemented.");
+    // TODO: Table to emit event on AnkhPiece.moveTo?
+    //       so panel/state know when move happens/done?
+    this.table.on('moveTo', () => {
+      // Monument, hex.isOnMap, mont.player === this.player,
+      GP.gamePlay.phaseDone(this);
+    })
   }
+  // detectObeliskTeleport... oh! this requires a 'Done' indication.
   enableObeliskTeleport(region: number): void {
-    throw new Error("Method not implemented.");
+    // TODO: per-panel 'Done' button
   }
   outline: RectShape;
   ankhSource: TileSource<AnkhToken>;
@@ -138,6 +148,7 @@ export class PlayerPanel extends Container {
   /** keybinder access to areYouSure */
   clickConfirm(yes = true) {
     // let target = (this.confirmContainer.children[2] as UtilButton);
+    if (!this.confirmContainer.visible) return;
     const event = new MouseEvent(S.click, false, true, 0, 0, undefined, -1, true, 0, 0);
     (yes ? this.buttonYes : this.buttonCan).dispatchEvent(event);
   }

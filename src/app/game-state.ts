@@ -1,15 +1,16 @@
-import { GamePlay, GP } from "./game-play";
 import { C, className, stime } from "@thegraid/common-lib";
-import { UtilButton } from "./shapes";
-import { AnkhPiece, Figure, Monument, Obelisk, Pyramid, Temple } from "./ankh-figure";
+import { Figure, Monument, Obelisk, Pyramid, Temple } from "./ankh-figure";
+import { GamePlay, GP } from "./game-play";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
+import { UtilButton } from "./shapes";
 import { Tile } from "./tile";
 
 interface Phase {
   Aname?: string,
   start(...args: any[]): void; // what to do in this phase
   done?: (...args: any[]) => void;          // for async; when done clicked: proceed
+  undo?: () => void;
   region?: number,
   panels?: PlayerPanel[],
   players?: Player[],
@@ -71,8 +72,13 @@ export class GameState {
 
   /** invoked when 'Done' button clicked. [or whenever phase is 'done' by other means] */
   done(...args: any[]) {
-    console.log(stime(this, `.done: ${this.state.Aname}`), this.state);
+    console.log(stime(this, `.done: ${this.state.Aname}-${this.selectedActions.length}`), this.state);
     this.state.done();
+  }
+  undoAction() {
+    const action = this.selectedAction;
+    if (!action) return;
+    this.states[action].undo?.();
   }
 
   readonly states: { [index: string]: Phase } = {
@@ -94,14 +100,17 @@ export class GameState {
         // enable and highlight open spots on Action Panel
         const lastAction = this.selectedActions[0], n = this.actionsDone + 1;
         const active = this.areActiveActions = this.table.activateActionSelect(true, lastAction);
-        if (!active) this.phase('EndTurn'); // assert: selectedActions[0] === 'Ankh'
-        this.selectedAction = undefined;
-        this.button(`Choice ${n} Done`);
+        if (!active) {
+          this.phase('EndTurn');  // assert: selectedActions[0] === 'Ankh'
+        } else {
+          this.selectedAction = undefined;
+          this.button(`Choice ${n} Done`);
+         }
       },
       done: (ok?: boolean) => {
         const action = this.selectedAction;
         if (!ok && !action) {
-          this.panel.areYouSure('You have unused action', () => {
+          this.panel.areYouSure('You have an unused action.', () => {
             setTimeout(() => this.state.done(true), 50);
           }, () => {
             setTimeout(() => this.state.start(), 50);
@@ -196,17 +205,18 @@ export class GameState {
         // [player can select Bastet Cat for disarming]
         this.actionsDone += 1;
         if (!!this.eventName) this.phase('Event');
-        this.phase('ChooseAction');
+        else this.phase('ChooseAction');
       },
     },
     Event: {
       start: () => {
         console.log(stime(this, `.Event: ${this.eventName}`));
-        this.phase(this.eventName);
+        this.phase(this.eventName);  // --> EventDone
       },
     },
     EventDone: {
       start: () => {
+        this.gamePlay.eventName = undefined;
         this.phase('EndTurn');
       },
       // phase(EndTurn)
@@ -242,6 +252,10 @@ export class GameState {
     },
     Claim: {
       start: () => {
+        // TODO: highlight AnkhToken source of PlayerPanel
+        // TODO: limit to One monument claimed; auto 'EventDone'
+        // TODO: highlight current Action until end of Action;
+        this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
         this.button('Claim done');
       },
       done: () => {
@@ -268,19 +282,17 @@ export class GameState {
     },
     ConflictNextRegion: {
       start: () => {
-        const region = ++this.conflictRegion; // 1..n
-        if (region > this.gamePlay.hexMap.regions.length) this.phase('ConflictDone');
-        this.phase('ConflictInRegion');
+        const conflictRegion = ++this.conflictRegion; // 1..n
+        if (conflictRegion > this.gamePlay.hexMap.regions.length) this.phase('ConflictDone');
+        else this.phase('ConflictInRegion');
       },
     },
     ConflictInRegion: {
-      panels: [],
       start: () => {
-        const panels = this.state.panels = this.panelsInConflict;
-        if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
-        if (panels.length === 1) this.phase('Dominate');   // no battle
-        // there will be a Battle! check for Obelisks:
-        this.phase('Obelisks');
+        const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
+        if (panels.length > 1) this.phase('Obelisks'); // do battle, check for Obelisk
+        else if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
+        else if (panels.length === 1) this.phase('Dominate');   // no battle
       }
     },
     Dominate: {
@@ -376,23 +388,17 @@ export class GameState {
     },
     PlagueResolution:{
       start: () => {
-        this.phase('Monuments');
         const panels = this.state.panels = this.panelsInConflict;
-        panels.forEach(panel => panel.enableBuild(this.conflictRegion));
+        // reveal bids, sacrifice followers, determine highest bidder, kill-units
+        this.phase('Monuments');
       },
-      done: (p: PlayerPanel) => {
-        const panels = this.state.panels;
-        const ndx = panels.indexOf(p);
-        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
-        if (panels.length === 0) this.phase('PlagueResolution');
-      }
-},
+    },
 
     Monuments: {
       // score Monuments in conflictRegion; incr Player.devotion (score);
       start: () => {
         this.scoreMonuments(false);
-        this.phase('BatleResolution')
+        this.phase('BattleResolution')
       },
       // count valueInRegion[type][player] (for curRegion)
       // for each type(incl strength): valueInRegion[type] = 0;

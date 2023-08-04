@@ -303,6 +303,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.clickConfirm, argVal: false })
     KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
     KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
+    KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
 
     // diagnostics:
     KeyBinder.keyBinder.setKey('t', { thisArg: this, func: () => {this.table.toggleText(); }})

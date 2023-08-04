@@ -1,9 +1,9 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhSource, Portal } from "./ankh-figure";
+import { AnkhPiece, AnkhSource, Figure, Monument, Portal } from "./ankh-figure";
 import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
-import { Meeple } from "./meeple";
+import type { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape } from "./shapes";
 import { DragContext, Table } from "./table";
@@ -11,10 +11,10 @@ import { TP } from "./table-params";
 import { Tile } from "./tile";
 
 
-export class AnkhToken extends Meeple {
+export class AnkhToken extends Figure {
   static source: AnkhSource<AnkhToken>[] = [];
 
-  static makeSource(player: Player, hex: Hex2, token: Constructor<Meeple>, n: number) {
+  static makeSource(player: Player, hex: Hex2, token: Constructor<Figure>, n: number) {
     return AnkhToken.makeSource0(AnkhSource<AnkhToken>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
@@ -23,7 +23,7 @@ export class AnkhToken extends Meeple {
   }
 
   constructor(player: Player, serial: number) {
-    super(`Ankh:${player?.index}\n${serial}`, player);
+    super(player, serial, `Ankh`);// `Ankh:${player?.index}\n${serial}`, player);
     this.name = `Ankh:${player?.index}-${serial}`;
     const r = this.radius;
     const ankhChar = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
@@ -52,9 +52,20 @@ export class AnkhToken extends Meeple {
       this.y += TP.ankh2Rad - this.radius;
       if (hex.tile) {
         hex.tile.setPlayerAndPaint(this.player);
+        this.highlight(false);
       }
     }
     return rv;
+  }
+
+  override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
+    const tile = hex.tile, player = this.player;
+    const allMonuments = GP.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
+    const allUnclaimed = allMonuments.filter(mon => mon.player === undefined);;
+    const canBeClaimed = (tile instanceof Monument) && ((allUnclaimed.length === 0) ? true : (tile.player === undefined));
+    const isClaimable = hex.findLinkHex(adj => adj.meep?.player === player);
+    if (isClaimable && canBeClaimed && (this.hex === this.source.hex) && GP.gamePlay.isPhase('Claim')) return true;
+    return false;
   }
 }
 
