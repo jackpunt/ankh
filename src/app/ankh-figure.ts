@@ -142,7 +142,10 @@ export class Portal extends AnkhPiece {
 
 
 // Figure == Meeple: [underlay, [baseShape, bitmapImage?], backSide]
+/** GodFigure, Warrior, Guardian */
 export class Figure extends Meeple {
+  static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) }
+
   constructor(player: Player, serial: number, Aname?: string) {
     super(Aname ?? `${Aname}\n${serial}`, player);
     this.underlay = new CircleShape();
@@ -283,6 +286,14 @@ export class Figure extends Meeple {
 }
 
 export class GodFigure extends Figure {
+  /** so we can keep GodFigures as singlton instances of each type. */
+  static named(name: string) {
+    return Meeple.allMeeples.find(meep => meep instanceof GodFigure && meep.name == name) as GodFigure;
+  }
+  override sendHome(): void {
+    this.moveTo(undefined);   // "there's no place like home" (home is like no-place...)
+    return;
+  }
 
   override get radius() { return TP.ankh2Rad; }
 

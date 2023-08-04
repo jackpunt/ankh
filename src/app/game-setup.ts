@@ -71,7 +71,7 @@ export class GameSetup {
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param gods 'ext' from URL
    */
-  startup(gods = this.ext, ngods = this.ngods) {
+  startup(gods = this.ext, ngods = this.ngods, scene='MiddleKingdom') {
     this.ext = gods;
     this.ngods = ngods;
     Tile.allTiles = [];
@@ -100,7 +100,7 @@ export class GameSetup {
       // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
       console.groupEnd()
     }
-    table.startGame('MiddleKingdom'); // allTiles.makeDragable(); placeStartTowns(); setNextPlayer();
+    table.startGame(scene); // parseScenario; allTiles.makeDragable(); setNextPlayer();
     return gamePlay
   }
   /** affects the rules of the game & board

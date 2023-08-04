@@ -306,7 +306,6 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
 
     // diagnostics:
-    KeyBinder.keyBinder.setKey('t', { thisArg: this, func: () => {this.table.toggleText(); }})
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }

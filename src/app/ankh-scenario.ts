@@ -6,24 +6,44 @@ import { AnkhPiece, Figure, GodFigure, Monument, Obelisk, Pyramid, Temple, Warri
 import { HexDir } from "./hex-intfs";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhMap, AnkhHex } from "./ankh-map";
-import { AnkhToken } from "./god";
+import { AnkhToken, God } from "./god";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { TileSource } from "./tile-source";
+import { GamePlay } from "./game-play";
 
-export type RegionSpec = { region: [row: number, col: number, bid: number][] }
-export type PlaceSpec = { place: [row: number, col: number, cons?: Constructor<AnkhPiece | Figure>, pid?: number][] }
-/** [row, col, bid] -> new rid, with battle order = bid */
-export type SplitSpec = { split: (string | number)[][] }
-export type splitsc0 = {
-  split: [[row: number, col: number, bid: number] | [row: number, col: number,
-    d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir][]]
-}
-export type SetupSpec = { coins?: number[], devs?: number[], event0: number, actions: { M: number, S: number, G: number, A: number } }
+type GodName = string;
+type GuardName = string;
+type RegionElt = [row: number, col: number, bid: number];
+type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
+type ClaimElt = [row: number, col: number, pid: number];
+type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1]
 
-export type SwapSpec = { swap: [rid: number, bid: number][] }
+/** [row, col, bid] -> new rid, with battle order = bid ;
+ * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
+ */
+type SplitBid = [row: number, col: number, bid: number];
+type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir];
+type SplitElt = (SplitBid | SplitDir)
 
-export type Scenario = (RegionSpec | PlaceSpec | SplitSpec | SetupSpec)[];
+type SetupElt = {
+    coins?: number[],
+    score?: number[],
+    event0: number,
+    actions: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
+    guards?: [[g1: GuardName, g2: GuardName, g3: GuardName], []]
+  }
+
+type RegionSpec = { region: RegionElt[] }
+type PlaceSpec = { place: PlaceElt[] }
+type SplitSpec = { split: SplitElt[] }
+type ClaimSpec = { claim: ClaimElt[] }
+type SetupSpec = { setup: SetupElt }
+
+type SwapSpec = { swap: [rid: number, bid: number][] }
+type ScenarioSpec = RegionSpec | PlaceSpec | SplitSpec | SetupSpec;
+type Scenario = ScenarioSpec[];
+
 // Rivers make first 3 Regions: West(1), East(2), Delta(3)
 export class AnkhScenario {
   static readonly MiddleKingdom: Scenario[] = [
@@ -135,26 +155,42 @@ export class AnkhScenario {
       }
     ],
   ];
+
+  // just push/concat more ScenarioSpec on the end:
+  static setup(scenario: Scenario, ...specs: Scenario) {
+    // First: convert PlaceElt Constructor<> to use 'string':
+    const place0 = scenario.find(elt => elt['place']) as PlaceSpec; // initial placements, before Move
+    const placeElt0 = place0.place;
+    const placeElt2 = placeElt0.map(([row, col, cons, pid]) => [row, col, (typeof cons === 'string') ? cons : cons.name, pid]) as PlaceElt[];
+    place0.place = placeElt2;
+    const acopy = structuredClone(scenario);
+    return acopy.concat(specs);
+  }
+  static AltMidKingom2 = AnkhScenario.setup(AnkhScenario.MiddleKingdom[0],
+    { place: []},
+    { setup: { event0: 3, actions: {} } },
+  )
 }
 
 export class ScenarioParser {
-  constructor(public map: AnkhMap<AnkhHex>) {
+  static classByName: { [index: string]: Constructor<GodFigure | Monument> } = { 'GodFigure': GodFigure, 'Obelisk': Obelisk, 'Pyramid': Pyramid, 'Temple': Temple, 'Warrior': Warrior }
+  constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
   }
   parseScenario(scenario: Scenario) {
-    const region0 = scenario.find(elt => elt['region']) as RegionSpec;
-    const splits = scenario.filter(elt => elt['split']) as SplitSpec[];
-    const place0 = scenario.find(elt => elt['place']) as PlaceSpec;
-    const setup = scenario.find(elt => elt['setup']) as SetupSpec;
-    this.parseRegions(region0);
-    this.parseSplits(splits);
-    this.parsePlaces(place0);
-    this.parseSetup(setup);
+    const regionSpec = scenario.find(elt => elt['region']) as RegionSpec;
+    const splitSpecs = scenario.filter(elt => elt['split']) as SplitSpec[];
+    const placeSpecs = scenario.filter(elt => elt['place']) as PlaceSpec[];
+    const setupSpecs = scenario.filter(elt => elt['setup']) as SetupSpec[];
+    this.parseRegions(regionSpec?.region);
+    this.parseSplits(splitSpecs);
+    placeSpecs.forEach(placeSpec => this.parsePlaces(placeSpec?.place));
+    this.parseSetup(setupSpecs[setupSpecs.length]?.setup); // only the last 'setup' is used.
   }
 
-  parseRegions(region0: RegionSpec) {
+  parseRegions(region: RegionElt[]) {
     const map = this.map;
-    region0.region.forEach(elt => {
+    region.forEach(elt => {
       // assign battleOrder for region[seed]
       // we will simply permute the regions array.
       const [row, col, bid] = elt, hex = map[row][col];
@@ -172,13 +208,12 @@ export class ScenarioParser {
   // console.log(stime(this, `.regions: result`), map.regionList());
   parseSplits(splits: SplitSpec[]) {
     const map = this.map;
-    splits.forEach((splitElt, i) => {
+    splits.forEach((splitElt) => {
       // console.log(stime(this, `.splits[${i}]`), splitElt, splitElt.split);
-      const splitN = (splitElt.split as any as number[][]);
-      const splitD = (splitElt.split as any as (number | string)[][]);
+      const splitN = (splitElt.split[0] as SplitBid);
+      const splitD = (splitElt.split as SplitDir[]); // we will skip splitD[0] !!
       // hex[row,col] will be in the NEW region, with NEW bid.
-      const split0 = splitN[0];
-      const [row, col, bid] = split0; //(split as any as (number)[][]).shift();
+      const [row, col, bid] = splitN; // (split as any as (number)[][]).shift();
       const newHex = this[row][col];
       const origNdx = map.regionOfHex(row, col, newHex);
       // console.log(stime(this, `.splits[${i}] hex: ${newHex} origNdx: ${origNdx} bid: ${bid}`))
@@ -186,8 +221,8 @@ export class ScenarioParser {
       const splitShape = map.edgeShape('#4D5656'); // grey
       map.mapCont.infCont.addChild(splitShape);
       splitD.forEach((elt, i) => {
-        if (i === 0) return undefined;
-        const [row, col, d0, d1, d2, d3, d4, d5] = elt as [number, number, HexDir, HexDir, HexDir, HexDir, HexDir, HexDir];
+        if (i === 0) return undefined; // element 0 is SplitN: SplitInt;
+        const [row, col, d0, d1, d2, d3, d4, d5] = elt; // generally no more than 3 edges per cell...
         const dirs = [d0, d1, d2, d3, d4, d5].filter(dir => dir !== undefined);
         // add border on each edge of [row, col]
         const hex = this[row][col];
@@ -198,40 +233,82 @@ export class ScenarioParser {
       map.update();
 
       // region will split to 2 region IDs: [regions.length, origNdx]
-      const ids = [bid - 1, origNdx,]; // given hex gets NEW region;
+      // given Hex put in slot 'len', but labeled with id/Ndx = bid-1, other get origNdx
+      const ids = [bid - 1, origNdx,];
       const [newRs, adjRs] = map.findRegions(map.regions[origNdx], newHex, ids.concat());
       // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
-      map.regions[ids[0]] = newRs[0]; // rid = len
-      map.regions[ids[1]] = newRs[1]; // rid = original
-      map.regions[ids[0]].forEach(hex => hex.district = ids[0] + 1);
-      map.regions[ids[1]].forEach(hex => hex.district = ids[1] + 1);
+      // copy regions to their designated slots:
+      map.regions[ids[0]] = newRs[0]; // rid = 'bid-1'; put in slot 'bid-1'
+      map.regions[ids[1]] = newRs[1]; // rid = origNdx; put in slot origNdx
+      map.regions[ids[0]].forEach(hex => hex.district = ids[0] + 1); // always: district = Ndx+1
+      map.regions[ids[1]].forEach(hex => hex.district = ids[1] + 1); // always: district = Ndx+1
     })
     // console.log(stime(this, `.split adjRegions:`), map.regionList());
   }
-  parsePlaces(place0: PlaceSpec) {
+
+  /** Place (or replace) all the Figures on the map. */
+  parsePlaces(place: PlaceElt[]) {
     const map = this.map;
+    Figure.allFigures.forEach(fig => fig.sendHome());
+
     //console.groupCollapsed('place');
-    place0.place.forEach(elt => {
-      const [row, col, cons, pid] = elt;
+    place.forEach(elt => {
+      const [row, col, cons0, pid] = elt;
+      const cons = (typeof cons0 === 'string') ? ScenarioParser.classByName[cons0] : cons0;
       const hex = map[row][col];
       const player = Player.allPlayers[pid - 1], pNdx = player?.index;
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.Aname) as GodFigure : undefined;
+      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(cons.name) ?? new cons(player, 0, player.god.Aname) as GodFigure;
       let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
       if ((pNdx !== undefined) && (piece instanceof Monument)) {
-        AnkhToken.source[pNdx].takeUnit().moveTo(hex);
+        AnkhToken.source[pNdx].takeUnit().moveTo(hex);// this.parseClaim([row, col, pNdx + 1]);
       }
     })
     //console.groupEnd();
   }
-  parseSetup(setup: SetupSpec) {
+  // {claim: [row, col, pid]}
+  parseClaim(claimSpec: ClaimElt[]) {
+    const map = this.map;
+    claimSpec.forEach(spec => {
+      const [row, col, pid] = spec;
+      const hex = map[row][col];
+      const player = Player.allPlayers[pid - 1], pNdx = player?.index;
+      const piece = hex.tile;
+      if ((pNdx !== undefined) && (piece instanceof Monument)) {
+        AnkhToken.source[pNdx].takeUnit().moveTo(hex);
+      }
+    })
+  }
 
+  parseMove(moveSpec: MoveElt[]) {
+    const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
+  }
+
+  // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
+  parseSetup(setup: SetupElt) {
+    if (!setup) return;
+    const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
+    setup.coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
+    setup.score?.forEach((v, ndx) => allPlayers[ndx].score = v);
+    if (setup.event0) {
+      for (let ndx = 0; ndx < setup.event0; ndx++) {
+        table.setEventMarker(ndx);
+      }
+    }
+    table.actionRows.forEach(({ id }, row) => {
+      const nSelected = setup.actions[id];
+      for (let cn = 0; cn < nSelected; cn++) {
+        const rowCont = table.actionPanels[row];
+        const button = rowCont.getButton(cn);
+        table.setActionMarker(button);
+      }
+    });
   }
 
   /** debug utility */

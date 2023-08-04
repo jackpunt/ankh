@@ -354,8 +354,8 @@ export class PlayerPanel extends Container {
       counter.clickToInc(incr);
       return counter;
     }
-    const coinsCounter = layoutCounter('coin', C.coinGold, 2 * rowh, ankhColx, true, );
-    coinsCounter.setValue(initialCoins);
+    layoutCounter('coin', C.coinGold, 2 * rowh, ankhColx, true, );
+    this.player.coins = initialCoins;
   }
 
 

@@ -17,11 +17,11 @@ import { AnkhMarker, AnkhToken } from "./god";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
 
-interface EventButton extends Container { isEvent: boolean; }
+export interface EventButton extends Container { isEvent: boolean; }
 interface EventIcon extends Container { eventName: string; }
 
 /** rowCont is an ActionContainer; each child is a CircleButton Container. */
-class ActionContainer extends Container {
+export class ActionContainer extends Container {
   constructor(public rad = 30) {
     super();
     this.highlight = new CircleShape(C.WHITE, this.rad + 5, '');
@@ -31,6 +31,10 @@ class ActionContainer extends Container {
   }
   highlight: PaintableShape;
   active: DisplayObject; // most recently activated button
+
+  getButton(cn: number) {
+    return (this.children.filter(c => (c instanceof Container)) as EventButton[])[cn];
+  }
 
   /** activate the first button witout a AnkhMarker */
   activate() {
@@ -435,7 +439,7 @@ export class Table extends EventDispatcher  {
   }
 
   actionPanels: ActionContainer[] = [];
-  actionRows = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
+  actionRows: { id: 'Move' | 'Summon' | 'Gain' | 'Ankh', dn?: number }[] = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
   makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.6) {
     const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
     const wide = 400;
@@ -457,7 +461,7 @@ export class Table extends EventDispatcher  {
       for (let cn = 0; cn < nc; cn++) {
         // make ActionSelectButton:
         const color = (cn < nc - 1) ? C.lightgrey : C.coinGold;
-        const button = this.makeCircleButton(color, rad, k) as EventButton;
+        const button = this.makeCircleButton(color, rad, k) as EventButton; // container with CircleShape(radius)
         button.name = `${id}-${cn}`;
         button.isEvent = (cn === nc - 1);
         button.x = cn * dx;
@@ -469,36 +473,23 @@ export class Table extends EventDispatcher  {
     this.addDoneButton(actionCont, rh)
   }
 
-  undoActionSelection(action: string, index: number) {
-    const rowCont = this.actionPanels[action] as ActionContainer;
-    if (!rowCont) debugger;    // TODO: undo 'Ankh' [isEvent!] -> 'Gain' -> direct to Event!
-    const button = rowCont.children.filter(ch => ch instanceof Container)[index] as EventButton;
-    button.removeChildType(AnkhMarker);
-    if (button.isEvent) {
-      const index = this.nextEventIndex - 1;
-      this.eventCells[index].removeChildType(AnkhMarker);
-    }
-    rowCont.activate();;
-  }
-
-  get nextEventIndex() { return this.eventCells.findIndex(ec => !ec.children.find(c => (c instanceof AnkhMarker)))}
   /** mark Action as selected, inform GamePlay & phaseDone() */
-  selectAction (id: string, button: EventButton, index: number) {
+  selectAction (id: string, button: EventButton, cn: number) {
     this.gamePlay.selectedAction = id;
-    this.gamePlay.selectedActionIndex = index;
+    this.gamePlay.selectedActionIndex = cn;
     if (button.isEvent) {
-      const index = this.nextEventIndex;
-      const cell = this.eventCells[index];
-      const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(TP.ankhRad);
-      cell.addChild(ankhToken)
-      this.gamePlay.eventName = cell.eventName;
+      this.setEventMarker(this.nextEventIndex);
     }
     this.activateActionSelect(false, id); // de-activate this row and the ones above.
-    const { x, y, width, height } = button.getBounds()
-    const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(width / 2);
+    this.setActionMarker(button);
+    GP.gamePlay.phaseDone(); // --> phase(selectedAction)
+  }
+
+  setActionMarker(button: EventButton) {
+    const rad = (button.children[0] as CircleShape).rad;
+    const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(rad);
     button.addChild(ankhToken);
     button.stage.update();
-    GP.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
   activeButtons: {[index: string]: [EventButton, number]} = {}
@@ -523,6 +514,17 @@ export class Table extends EventDispatcher  {
     }
     // this.doneButton.visible = this.doneButton.mouseEnabled = true;
     return active > 0;
+  }
+
+  undoActionSelection(action: string, index: number) {
+    const rowCont = this.actionPanels[action] as ActionContainer;
+    if (!rowCont) debugger;    // TODO: undo 'Ankh' [isEvent!] -> 'Gain' -> direct to Event!
+    const button = rowCont.children.filter(ch => ch instanceof Container)[index] as EventButton;
+    button.removeChildType(AnkhMarker);
+    if (button.isEvent) {
+      this.removeEventMarker(this.nextEventIndex - 1);
+    }
+    rowCont.activate();;
   }
 
   doneButton: UtilButton;
@@ -550,6 +552,7 @@ export class Table extends EventDispatcher  {
     return actionCont;
   }
 
+  get nextEventIndex() { return this.eventCells.findIndex(ec => !ec.children.find(c => (c instanceof AnkhMarker)))}
   eventCells: EventIcon[] = [];
   makeEventCont(row = TP.nHexes + 0.5, col = 7.05) {
     const eventCont = new Container();
@@ -590,6 +593,18 @@ export class Table extends EventDispatcher  {
       eventCont.addChild(icon);
     })
     return eventCont;
+  }
+
+  removeEventMarker(index: number) {
+    this.eventCells[index].removeChildType(AnkhMarker);
+    if (this.gamePlay.eventName) this.setEventMarker(index - 1);
+  }
+
+  setEventMarker(index: number) {
+    const cell = this.eventCells[index];
+    const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(TP.ankhRad);
+    cell.addChild(ankhToken);
+    this.gamePlay.eventName = cell.eventName;
   }
 
   readonly emptyColor = 'rgb(240,240,240)';
@@ -651,22 +666,17 @@ export class Table extends EventDispatcher  {
   }
 
   startGame(sname: string) {
+    // Place Pieces and Figures on map:
     const np = Player.allPlayers.length;
     const scenario = AnkhScenario[sname][np-2];
-    new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>).parseScenario(scenario);
+    new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>, this.gamePlay).parseScenario(scenario);
+    this.toggleText(false);
 
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {
       this.makeDragable(tile);
     })
 
-    this.gamePlay.forEachPlayer(p => {
-      // p.initialHex.forEachLinkHex(hex => hex.isLegal = true, true )
-      // this.hexMap.update();
-      // // place Town on hexMap
-      // p.initialHex.forEachLinkHex(hex => hex.isLegal = false, true )
-      this.toggleText(false)
-    })
     // this.stage.enableMouseOver(10);
     this.scaleCont.addChild(this.overlayCont); // now at top of the list.
     this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[0]);
@@ -887,6 +897,7 @@ export class Table extends EventDispatcher  {
       this.bindKeysToScale(scaleC, "a", 436, 2);
       KeyBinder.keyBinder.setKey('Space',   { thisArg: this, func: () => this.dragTarget() });
       KeyBinder.keyBinder.setKey('S-Space', { thisArg: this, func: () => this.dragTarget() });
+      KeyBinder.keyBinder.setKey('t', { thisArg: this, func: () => { this.toggleText(); } })
     }
     return scaleC;
   }

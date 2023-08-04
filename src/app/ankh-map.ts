@@ -1,17 +1,14 @@
-import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
+import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import type { AnkhPiece, Figure, GodFigure } from "./ankh-figure";
-import { PlaceSpec, RegionSpec, Scenario, SetupSpec, SplitSpec } from "./ankh-scenario";
+import type { AnkhPiece, Figure } from "./ankh-figure";
 import { permute } from "./functions";
-import { AnkhToken, God } from "./god";
+import { God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { Player } from "./player";
 import { HexShape } from "./shapes";
 import { TP } from "./table-params";
 import type { Tile } from "./tile";
-import { TileSource } from "./tile-source";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
