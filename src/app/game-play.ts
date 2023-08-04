@@ -1,20 +1,18 @@
 import { Constructor, json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
-import { Container } from "@thegraid/easeljs-module";
 import { EzPromise } from "@thegraid/ezpromise";
+import { Figure, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { Figure } from "./ankh-figure";
 import { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
-import { CenterText } from "./shapes";
 import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
-import { MapTile, Tile } from "./tile";
+import { Tile } from "./tile";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -53,15 +51,16 @@ export class GamePlay0 {
   readonly gameState: GameState = (this instanceof GamePlay) ? new GameState(this) : undefined;
   get gamePhase() { return this.gameState.state; }
   isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
-  phaseDone() { this.gameState.done(); }
+  phaseDone(...args: any[]) { this.gameState.done(...args); }
 
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
   readonly logWriter: LogWriter
 
   get allPlayers() { return Player.allPlayers; }
+  selectedActionIndex: number;
   selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
-  actionIsEvent: string;
+  eventName: string;
 
   readonly hexMap = new AnkhMap<AnkhHex>()
   readonly history: Move[] = []          // sequence of Move that bring board to its state
@@ -456,51 +455,4 @@ export class GamePlay extends GamePlay0 {
   playerMoveEvent(hev: HexEvent): void {
     this.localMoveEvent(hev)
   }
-
-}
-
-class Dice {
-  text: CenterText;
-  textSize: number = .5 * TP.hexRad;
-  constructor() {
-    this.text = new CenterText(`0:0`, this.textSize);
-  }
-  roll(n = 2, d = 6) {
-    let rv = new Array(n).fill(1).map(v => 1 + Math.floor(Math.random() * d));
-    this.text.text = rv.reduce((pv, cv, ci) => `${pv}${ci > 0 ? ':' : ''}${cv}`, '');
-    return rv
-  }
-  setContainer(parent: Container, x = 0, y = 0) {
-    this.text.x = x;
-    this.text.y = y;
-    parent.addChild(this.text);
-  }
-}
-
-/** a uniquifying 'symbol table' of Board.id */
-class BoardRegister extends Map<string, Board> {}
-/** Identify state of HexMap by itemizing all the extant Stones
- * id: string = Board(nextPlayer.color, captured)resigned?, allStones
- * resigned: PlayerColor
- * repCount: number
- */
-export class Board {
-  readonly id: string = ""   // Board(nextPlayer,captured[])Resigned?,Stones[]
-  readonly resigned: PlayerColor //
-  repCount: number = 1;
-
-  /**
-   * Record the current state of the game: {Stones, turn, captures}
-   * @param move Move: color, resigned & captured [not available for play by next Player]
-   */
-  constructor(id: string, resigned: PlayerColor) {
-    this.resigned = resigned
-    this.id = id
-  }
-  toString() { return `${this.id}#${this.repCount}` }
-
-  setRepCount(history: { board }[]) {
-    return this.repCount = history.filter(hmove => hmove.board === this).length
-  }
-  get signature() { return `[${TP.mHexes}x${TP.nHexes}]${this.id}` }
 }

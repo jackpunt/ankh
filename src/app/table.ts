@@ -1,6 +1,6 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
-import { Guardian } from "./ankh-figure";
+import { AnkhSource, Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
 import { AnkhScenario } from "./ankh-scenario";
 import { GP, type GamePlay } from "./game-play";
@@ -18,13 +18,14 @@ import { AnkhMarker, AnkhToken } from "./god";
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
 
 interface EventButton extends Container { isEvent: boolean; }
-interface EventIcon extends Container { event: string; }
+interface EventIcon extends Container { eventName: string; }
 
 /** rowCont is an ActionContainer; each child is a CircleButton Container. */
 class ActionContainer extends Container {
   constructor(public rad = 30) {
     super();
     this.highlight = new CircleShape(C.WHITE, this.rad + 5, '');
+    this.highlight.name = `highlight`;
     this.addChildAt(this.highlight, 0);
     this.highlight.visible = true;
   }
@@ -107,7 +108,7 @@ class TextLog extends Container {
   }
 
   log(line: string, from = '', toConsole = true) {
-    line = line.replace("\n", "-");
+    line = line.replace('\n', '-');
     toConsole && console.log(stime(`${from}:`), line);
     if (line === this.lastLine) {
       this.lines[this.lines.length - 1].text = `[${++this.nReps}] ${line}`;
@@ -417,7 +418,7 @@ export class Table extends EventDispatcher  {
     rHex.cont.updateCache();
     return rHex;
   }
-  guardSources: UnitSource<Guardian>[] = [];
+  guardSources: AnkhSource<Guardian>[] = [];
   makeGuardSources(row = 7, col = TP.nHexes + 1.7) {
     const guards = this.gamePlay.guards;
     guards.forEach((guard, i) => { // .filter((g, i) => i > 0)
@@ -440,39 +441,56 @@ export class Table extends EventDispatcher  {
     console.log(stime(this, `.makeActionCont`), np);
     // TODO: class actionCont, with slots to hold button & each circle/state (number activated)
     // or could use children[] and the color/visiblity of each shape/cont
-    const actionCont = new Container()
+    const actionCont = new Container(); actionCont.name = `actionRowCont`;
     this.hexMap.mapCont.resaCont.addChild(actionCont);
     this.setToRowCol(actionCont, row, col);
 
     //for (let rn = 0; rn < actionRows.length; rn++) {
-    this.actionRows.forEach((action, rn) => {
-      const nc = np + 2 + (action.dn ?? 0), dx = wide / (nc - 1), id = action.id;
+    this.actionRows.forEach((actionRow, rn) => {
+      const nc = np + 2 + (actionRow.dn ?? 0), dx = wide / (nc - 1), id = actionRow.id;
       const rowCont = new ActionContainer(rad);
+      rowCont.name = `rowCont-${id}`;
       rowCont.y = rn * rh;
       actionCont.addChild(rowCont);
-      const k = firstChar(action.id);
+      const k = firstChar(actionRow.id);
       for (let cn = 0; cn < nc; cn++) {
         // make ActionSelectButton:
         const color = (cn < nc - 1) ? C.lightgrey : C.coinGold;
         const button = this.makeCircleButton(color, rad, k) as EventButton;
+        button.name = `${id}-${cn}`;
         button.isEvent = (cn === nc - 1);
         button.x = cn * dx;
         rowCont.addChild(button);
-        button.on(S.click, (evt: Object) => this.selectAction(id, button), this);
+        button.on(S.click, (evt: Object) => this.selectAction(id, button, cn), this);
       }
-      this.actionPanels[action.id] = rowCont;
+      this.actionPanels[actionRow.id] = rowCont;
     });
     this.addDoneButton(actionCont, rh)
   }
-  /** mark Action as selected, inform GamePlay & phaseDone() */
-  selectAction (id: string, button: EventButton) {
-    this.gamePlay.selectedAction = id;
+
+  undoActionSelection(action: string, index: number) {
+    const rowCont = this.actionPanels[action] as ActionContainer;
+    if (!rowCont) debugger;
+    const button = rowCont.children.filter(ch => ch instanceof Container)[index] as EventButton;
+    button.removeChildType(AnkhMarker);
     if (button.isEvent) {
-      const doneCells = this.eventCells.filter(ec => ec.children.find(c => c instanceof AnkhMarker));
-      const cell = this.eventCells[doneCells.length];
+      const index = this.nextEventIndex - 1;
+      this.eventCells[index].removeChildType(AnkhMarker);
+    }
+    rowCont.activate();;
+  }
+
+  get nextEventIndex() { return this.eventCells.findIndex(ec => !ec.children.find(c => (c instanceof AnkhMarker)))}
+  /** mark Action as selected, inform GamePlay & phaseDone() */
+  selectAction (id: string, button: EventButton, index: number) {
+    this.gamePlay.selectedAction = id;
+    this.gamePlay.selectedActionIndex = index;
+    if (button.isEvent) {
+      const index = this.nextEventIndex;
+      const cell = this.eventCells[index];
       const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(TP.ankhRad);
       cell.addChild(ankhToken)
-      this.gamePlay.actionIsEvent = cell.event;
+      this.gamePlay.eventName = cell.eventName;
     }
     this.activateActionSelect(false, id); // de-activate this row and the ones above.
     const { x, y, width, height } = button.getBounds()
@@ -481,38 +499,52 @@ export class Table extends EventDispatcher  {
     button.stage.update();
     GP.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
-  doneButton: UtilButton
-  addDoneButton(actionCont: Container, rh: number) {
-    const w = 90, h = 56;
-    //const doneButton = this.makeSquareButton(C.GREEN, {x: -w/2, y: -h/2, w, h}, 'Done');
-    const doneButton = this.doneButton = new UtilButton('lightgreen', 'Done', 30, C.black);
-    doneButton.x = -(w + 10);
-    doneButton.y = 2 * rh;
-    doneButton.on(S.click, (evt) => {
-      this.activateActionSelect(false); // deactivate all
-      GP.gamePlay.phaseDone();
-    });
-    actionCont.addChild(doneButton);
-    return actionCont;
-  }
 
-  /** On each row: activate or deactivate the first button without an AnkhMarker on each line  */
+  /**
+   * On each row: activate or deactivate the first button without an AnkhMarker on each line.
+   * If a row is 'full' (previous Event) it is reset to the beginning.
+   *
+   * @return false if no buttons were activated (after == 'Ankh')
+   */
   activateActionSelect(activate: boolean, after?: string, cat = false) {
     let isAfter = (after === undefined);
     let active = 0;
     this.actionRows.map(({id, dn}, i) => {
       const rowCont = this.actionPanels[id] as ActionContainer;
-      if (!activate) { rowCont.deactivate() }
+      if (!activate) { rowCont.deactivate() } // mouseEnable
       else if (isAfter) { rowCont.activate(); active++; }
       isAfter = isAfter || id === after;
     })
     if (cat) {
       // [de]activate 'Cat' & 'Pass' buttons..?
     }
-    this.doneButton.visible = this.doneButton.mouseEnabled = true;
+    // this.doneButton.visible = this.doneButton.mouseEnabled = true;
     return active > 0;
   }
 
+  doneButton: UtilButton
+  addDoneButton(actionCont: Container, rh: number) {
+    const w = 90, h = 56;
+    const doneButton = this.doneButton = new UtilButton('lightgreen', 'Done', 36, C.black);
+    doneButton.x = -(w + 10);
+    doneButton.y = 3 * rh;
+    doneButton.label.textAlign = 'right';
+    doneButton.on(S.click, (evt) => {
+      this.activateActionSelect(false); // deactivate all
+      GP.gamePlay.phaseDone();
+    });
+    actionCont.addChild(doneButton);
+
+    // prefix advice: set text color
+    const o_cgf = doneButton.shape.cgf;
+    const cgf = (color) => {
+      const tcolor = (C.dist(color, C.WHITE) < C.dist(color, C.black)) ? C.black : C.white;
+      doneButton.label.color = tcolor;
+      return o_cgf(color);
+    }
+    doneButton.shape.cgf = cgf; // invokes shape.paint(cgf) !!
+    return actionCont;
+  }
 
   eventCells: EventIcon[] = [];
   makeEventCont(row = TP.nHexes + 0.5, col = 7.05) {
@@ -530,8 +562,8 @@ export class Table extends EventDispatcher  {
     let cx = 0;
     events.forEach((evt, nth) => {
       const icon = new Container() as EventIcon;
-      icon.event = evt;
-      const k = firstChar(evt);
+      icon.eventName = evt;
+      const k = (evt === 'Conflict') ? 'B' : firstChar(evt);
       const shape = new CircleShape('rgb(240,240,240)', rad, );
       const text = new CenterText(k, rad * 1.8); text.y += 2;
       if (lf && Math.floor(cx) === 8) cx = Math.floor(cx);
@@ -539,7 +571,7 @@ export class Table extends EventDispatcher  {
       icon.y = row * dx;
       icon.x = ((row == 0) ? cx : cx - 8 ) * dx;
       cx += 1;
-      if (evt === 'Conflict') {
+      if (k === 'B') {
         cx += bx;  // extra gap after Conflict
       }
       if (k === 'M' || k === 'R') {
@@ -713,7 +745,7 @@ export class Table extends EventDispatcher  {
       const hexIsLegal = (hex: Hex2) => ctx.nLegal += ((hex !== tile.hex) && (hex.isLegal = tile.isLegalTarget(hex, ctx)) ? 1 : 0);
       tile.markLegal(this, hexIsLegal, ctx);           // delegate to check each potential target
       this.gamePlay.recycleHex.isLegal = tile.isLegalRecycle(ctx); // do not increment ctx.nLegal!
-      tile.moveTo(undefined);
+      tile.moveTo(undefined); // notify source Hex, so it can scale; also triggers nextUnit !!
       tile.dragStart(ctx);  // which *could* reset nLegal ?
       this.hexMap.update();
       if (ctx.nLegal === 0) {

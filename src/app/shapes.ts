@@ -22,7 +22,7 @@ export class CenterText extends Text {
 
 export interface Paintable extends DisplayObject {
   /** paint with new player color; updateCache() */
-  paint(colorn: string): Graphics;
+  paint(colorn: string, force?: boolean): Graphics;
 }
 
 /** Color Graphics Function */
@@ -65,10 +65,13 @@ export class PaintableShape extends Shape implements Paintable {
       this.paint(this.colorn);
     }
   }
+  /** previous/current graphics that were rendered. */
   cgfGraphics: Graphics;
-  paint(colorn: string = this.colorn): Graphics {
-    if (this.graphics !== this.cgfGraphics || this.colorn !== colorn) {
+  /** render graphics from cgf. */
+  paint(colorn: string = this.colorn, force = false): Graphics {
+    if (force || this.graphics !== this.cgfGraphics || this.colorn !== colorn) {
       // need to repaint, even if same color:
+      this.graphics.clear();
       this.graphics = this.cgfGraphics = this.cgf(this.colorn = colorn);
       if (this.cacheID) this.updateCache();
     }
@@ -108,8 +111,7 @@ export class HexShape extends PaintableShape {
    * or in other way setBounds().
    */
   hscgf(color: string) {
-    const g = new Graphics();
-    return g.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
+    return this.graphics.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
 
@@ -135,12 +137,16 @@ export class RectShape extends PaintableShape {
   static rectWHXY(w: number, h: number, x = -w / 2, y = -h / 2, g0 = new Graphics()) {
     return g0.dr(x, y, w, h)
   }
-  static rectText(t: Text | string, fs?: number, b?: number, g0 = new Graphics()) {
+  /** draw rectangle suitable for given Text; with border, textAlign. */
+  static rectText(t: Text | string, fs?: number, b?: number, align = (t instanceof Text) ? t.textAlign : 'center', g0 = new Graphics()) {
     const txt = (t instanceof Text) ? t : new CenterText(t, fs ?? 30);
+    txt.textAlign = align;
+    if (txt.text === undefined) return g0; // or RectShape.rectWHXY(0,0,0,0); ??
     if (fs === undefined) fs = txt.getMeasuredHeight();
     if (b === undefined) b = fs * .1;
-    const txtw = txt.getMeasuredWidth(), w = txtw + b + b, h = fs + b;
-    return RectShape.rectWHXY(w, h, -w/2, -h/2, g0);
+    const txtw = txt.getMeasuredWidth(), w = b + txtw + b, h = b + fs + b;
+    const x = (align == 'right') ? w-b : (align === 'left') ? -b : w / 2;
+    return RectShape.rectWHXY(w, h, -x, -h / 2, g0);
   }
 
   g0: Graphics;
@@ -332,18 +338,17 @@ export class UtilButton extends Container implements Paintable {
   constructor(color: string, text: string, public fontSize = 30, public textColor = C.black, cgf?: CGF) {
     super();
     this.label = new CenterText(text, fontSize, textColor);
-    this.shape = new PaintableShape(cgf ?? ((c: string) => this.ubcsf(c)));
+    this.shape = new PaintableShape(cgf ?? ((c) => this.ubcsf(c)));
     this.shape.paint(color);
     this.addChild(this.shape, this.label);
   }
 
   ubcsf(color: string) {
-    const g = RectShape.rectText(this.label.text, this.fontSize, undefined, new Graphics().f(color))
-    return g;
+    return RectShape.rectText(this.label.text, this.fontSize, this.fontSize * .3, this.label.textAlign, new Graphics().f(color))
   }
 
-  paint(color: string) {
-    return this.shape.paint(color);
+  paint(color = this.shape.colorn, force = false ) {
+    return this.shape.paint(color, force);
   }
 
   /**

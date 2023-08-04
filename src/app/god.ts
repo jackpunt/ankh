@@ -1,5 +1,7 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
+import { AnkhSource, Portal } from "./ankh-figure";
+import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
@@ -7,13 +9,13 @@ import { CenterText, CircleShape } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { UnitSource } from "./tile-source";
-import { GP } from "./game-play";
+
+
 export class AnkhToken extends Meeple {
-  static source: UnitSource<Meeple>[] = [];
+  static source: AnkhSource<AnkhToken>[] = [];
 
   static makeSource(player: Player, hex: Hex2, token: Constructor<Meeple>, n: number) {
-    return Tile.makeSource0(UnitSource<AnkhToken>, token, player, hex, n);
+    return AnkhToken.makeSource0(AnkhSource<AnkhToken>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
   override isDragable(arg: DragContext) {
@@ -22,6 +24,7 @@ export class AnkhToken extends Meeple {
 
   constructor(player: Player, serial: number) {
     super(`Ankh:${player?.index}\n${serial}`, player);
+    this.name = `Ankh:${player?.index}-${serial}`;
     const r = this.radius;
     const ankhChar = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
     ankhChar.y += r * .1;
@@ -59,6 +62,7 @@ export class AnkhToken extends Meeple {
 export class AnkhMarker extends Container {
   constructor(color: string, rad = TP.ankhRad) {
     super();
+    this.name = 'AnkhMarker';
     const shape = new CircleShape(color, rad, );
     const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
     ankh.y += rad * .1;
@@ -69,12 +73,17 @@ export class AnkhMarker extends Container {
 export class God {
   static byName = new Map<string, God>();
 
+  static get constructors() { return constructors }
+
   static get allGods() {
     return Array.from(God.byName).map(([gname, god]) => god);
   }
   static get allNames() {
-    return Array.from(God.byName).map(([gname, god]) => gname);
+    return Array.from(constructors).map((god) => god.name);
   }
+
+  public player: Player;
+  public name: string;
 
   constructor(
     public Aname: string,
@@ -82,6 +91,7 @@ export class God {
   ) {
     // constructor here:
     God.byName.set(Aname, this);
+    this.name = Aname;
   }
   ankhPowers: string[] = [];
 
@@ -128,9 +138,10 @@ class Amun extends God {
     return cont0;
   }
 }
-/** AmunHex scales the Tile by .8 */
+/** AmunHex scales the Tile or Meep by .8 */
 class AmunHex extends Hex2 {
   static scale = .8;
+
   override get meep() { return super.meep; }
 
   override set meep(meep: Meeple) {
@@ -142,6 +153,20 @@ class AmunHex extends Hex2 {
     if (meep !== undefined) {
       meep.scaleX = meep.scaleY = AmunHex.scale;
       meep.updateCache();
+    }
+  }
+
+  override get tile() { return super.tile; }
+
+  override set tile(tile: Tile) {
+    if (tile === undefined && this.tile) {
+      this.tile.scaleX = this.tile.scaleY = 1;
+      this.tile.updateCache();
+    }
+    super.tile = tile;
+    if (tile !== undefined) {
+      tile.scaleX = tile.scaleY = AmunHex.scale;
+      tile.updateCache();
     }
   }
 }
@@ -165,6 +190,17 @@ class Isis extends God {
 
 class Osiris extends God {
   constructor() { super('Osiris', 'lightgreen') }
+  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont0, wh, table);
+    const hex = table.newHex2(0, 0, `portals`, AmunHex)
+    cont0.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    const source = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
+    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.x += TP.ankh2Rad * .5;
+    table.sourceOnHex(source, hex);
+    return cont0;
+  }
+
 }
 
 class Ra extends God {
@@ -179,6 +215,6 @@ class Toth extends God {
   constructor() { super('Toth', 'cyan') }
 }
 
-// Make all the Gods:
-const godSpecs: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
-godSpecs.forEach(god => new god());
+// List all the God constructors:
+const constructors: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
+// godSpecs.forEach(god => new god());

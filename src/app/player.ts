@@ -1,15 +1,13 @@
 import { Constructor, stime } from "@thegraid/common-lib";
-import { DecimalCounter, NumCounter } from "./counters";
-import { GP, GamePlay, GamePlay0 } from "./game-play";
-import type { Hex, Hex1, Hex2 } from "./hex";
+import { NumCounter } from "./counters";
+import { GamePlay, GamePlay0 } from "./game-play";
+import { God } from "./god";
+import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";
-import { CenterText } from "./shapes";
 import { TP } from "./table-params";
 import { MapTile, Tile, } from "./tile";
-import { UnitSource } from "./tile-source";
-import { God } from "./god";
 
 export class Player {
   static allPlayers: Player[] = [];
@@ -20,7 +18,9 @@ export class Player {
     readonly godName: string,
     readonly gamePlay: GamePlay0,
   ) {
-    this.god = God.byName.get(godName);
+    const godc = God.constructors.find(g => g.name === godName);
+    this.god =  new godc();
+    this.god.player = this;
     Player.allPlayers[index] = this;
     this.Aname = `P${index}-${this.god.Aname}:${this.god.color}`;
     console.log(stime(this, `.new:`), this.Aname);

@@ -3,7 +3,7 @@ import { Bitmap, Container, DisplayObject, MouseEvent, Text } from "@thegraid/ea
 import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { BalMark, C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
+import { C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
@@ -162,7 +162,6 @@ export class Tile extends Tile0 {
     const rad = this.radius;
     if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
     this.addChild(this.baseShape);
-    this.addChild(new BalMark(this));
     this.setPlayerAndPaint(player);
     this.nameText = this.addTextChild(rad / 2);
   }
@@ -178,12 +177,12 @@ export class Tile extends Tile0 {
   }
 
   override toString(): string {
-    return `${this.Aname}@${this.hex?.Aname ?? '?'}`;
+    return `${this.Aname.replace('\n','-')}@${this.hex?.Aname ?? '?'}`;
   }
 
 
   /** name in set of filenames loaded in GameSetup
-   * @param at = 2; above HexShape & BalMark
+   * @param at = 2; above HexShape
    */
   override addImageBitmap(name: string, at = 2) {
     let bm = super.addImageBitmap(name, at);

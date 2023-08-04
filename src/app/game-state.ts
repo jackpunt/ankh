@@ -1,11 +1,18 @@
 import { GamePlay, GP } from "./game-play";
-import { stime } from "@thegraid/common-lib";
+import { C, className, stime } from "@thegraid/common-lib";
 import { UtilButton } from "./shapes";
+import { AnkhPiece, Figure, Monument, Obelisk, Pyramid, Temple } from "./ankh-figure";
+import { Player } from "./player";
+import { PlayerPanel } from "./player-panel";
+import { Tile } from "./tile";
 
 interface Phase {
   Aname?: string,
-  start(): void;           // what to do in this phase
-  done?: () => void;       // for async; when done clicked: proceed
+  start(...args: any[]): void; // what to do in this phase
+  done?: (...args: any[]) => void;          // for async; when done clicked: proceed
+  region?: number,
+  panels?: PlayerPanel[],
+  players?: Player[],
 }
 
 export class GameState {
@@ -15,20 +22,29 @@ export class GameState {
 
   state: Phase;
   get table() { return this.gamePlay?.table; }
-  get actionIsEvent() { return this.gamePlay.actionIsEvent; }
+  get panel() { return this.table.panelForPlayer[this.gamePlay.curPlayerNdx]; }
+
+  get eventName() { return this.gamePlay.eventName; }
   get selectedAction() { return this.gamePlay.selectedAction; }
   set selectedAction(val) { this.gamePlay.selectedAction = val; }
+  get selectedActionIndex() { return this.gamePlay.selectedActionIndex; }
+  readonly selectedActions: string[] = [];
+  areActiveActions: boolean;
+
+  get playerFigures() { return this.gamePlay.curPlayer.meeples.filter(meep => (meep instanceof Figure)) as Figure[]}
   doneButton: UtilButton;
+  highlights: Figure[];
+  conflictRegion = 0;
+  get panelsInConflict() {
+    return this.table.panelForPlayer.filter(panel => panel.isPlayerInRegion(this.conflictRegion));
+  }
+  panelsInThisConflict: PlayerPanel[];
 
   actionsDone = 0;
   bastetEnabled = false;
   chooseAction(val = 0) {
     this.actionsDone = val;
     return 'ChooseAction';
-  }
-  isEvent(action: string) {
-    const panel = this.table.actionPanels[action];
-    return panel.children.find(b => b['isEvent'] ?? false);
   }
 
   findGod(name: string) {
@@ -46,8 +62,15 @@ export class GameState {
     this.state.start();
   }
 
-  /** invoked when 'Done' button clicked. [or otherwise we determine phase is done] */
-  done() {
+  button(label?: string) {
+    this.doneButton.label.text = label;
+    this.doneButton.paint(this.gamePlay.curPlayer.color, true);
+    this.doneButton.visible = this.doneButton.mouseEnabled = !!label;
+    this.doneButton.updateWait(false)
+  }
+
+  /** invoked when 'Done' button clicked. [or whenever phase is 'done' by other means] */
+  done(...args: any[]) {
     console.log(stime(this, `.done: ${this.state.Aname}`), this.state);
     this.state.done();
   }
@@ -58,6 +81,7 @@ export class GameState {
         this.bastetEnabled = !!this.findGod('Bastet');
         this.selectedAction = undefined;
         this.actionsDone = 0;
+        this.selectedActions.length = 0;
         this.phase('ChooseAction');
       },
     },
@@ -66,14 +90,25 @@ export class GameState {
         if (this.bastetEnabled) {
           /* enable 'Cats' button; onClick --> phase('Bastet') */
         }
-        if (this.actionsDone >= 2) this.phase('EndTurn')
+        if (this.actionsDone >= 2) this.phase('EndTurn');
         // enable and highlight open spots on Action Panel
-        const active = this.table.activateActionSelect(true, this.selectedAction);
-        if (!active) this.phase('EndTurn');
-        this.doneButton.visible = this.doneButton.mouseEnabled = true;
+        const lastAction = this.selectedActions[0], n = this.actionsDone + 1;
+        const active = this.areActiveActions = this.table.activateActionSelect(true, lastAction);
+        if (!active) this.phase('EndTurn'); // assert: selectedActions[0] === 'Ankh'
+        this.selectedAction = undefined;
+        this.button(`Choice ${n} Done`);
       },
-      done: () => {
-        const action = this.gamePlay.selectedAction;
+      done: (ok?: boolean) => {
+        const action = this.selectedAction;
+        if (!ok && !action) {
+          this.panel.areYouSure('You have unused action', () => {
+            setTimeout(() => this.state.done(true), 50);
+          }, () => {
+            setTimeout(() => this.state.start(), 50);
+          });
+          return;
+        }
+        this.selectedActions.unshift(action);
         this.phase(action ?? 'EndTurn');
       }
     },
@@ -88,29 +123,68 @@ export class GameState {
     },
     Move: {
       start: () => {
-      // mouse enable moveable Meeples; (faceUp all Figures onMap)
-      // onClick/dragStart: mark legal hexes
-      // onDrop: meep.moveTo(hex)
+        this.highlights = this.playerFigures.filter(fig => fig.hex?.isOnMap)
+        this.highlights.forEach(fig => fig.highlight(true, C.BLACK));
+        this.button('Move done');
       },
-      done: () => { this.phase('EndAction') },
+      done: (ok?: boolean) => {
+        const nmoved = this.highlights.filter(fig => fig.hex !== fig.startHex).length;
+        if (!ok && nmoved === 0) {
+          this.panel.areYouSure('You have not moved any Figures', () => {
+            setTimeout(() => this.state.done(true), 50); // new thread
+          }, () => {
+            console.log(stime(this, `.Move done: cancel`), this.selectedActions)
+          });
+          return;
+        }
+        this.highlights.forEach(fig => fig.highlight(false));
+        this.playerFigures.forEach(fig => fig.faceUp()); // set meep.startHex
+        this.phase('EndAction')
+      },
     },
     Summon: {
-      start: () => { },
+      start: () => {
+        this.highlights = this.panel.highlightStable(true);
+        this.playerFigures.forEach(fig => fig.faceUp()); // set meep.startHex
+        this.button('Summon done');
+      },
       // mouse enable summonable Meeples (Stable)
       // Mark legal hexes
       // Drag & Drop;
-      done: () => { this.phase('EndAction') },
+      done: () => {
+        this.highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
+        this.phase('EndAction');
+      },
     },
     Gain: {
-      start: () => { },
-      // curPlayer.coins += filterHex( adjToMeep(curPlayer) ).length
-      done: () => { this.phase('EndAction') },
+      start: () => {
+        this.gainFollowersAction();// curPlayer.coins += filterHex( adjToMeep(curPlayer) ).length
+        this.phase('EndAction')
+      },
     },
     Ankh: {
-      start: () => {
-        const ndx = this.gamePlay.curPlayerNdx;
-        const panel = this.gamePlay.table.panelForPlayer[ndx];
-        panel.activateSelectAnkhPower();
+      start: (ok?: boolean) => {
+        const panel = this.panel, rank = panel.nextAnkhRank;
+        if (!ok && this.gamePlay.curPlayer.coins <= rank) {
+          console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
+          panel.areYouSure('Not enough followers to obtain Anhk power!',
+            () => {
+              console.log(stime(this, `.Ankh state: yes`))
+              panel.selectAnkhPower(undefined, { }); // as if a button was clicked: take Ankh, get Guardian.
+            },
+            () => {
+              console.log(stime(this, `.Ankh state: cancel`), this.selectedActions)
+              this.table.undoActionSelection(this.selectedAction, this.selectedActionIndex);
+              this.selectedAction = undefined;
+              this.selectedActions.shift();     // action1 or undefined
+              const active = this.table.activateActionSelect(true, this.selectedActions[0]); // true.
+              if (!active) debugger;
+              this.state = this.states['ChooseAction'];
+            });
+          return;
+        }
+        this.button();
+        panel.activateAnkhPowerSelector();
       },
       // mouseEnable next Upgrades;
       // on click: move Anhk to button (cover: now unclickable), set bit on Player.
@@ -121,24 +195,30 @@ export class GameState {
       start: () => {
         // [player can select Bastet Cat for disarming]
         this.actionsDone += 1;
-        if (!!this.actionIsEvent) this.phase('Event');
+        if (!!this.eventName) this.phase('Event');
         this.phase('ChooseAction');
       },
     },
     Event: {
       start: () => {
-        console.log(stime(this, `.Event: ${this.actionIsEvent}`));
-        this.phase(this.actionIsEvent);
+        console.log(stime(this, `.Event: ${this.eventName}`));
+        this.phase(this.eventName);
       },
     },
     EventDone: {
       start: () => {
-
+        this.phase('EndTurn');
       },
       // phase(EndTurn)
     },
     Split: {
-      start: () => { },
+      start: () => {
+        console.log(stime(this, `Split:`));
+        this.button('Split done');
+      },
+      done: () => {
+        this.phase('Swap');
+      },
       // mouse enable edges (of land tiles)
       // disable edges of hexes in region of < 12 hexes!
       // click each edge! to light
@@ -146,21 +226,37 @@ export class GameState {
       // click Done(assign number, phase(Swap))
     },
     Swap: {
-      start: () => { }, // after Split
+      start: () => {
+        console.log(stime(this, `Swap:`))
+        this.button('Swap done');
+      },
+      done: () => {
+        this.phase('EventDone');
+      }
+
+      // after Split
       // mark startRegion of each marker
       // mouse enable all region markers
       // dragStart: mark legal (either of 2 split regions that contain new/old markers)
       // click Done(phase(EventDone))
     },
     Claim: {
-      start: () => { },
+      start: () => {
+        this.button('Claim done');
+      },
+      done: () => {
+        this.phase('EventDone');
+      }
       // x = isUnclaimedMonument() ?
       // mouse enable Hex; with (x ? unclaimed : any monument) and adj(curPlayer))
       // click: unmark & remark
       // Done(phase(EventDone))
     },
     Conflict: {
-      start: () => { },
+      start: () => {
+        this.conflictRegion = 0;
+        this.phase('ConflictNextRegion');
+      },
       // process Omnipresent
       // process TeleportToTemple (for each player!)
       // phase(Horus ? Horus : ConflictRegions)
@@ -168,21 +264,57 @@ export class GameState {
     Horus: {
       start: () => { },
       // place enable Eyes, drag to each Region (to Region index marker...)
-      // Done(phase(ConflictEachRegion))
+      // Done(phase(ConflictNextRegion))
     },
-    ConflictEachRegion: {
-      start: () => { },
-      // region = region ? ++region  : 1;
-      // if (region > nRegions) phase(ConflictDone)
-      // phase(ConflictInRegion)
+    ConflictNextRegion: {
+      start: () => {
+        const region = ++this.conflictRegion; // 1..n
+        if (region > this.gamePlay.hexMap.regions.length) this.phase('ConflictDone');
+        this.phase('ConflictInRegion');
+      },
     },
     ConflictInRegion: {
-      start: () => { },
-      // process Obelisk-attuned!
-      // phase(Card);
+      panels: [],
+      start: () => {
+        const panels = this.state.panels = this.panelsInConflict;
+        if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
+        if (panels.length === 1) this.phase('Dominate');   // no battle
+        // there will be a Battle! check for Obelisks:
+        this.phase('Obelisks');
+      }
+    },
+    Dominate: {
+      start: (panel: PlayerPanel) => {
+        this.scoreMonuments(true); // monunent majorities (for sole player in region)
+        this.phase('ConflictNextRegion');
+      }
+    },
+    Obelisks: {
+      panels: [],
+      start: () => {
+        const panels = this.panelsInConflict.filter(panel => panel.god.ankhPowers.includes('Obelisk'));
+        // enable on-panel 'Obelisk done' button => phaseDone(panel);
+        panels.forEach(panel => panel.enableObeliskTeleport(this.conflictRegion));
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels;
+        const ndx = panels.indexOf(p);
+        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
+        if (panels.length === 0) this.phase('Card');
+      }
     },
     Card: {
-      start: () => { }, // for battleRegion
+      panels: [],
+      start: () => {
+        const panels = this.state.panels = this.panelsInConflict;
+        panels.forEach(panel => panel.selectCards());
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels;
+        const ndx = panels.indexOf(p);
+        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
+        if (panels.length === 0) this.phase('Reveal');
+      }
       // Open all player card lists! (atop meeple stable area)
       // if (Horus) mark excluded card (GREEN to GREY)
       // click card to select/play (GREEN to YELLOW)
@@ -200,13 +332,25 @@ export class GameState {
       // Toth-incorrect: followers from Scales to player
     },
     Reveal: {
-      start: () => { },
-      // "reveal" all cards; (YELLOW)
-      // trigger Flood
-      // phase Build
+      start: () => {
+        // "reveal" all cards; (YELLOW)
+        // trigger Flood
+        this.phase('Build');
+      },
     },
     Build: {
-      start: () => { }, // for battleRegion
+      panels: [],
+      start: () => {
+        const panels = this.state.panels = this.panelsInConflict;
+        panels.forEach(panel => panel.enableBuild(this.conflictRegion));
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels;
+        const ndx = panels.indexOf(p);
+        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
+        if (panels.length === 0) this.phase('Plague');
+      }
+
       // for each build card in player-score order:
       // mouse enable empty hex in region & monument sources (obelisk, temple, pyramid)
       // drag & drop: place monument, set owner
@@ -214,13 +358,41 @@ export class GameState {
       // click Done: phase Plague
     },
     Plague: {
-      start: () => { },
+      panels: [],
+      start: () => {
+        const panels = this.state.panels = this.panelsInConflict;
+        panels.forEach(panel => panel.enablePlagueBid(this.conflictRegion));
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels;
+        const ndx = panels.indexOf(p);
+        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
+        if (panels.length === 0) this.phase('PlagueResolution');
+      }
+
       // mouse enable plague big counters (max value: player.coins)
       // on Done --> process result: remove meeples, (process mummy cat, etc)
       // phase Monuments
     },
+    PlagueResolution:{
+      start: () => {
+        this.phase('Monuments');
+        const panels = this.state.panels = this.panelsInConflict;
+        panels.forEach(panel => panel.enableBuild(this.conflictRegion));
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels;
+        const ndx = panels.indexOf(p);
+        panels.splice(ndx, 0);  // or rig it up to use Promise/PromiseAll
+        if (panels.length === 0) this.phase('PlagueResolution');
+      }
+},
+
     Monuments: {
-      start: () => { },
+      // score Monuments in conflictRegion; incr Player.devotion (score);
+      start: () => {
+        this.phase('BatleResolution')
+      },
       // count valueInRegion[type][player] (for curRegion)
       // for each type(incl strength): valueInRegion[type] = 0;
       // forEachHex(in region, with claimed Monument: incr playerCount, record Max/Tie)
@@ -229,7 +401,12 @@ export class GameState {
       // phase: BattleResolution
     },
     BattleResolution: {
-      start: () => { },
+      start: () => {
+        this.panelsInConflict.forEach(panel => setStrengthInRegion(this.conflictRegion));
+        this.panelsInConflict.sort((a, b) => a.strength - b.strength)
+
+        this.phase('ConflictNextRegion')
+      },
       // add Temple to strength (if not done above)
       // add Replendent to strength
       // add Cards to strength (Plague, Drought, Chariots)
@@ -261,4 +438,44 @@ export class GameState {
   setup() {
 
   }
+
+  gainFollowersAction() {
+    const player = this.gamePlay.curPlayer;
+    // Osiris Portal begins offMap.
+    const allMonts = Tile.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
+    const monts =  allMonts.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
+    const mine = monts.filter(mont => mont.hex.findAdjHex(hex => hex.meep?.player === player));
+    const n = mine.length;
+    player.coins += n;
+    if (player.god.ankhPowers.includes('Revered')) player.coins += 1;
+  }
+
+  scoreMonuments(dom = false) {
+    const allPlayers = this.gamePlay.allPlayers;
+    const players = this.panelsInConflict.map(panel => panel.player);
+    const hexes = this.gamePlay.hexMap.regions[this.conflictRegion].filter(hex => hex.tile instanceof Monument);
+    const tiles = hexes.map(hex => hex.tile);
+    const types = [Obelisk, Pyramid, Temple];
+    const typeNameToNdx = new Map<string, number>();
+    types.forEach((type, n) => typeNameToNdx.set(type.name, n)); // { Obelisk: 0, Pyramid: 1, Temple: 2 }
+    const countsByPlayerOfType = allPlayers.map(type => types.map(type => 0));// [[0,0,0], [0,0,0], [0,0,0], ...]
+    tiles.forEach(tile => allPlayers.forEach(p => countsByPlayerOfType[p.index][typeNameToNdx.get(className(tile))]++));
+    // [ [p1nOb, p2nOb, p3nOb], [p1nPy, p2nPy, p3nTe], [p1nTe, p2nTe, p3nTe], ... ]
+    const labeledCounts = countsByPlayerOfType.map((pnary, pndx) => pnary.map(pn => ({ n: pn, p: pndx })));
+    // [{ n: p1nOb, p: p1 }, { n: p2nOb, p: p2 }, { n: p3nOb, p: p3 }], [p1nPy, p2nPy, p3nPy], [p1nTe, p2nTn, p3nTe]]
+    const sortedCount = labeledCounts.map(pnary => pnary.sort((a, b) => a.n - b.n));
+    const deltas = sortedCount.map(pnary => ({ p: pnary[0].p, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) }));
+    const winers = deltas.map(({ p, n, d }) => ({ p: ((n > 0 && d > 0) ? allPlayers[p] : undefined), n, d }));
+    winers.forEach(({ p, n, d }) => {
+      console.log(stime(this, `.scoreMonuments - ${types[n].name}: Player=${p.Aname}, d=${d}, n=${n}`))
+      if (players.includes(p)) p.score + 1;
+    })
+
+  }
 }
+function setStrengthInRegion(conflictRegion: number): void {
+  throw new Error("Function not implemented.");
+}
+
+
+

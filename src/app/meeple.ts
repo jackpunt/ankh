@@ -46,7 +46,7 @@ export class Meeple extends Tile {
   static allMeeples: Meeple[] = [];
 
   readonly colorValues = C.nameToRgba("blue"); // with alpha component
-  get backSide() { return (this.baseShape as MeepleShape).backSide; }
+  get backSide() { return this.baseShape.backSide; }
   override get recycleVerb() { return 'dismissed'; }
 
   /**
@@ -79,7 +79,8 @@ export class Meeple extends Tile {
 
   override get radius() { return TP.meepleRad } // 31.578 vs 60*.4 = 24
   override textVis(v: boolean) { super.textVis(true); }
-  override makeShape(): PaintableShape { return new MeepleShape(this.player, this.radius); }
+  override makeShape() { return new MeepleShape(this.player, this.radius); }
+  override baseShape: MeepleShape;
 
   /** location at start-of-turn; for Meeples.unMove() */
   startHex: Hex1;
@@ -114,14 +115,14 @@ export class Meeple extends Tile {
     }
     const fromHex = this.fromHex;
     super.moveTo(hex); // hex.set(meep) = this; this.x/y = hex.x/y
-    this.faceUp((!hex?.isOnMap || !fromHex?.isOnMap || hex === this.startHex));
+    this.faceUp(!(hex?.isOnMap && fromHex?.isOnMap && hex !== this.startHex));
     return hex;
   }
 
   override moveTo(hex: Hex1) {
     const source = this.source;
     const fromHex = this.hex;
-    const toHex = this.moveTo0(hex);  // collides with source.hex.meep
+    const toHex = this.moveTo0(hex);  // may collide with source.hex.meep
     if (source && fromHex === this.source.hex && fromHex !== toHex) {
       source.nextUnit()   // shift; moveTo(source.hex); update source counter
     }
@@ -154,13 +155,16 @@ export class Meeple extends Tile {
     return;
   }
 
-  override isLegalTarget(hex: Hex1, ctx?: DragContext) {  // Meeple
+  isLegalTarget0(hex: Hex1, ctx?: DragContext) {  // Meeple
     if (!hex) return false;
-    if (hex.meep) return false;    // no move onto meeple
-    if (!hex.isOnMap) return false;
-    if (!ctx?.lastShift && this.backSide?.visible) return false;
-    // TODO: Check distance <= 3
+    if (hex.meep) return false;
+    if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
+    if (!ctx?.lastShift && this.backSide.visible) return false;
     return true;
+  }
+
+  override isLegalTarget(hex: Hex1, ctx?: DragContext) {  // Meeple
+    return this.isLegalTarget0(hex, ctx);
   }
 
   override isLegalRecycle(ctx: DragContext) {

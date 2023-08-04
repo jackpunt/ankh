@@ -1,15 +1,17 @@
 import { C, Constructor, KeyBinder, RC, S, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhPiece, GodFigure, Monument } from "./ankh-figure";
+import { AnkhPiece, Figure, GodFigure, Monument } from "./ankh-figure";
 import { PlaceSpec, RegionSpec, Scenario, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { AnkhToken, God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
+import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { HexShape } from "./shapes";
 import { TP } from "./table-params";
 import { TileSource } from "./tile-source";
+import { Tile } from "./tile";
 
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
@@ -79,6 +81,12 @@ export class AnkhHex extends Hex2 {
   overlay: HexShape;
   get piece() { return this.tile ?? this.meep }
 
+  override get meep(): Figure { return super.meep as Figure; }
+  override set meep(meep: Meeple) { super.meep = meep; }
+
+  override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
+  override set tile(tile: Tile) { super.tile = tile; }
+
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
     if (!this.overlay) this.overlay = new HexShape(undefined); // for showRegion()
     this.overlay.paint('rgba(250,250,250,.3)');
@@ -86,10 +94,14 @@ export class AnkhHex extends Hex2 {
     this.cont.addChild(this.overlay);
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
-    /** search each Hex linked to this. */
-    findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
-      return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
-    }
+
+  /** search each Hex linked to this. */
+  findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
+    return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
+  }
+  filterAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
+    return this.linkDirs.filter((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
+  }
 
 }
 
@@ -253,7 +265,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       if (hex.regionId !== undefined) return; // already done
       if (hex.terrain === 'w') return;        // not member of any region
       const region = [], rndx = regions.length, id = ids?.pop() ?? rndx;
-      console.log(stime(this, `.findRegions: seed ${hex} hex.id: ${id0} id: ${id} ids: ${ids} rndx: ${rndx}`), regions.concat());
+      // console.log(stime(this, `.findRegions: seed ${hex} hex.id: ${id0} id: ${id} ids: ${ids} rndx: ${rndx}`), regions.concat());
       regions.push(region);
       addNeighbors(hex, region, id, rndx);
     });
@@ -285,6 +297,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   regionOfHex(row: number, col: number, hex = this[row][col]) {
     return this.regions.findIndex(r => r?.includes(hex));
   }
+  /** debug aid: return array of {r.Aname, r.index, r.length} */
   regionList(regions = this.regions) {
     return regions.map((r, i) => { return { r: r && r['Aname'], i: i+1, l: r?.length ?? -1 } })
   }
@@ -353,7 +366,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       const hex = this[row][col];
       const player = Player.allPlayers[pid-1], pNdx = player?.index;
       // find each piece, place on map
-      console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
+      // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
       const godFig = (cons.name === 'GodFigure') ? new cons(player, 0, player.god.Aname) as GodFigure: undefined;

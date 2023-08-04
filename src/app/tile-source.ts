@@ -29,9 +29,9 @@ export class TileSource<T extends Tile> {
     this.Aname = `${type.name}Source`;
     if (!counter) {
       const cont = hex.map.mapCont.counterCont; // GP.gamePlay.hexMap.mapCont.counterCont;
-      const xy = hex.cont.localToLocal(0, -TP.hexRad / H.sqrt3, cont);
+      const { x, y } = hex.cont.localToLocal(0, TP.hexRad / H.sqrt3, cont);
       counter = this.makeCounter(`${type.name}:${player?.index ?? 'any'}`, this.numAvailable, `lightblue`, TP.hexRad / 2);
-      counter.attachToContainer(cont, xy);
+      counter.attachToContainer(cont, { x: counter.x + x, y: counter.y + y });
     }
     this.counter = counter;
   }
@@ -78,12 +78,13 @@ export class TileSource<T extends Tile> {
     }
   }
 
-  get availableUnit() {
+  get sourceHexUnit() {
     return (this.hex.tile || this.hex.meep) as T; // moveTo puts it somewhere...
   }
 
+  /** programmatic, vs Table.dragStart */
   takeUnit() {
-    const unit = this.availableUnit;
+    const unit = this.sourceHexUnit;
     unit?.moveTo(undefined);
     this.nextUnit();
     return unit;

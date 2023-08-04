@@ -1,33 +1,81 @@
-import { C, Constructor, stime } from "@thegraid/common-lib";
+import { C, Constructor, XY, stime } from "@thegraid/common-lib";
 import { Container, Graphics } from "@thegraid/easeljs-module";
 import { AnkhHex } from "./ankh-map";
+import { NumCounter } from "./counters";
 import { GP } from "./game-play";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { C1, CenterText } from "./shapes";
+import { C1, CenterText, CircleShape, HexShape, PaintableShape } from "./shapes";
 import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
-import { TileSource, UnitSource } from "./tile-source";
+import { TileSource } from "./tile-source";
 
-export class AnkhPiece extends MapTile {
-  constructor(player: Player, serial: number, Aname?: string) {
-    super(Aname ?? `${Aname}\n${serial}`, player);
+
+export class AnkhSource<T extends Tile> extends TileSource<T> {
+  static dummyCounter = new NumCounter('dummy');
+  constructor(type: Constructor<T>, player: Player, hex: Hex2, xy?: XY, counter?: NumCounter) {
+    const myCounter = () => {
+      if (!counter) {
+        const makeCounter = (name: string, initValue: number, color: string, fontSize: number, fontName?: string, textColor?: string) => {
+          return new NumCounter(name, initValue, 'rgba(240,240,240,.6)', fontSize, fontName, textColor);
+        }
+        const radius = type.prototype.radius ?? 0, fs = TP.hexRad / 2, x0 = radius / 2, y0 = radius - fs / 4;
+        const cont = hex.map.mapCont.counterCont; // GP.gamePlay.hexMap.mapCont.counterCont;
+        const { x, y } = hex.cont.localToLocal(xy ? xy.x ?? x0 : x0, xy ? xy.y ?? y0 : y0, cont);
+        const counter = makeCounter(`${type.name}:${player?.index ?? 'any'}`, 0, `lightblue`, TP.hexRad / 2);
+        counter.attachToContainer(cont, { x: counter.x + x, y: counter.y + y });
+        return counter;
+      }
+      return counter;
+    }
+    super(type, player, hex, myCounter());
+  }
+
+  override makeCounter(name: string, initValue: number, color: string, fontSize: number, fontName?: string, textColor?: string): NumCounter {
+    return new NumCounter(name, initValue, 'rgba(240,240,240,.6)', fontSize, fontName, textColor);
   }
 }
 
+/** Monument, Portal  */
+export class AnkhPiece extends MapTile {
+  constructor(player: Player, serial: number, Aname?: string) {
+    super(`${Aname}\n${serial}`, player);
+  }
+  override get hex() { return super.hex as AnkhHex; }
+  override set hex(hex: AnkhHex) { super.hex = hex; }
+
+  // TODO: can we put this in Tile? as common code with Meeple.moveTo override.
+  override moveTo(hex: Hex1) {
+    const source = this.source;
+    const fromHex = this.hex;
+    const toHex = super.moveTo(hex);  // may collide with source.hex.meep
+    if (source && fromHex === this.source.hex && fromHex !== toHex) {
+      source.nextUnit()   // shift; moveTo(source.hex); update source counter
+    }
+    return hex;
+  }
+  isPhase(name: string) {
+    return GP.gamePlay.isPhase(name);
+  }
+
+  isStableHex(hex: Hex1) {
+    return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2)));
+  }
+
+  override sendHome(): void {
+      super.sendHome()
+  }
+}
 export class Monument extends AnkhPiece {
-  private static source: TileSource<Monument>[] = [];
+
   override get radius() { return TP.ankh2Rad }
   override textVis(vis?: boolean): void {
       super.textVis(true);
   }
 
-  static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
-    return Tile.makeSource0(TileSource<Monument>, Monument, player, hex, n);
-  }
   constructor(player: Player, serial: number, Aname = 'Monument') {
     super(player, serial, Aname);
     this.nameText.y -= this.radius/2;
@@ -59,28 +107,91 @@ export class Temple extends Monument {
   }
 }
 
-// Figure == Meeple:
+export class Portal extends AnkhPiece {
+  static source = [[]]; // per-player source, although only 1 Osiris player...
+  static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
+    return AnkhPiece.makeSource0(AnkhSource<Portal>, Portal, player, hex, n);
+  }
+  static radius0 = TP.ankh2Rad;
+  static dr = 3;
+  override get radius() { return Portal.radius0 + Portal.dr };
+
+  constructor(player: Player, serial?: number) {
+    super(player, serial, 'Portal');
+    const base = this.baseShape;
+    const hscgf = base.cgf;
+    base.cgf = (color) => {
+      base.graphics.c().f(color).dp(0, 0, this.radius, 6, 0, 0);
+      return hscgf('rgba(80,80,80,.8)');
+    }
+   }
+
+   override makeShape(): PaintableShape {
+    return new HexShape(Portal.radius0); // hexgon properly oriented...
+   }
+
+  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
+    if (this.isPhase('Summon')) {
+      if (this.isStableHex(this.hex)) {
+
+      }
+    }
+    return false;
+  }
+}
+
+
+// Figure == Meeple: [underlay, [baseShape, bitmapImage?], backSide]
 export class Figure extends Meeple {
   constructor(player: Player, serial: number, Aname?: string) {
     super(Aname ?? `${Aname}\n${serial}`, player);
+    this.underlay = new CircleShape();
+    this.addChildAt(this.underlay, 0);
+    this.underlay.visible = false;
   }
+  underlay: CircleShape;
+
+  override get hex() { return super.hex as AnkhHex; }
+  override set hex(hex: AnkhHex) { super.hex = hex; }
 
   override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
     this.paintRings(colorn, colorn, 4, 4); // one fat ring...
   }
 
-  override isLegalRecycle(ctx: DragContext): boolean {
-    return true;
+  makeUnderlay() {
+    const underlay = new CircleShape();
+    underlay.visible = false;
+    this.addChildAt(underlay, 1);
+    return underlay;
   }
 
-  isLegalTarget0(hex: AnkhHex, ctx?: DragContext) {  // Meeple
-    if (!hex) return false;
-    if (hex.piece) return false;
-    if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
-    if (!ctx?.lastShift && this.backSide.visible) return false;
-    return true;
+  highlight(show = true, color = C.WHITE, rad = this.radius + 4 ?? TP.ankhRad) {
+    if (show) {
+      // cgf with color *and* rad:
+      this.underlay.cgf = (color) => new Graphics().f(color).dc(0, 0, rad);
+      this.underlay.paint(color);
+      this.underlay.visible = true;
+      if (this.cacheID) {
+        const { x, y, width, height } = this.getBounds();
+        const nw = Math.max(width, 2 * rad), dw = nw - width;
+        this.cache(x - dw / 2, y - dw / 2, nw, nw); // assume symmetry
+      }
+    } else {
+      this.underlay.visible = false;
+      this.updateCache();
+    }
+    this.stage?.update();
+    return this;
   }
 
+  override moveTo(hex: Hex1) {
+    const startHex = this.startHex;
+    const rv = super.moveTo(hex);
+    if (GP.gamePlay.isPhase('Summon') && startHex) {
+      this.startHex = startHex;
+    }
+    return rv;
+  }
   override dragStart(ctx: DragContext): void {
     console.log(stime(this, `.dragStart:`), ctx.tile, ctx.targetHex);
     super.dragStart(ctx);
@@ -94,40 +205,63 @@ export class Figure extends Meeple {
     return GP.gamePlay.isPhase(name);
   }
 
-
-  isStable(hex: Hex1) {
+  isStableHex(hex: Hex1) {
     return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2)));
   }
+
   isLegalWater(hex: AnkhHex) {
-    if (hex.terrain === 'w') return false;
+    return (hex.terrain !== 'w');
+  }
+
+  get isOsirisSummon() {
+    return !!this.isStableHex(this.hex) && this.isPhase('Summon') && this.player?.god.Aname === 'Osiris';
+  }
+  isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
+    return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon);
+  }
+
+  override isLegalRecycle(ctx: DragContext): boolean {
+    return ctx.lastShift;
+  }
+
+  override isLegalTarget0(hex: AnkhHex, ctx?: DragContext) {  // Meeple
+    if (!hex) return false;
+    // AnkhToken can moveTo Monument, but that is not a user-drag.
+    if (!this.isOccupiedLegal(hex, ctx)) return false;
+    if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
+    if (!ctx?.lastShift && this.backSide.visible) return false;
     return true;
+  }
+  isLegalSummon(hex: AnkhHex, ctx?: DragContext) {
+    if (!(hex.findAdjHex(adj => adj.piece?.player === this.player && adj.piece !== this))) return false;
+    return true;
+  }
+  isLegalMove(hex: AnkhHex, ctx?: DragContext) {
+    return (hex.isOnMap && this.distWithin(hex, this.hex, 3));
   }
 
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext) { // Police
     if (!this.isLegalTarget0(hex, ctx)) return false;
-    if (!this.isLegalWater(hex)) return false;
+    if (!this.isLegalWater(hex)) return false;              // Apep can Summon to water!
 
     // isSummon: adjacent to existing, player-owned Figure or Monument.
-    if (this.isStable(this.hex)) {
-      if (Meeple.allMeeples.filter(m => m.hex?.isOnMap && m.player === this.player).length < 1) return true; // Test Hack!
-      if (!(hex.findAdjHex(adj => adj.piece?.player === this.player))) return false;
-      return true;
+    if (this.isPhase('Summon')) {
+      return this.isStableHex(this.hex) && this.isLegalSummon(hex, ctx);
+      // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
     }
-    // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
-    // TODO: also apply when teleporting to Temple: if gameState.phase == Battle
-    if (this.hex.isOnMap) {
-      if (this.isPhase('Summon')) {
-        if (!(hex.findAdjHex(adj => (adj.tile instanceof Pyramid) && adj.tile.player === this.player))) return false;
-        return true;
-      }
-      if (this.isPhase('Move')) {
-        if (!this.distWithin(hex, this.hex, 3)) return false;
-        return true;
+    if (this.isPhase('Move')) {
+      return this.isLegalMove(hex, ctx);
+    }
+    if (this.isPhase('ConflictInRegion')) {
+      // apply when teleporting to Temple: if gameState.phase == Battle
+      if (this.player?.god.ankhPowers.includes('Obelisk')) {
+        const obelisk = (hex.tile instanceof Obelisk) ? hex.tile : undefined;
+        return (obelisk?.player === this.player);
       }
     }
-
     return false;
   }
+
   distWithin(hex: Hex, target: Hex, n = 3) {
     // TODO: optimize; use only links in the right direction?
     const loop = (testhex: Hex, n = 3, excl: Hex[] = []) => {
@@ -144,6 +278,7 @@ export class Figure extends Meeple {
     }
     return loop(hex, n);
   }
+
 }
 
 export class GodFigure extends Figure {
@@ -157,16 +292,14 @@ export class GodFigure extends Figure {
 }
 
 export class Warrior extends Figure {
-  private static source: UnitSource<Warrior>[] = [];
-  // override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
-  //   return true;
-  // }
+  private static source: AnkhSource<Warrior>[][] = [[]];  // makeSource sets
+
   /**
    * invoke Warrior.makeSource(player, hex, n) to create all the Warriors for Player.
    * makeSource0 will invoke new Warrior(), etc.
    */
   static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
-    return Meeple.makeSource0(UnitSource<Warrior>, Warrior, player, hex, n);
+    return Warrior.makeSource0(AnkhSource<Warrior>, Warrior, player, hex, n);
   }
 
   override get radius() { return TP.ankh1Rad }
@@ -181,28 +314,28 @@ export class Warrior extends Figure {
 export class Guardian extends Figure {
 
   static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = 0) {
-    return Meeple.makeSource0(UnitSource<Guardian>, guard, undefined, hex, n);
+    return Guardian.makeSource0(AnkhSource<Guardian>, guard, undefined, hex, n);
   }
 
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
     // Coming from global source:
     if (this.hex === this.source.hex) {
+      // allow moveTo a stable if ctx.lastShift
       const index = GP.gamePlay.table.guardSources.findIndex(s => s === this.source) + 1;
-      const toStable = (!ctx.lastShift)
-        ? (GP.gamePlay.curPlayer.stableHexes[index] === hex)
-        : GP.gamePlay.allPlayers.find(p => p.stableHexes[index] === hex)
-      if (toStable && !hex.occupied) return true;
+      const toStable =  !!GP.gamePlay.allPlayers.find(p => p.stableHexes[index] === hex);
+      if (ctx.lastShift && toStable && !hex.occupied) return true;
     }
     return super.isLegalTarget(hex, ctx);
   }
 
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-    if (this.isStable(targetHex)) {
+    if (this.isStableHex(targetHex)) {
       const plyr = GP.gamePlay.allPlayers.find(p => p.stableHexes.includes(targetHex))
       this.setPlayerAndPaint(plyr);
     }
     super.dropFunc(targetHex, ctx);
   }
+
   override sendHome(): void {
     this.setPlayerAndPaint(undefined);
     super.sendHome();
@@ -239,8 +372,10 @@ export class Apep extends Guardian2 {
   }
   override isLegalWater(hex: AnkhHex): boolean {
     // can Summon to water; but not move water-to-water!
-    if (this.isStable(this.hex)) return true;
-    return super.isLegalWater(hex);
+    return this.isStableHex(this.hex) ? true : super.isLegalWater(hex);
+  }
+  override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
+    return super.isLegalTarget(hex, ctx);
   }
 }
 

@@ -222,36 +222,33 @@ export class Hex2 extends Hex1 {
   distText: Text    // shown on this.cont
   rcText: Text      // shown on this.cont
 
-  override get tile() { return super.tile; }
-  override set tile(tile: Tile) {
+  setUnit(unit: Tile, meep = false) {
     const cont: Container = this.map.mapCont.tileCont, x = this.x, y = this.y;
-    const underTile = this.tile;
-    super.tile = tile  // this._tile = tile
-    if (tile !== undefined) {
-      tile.x = x; tile.y = y;
-      cont.addChildAt(tile, 0); // under hex.meep (and various Text)
-    }
-    if (tile && underTile) tile.overSet(underTile);
-  }
-
-  override get meep() { return super.meep; }
-  override set meep(meep: Meeple) {
-    const cont: Container = this.map.mapCont.tileCont, x = this.x, y = this.y;
-    let k = true;     // debug double meep; maybe overMeep.overSet(this)?
-    if (meep !== undefined && this.meep !== undefined) {
-      if (this === this.meep.source?.hex && this === meep.source?.hex) {
-        // dragStart does moveTo(undefined); which triggers source.nextUnit()
-        // so if we drop to the startHex, we have this collision.
-        // put the 'nextHex' back in the source:
-        this.meep.source.availUnit(this.meep);
+    let k = true;     // debug double tile
+    const this_unit = (meep ? this.meep : this.tile)
+    if (unit !== undefined && this_unit !== undefined) {
+      if (this === this_unit.source?.hex && this === unit.source?.hex) {
+        // Table.dragStart does moveTo(undefined); which triggers source.nextUnit()
+        // so if we drop to the startHex, we have a collision.
+        // Resolve by putting this_unit (the 'nextUnit') back in the source.
+        // (availUnit will recurse to set this.unit = undefined)
+        this_unit.source.availUnit(this_unit);
       } else if (k) debugger;
     }
-    super.meep = meep // this._meep = meep    super.meep = meep
-    if (meep !== undefined) {
-      meep.x = x; meep.y = y;
-      cont.addChild(meep);      // tile will go under meep
+    meep ? (super.meep = unit as Meeple) : (super.tile = unit); // set _meep or _tile;
+    if (unit !== undefined) {
+      unit.x = x; unit.y = y;
+      cont.addChild(unit);      // meep will go under tile
+      // after source.hex is set, updateCounter:
+      if (this === unit.source?.hex) unit.source.updateCounter();
     }
   }
+
+  override get tile() { return super.tile; }
+  override set tile(tile: Tile) { this.setUnit(tile, false)}
+
+  override get meep() { return super.meep; }
+  override set meep(meep: Meeple) { this.setUnit(meep, true)}
 
   /**
    * add Hex2 to map?.mapCont.hexCont; not in map.hexAry!

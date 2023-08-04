@@ -69,20 +69,28 @@ export class GameSetup {
   ngods: number = 4;
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
-   * @param ext Extensions from URL
+   * @param gods 'ext' from URL
    */
-  startup(ext = this.ext, ngods = this.ngods) {
-    this.ext = ext;
+  startup(gods = this.ext, ngods = this.ngods) {
+    this.ext = gods;
     this.ngods = ngods;
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
-    const gods = ext.length > 2 ? ext : selectN(God.allNames, ngods);
-    gods.length = Math.min(gods.length, 5);
+    const uniq = <T>(ary: T[]) => {
+      const rv: T[] = [];
+      ary.forEach(elt => rv.includes(elt) || rv.push(elt))
+      return rv;
+    }
+    const nToFind = (ngods - gods.length);
+    const godNames = (nToFind > 0)
+      ? [...gods].concat(selectN(God.allNames.filter(gn => !gods.includes(gn)), nToFind))
+      : (nToFind < 0) ? selectN(uniq(gods), ngods) : gods;
+    godNames.length = Math.min(godNames.length, 5);
     const guardsC: Constructor<Guardian>[][] = [[Satet, MumCat], [Apep, Mummy], [Scorpion, Androsphinx]];
     const guards: Constructor<Guardian>[] = guardsC.map(gs => selectN(gs, 1)[0]);
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
-    const gamePlay = new GamePlay(gods, guards, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
+    const gamePlay = new GamePlay(godNames, guards, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
