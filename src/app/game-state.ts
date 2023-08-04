@@ -391,6 +391,7 @@ export class GameState {
     Monuments: {
       // score Monuments in conflictRegion; incr Player.devotion (score);
       start: () => {
+        this.scoreMonuments(false);
         this.phase('BatleResolution')
       },
       // count valueInRegion[type][player] (for curRegion)

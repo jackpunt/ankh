@@ -35,8 +35,8 @@ class ActionContainer extends Container {
   /** activate the first button witout a AnkhMarker */
   activate() {
     const hl = this.highlight;
-    const buttons = this.children.filter(c => (c instanceof Container)) as Container[]; // minus highlight;
-    let button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker)));
+    const buttons = this.children.filter(c => (c instanceof Container)) as EventButton[]; // minus highlight;
+    let button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker))) as EventButton;
     if (!button) { // reset after Event!
       buttons.forEach(b => b.removeChildType(AnkhMarker));
       button = buttons[0];
@@ -46,6 +46,7 @@ class ActionContainer extends Container {
     hl.visible = button.mouseEnabled = true;
     this.active = button;
     this.stage.update();
+    return button;
   }
 
   deactivate() {
@@ -500,6 +501,7 @@ export class Table extends EventDispatcher  {
     GP.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
+  activeButtons: {[index: string]: [EventButton, number]} = {}
   /**
    * On each row: activate or deactivate the first button without an AnkhMarker on each line.
    * If a row is 'full' (previous Event) it is reset to the beginning.
@@ -509,10 +511,11 @@ export class Table extends EventDispatcher  {
   activateActionSelect(activate: boolean, after?: string, cat = false) {
     let isAfter = (after === undefined);
     let active = 0;
-    this.actionRows.map(({id, dn}, i) => {
+    this.activeButtons = {};
+    this.actionRows.map(({id, dn}, cn) => {
       const rowCont = this.actionPanels[id] as ActionContainer;
       if (!activate) { rowCont.deactivate() } // mouseEnable
-      else if (isAfter) { rowCont.activate(); active++; }
+      else if (isAfter) { this.activeButtons[id]= [rowCont.activate(), cn]; active++; }
       isAfter = isAfter || id === after;
     })
     if (cat) {
@@ -522,17 +525,18 @@ export class Table extends EventDispatcher  {
     return active > 0;
   }
 
-  doneButton: UtilButton
+  doneButton: UtilButton;
+  doneClicked = (evt?) => {
+    this.activateActionSelect(false); // deactivate all
+    GP.gamePlay.phaseDone();
+  }
   addDoneButton(actionCont: Container, rh: number) {
     const w = 90, h = 56;
     const doneButton = this.doneButton = new UtilButton('lightgreen', 'Done', 36, C.black);
     doneButton.x = -(w + 10);
     doneButton.y = 3 * rh;
     doneButton.label.textAlign = 'right';
-    doneButton.on(S.click, (evt) => {
-      this.activateActionSelect(false); // deactivate all
-      GP.gamePlay.phaseDone();
-    });
+    doneButton.on(S.click, this.doneClicked, this);
     actionCont.addChild(doneButton);
 
     // prefix advice: set text color

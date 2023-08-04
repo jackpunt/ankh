@@ -292,27 +292,34 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('Escape', {thisArg: table, func: table.stopDragging}) // Escape
     KeyBinder.keyBinder.setKey('C-s', { thisArg: this.gameSetup, func: () => { this.gameSetup.restart() } })// C-s START
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.stopPlayer })// C-c Stop Planner
-    KeyBinder.keyBinder.setKey('m', { thisArg: this, func: this.makeMove, argVal: true })
-    KeyBinder.keyBinder.setKey('M', { thisArg: this, func: this.makeMoveAgain, argVal: true })
-    KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.autoMove, argVal: false })
-    KeyBinder.keyBinder.setKey('N', { thisArg: this, func: this.autoMove, argVal: true})
-    KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.autoPlay, argVal: 0})
-    KeyBinder.keyBinder.setKey('v', { thisArg: this, func: this.autoPlay, argVal: 1})
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
     KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn })
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: Tile.reCacheTiles })
 
-    // diagnostics:
-    //KeyBinder.keyBinder.setKey('x', { thisArg: this, func: () => {this.table.enableHexInspector(); }})
-    KeyBinder.keyBinder.setKey('t', { thisArg: this, func: () => {this.table.toggleText(); }})
-    //KeyBinder.keyBinder.setKey('z', { thisArg: this, func: () => {this.gStats.updateStats(); }})
+    KeyBinder.keyBinder.setKey('m', { thisArg: this, func: this.chooseAction, argVal: 'Move' })
+    KeyBinder.keyBinder.setKey('s', { thisArg: this, func: this.chooseAction, argVal: 'Summon' })
+    KeyBinder.keyBinder.setKey('g', { thisArg: this, func: this.chooseAction, argVal: 'Gain' })
+    KeyBinder.keyBinder.setKey('w', { thisArg: this, func: this.chooseAction, argVal: 'Ankh' })
+    KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.clickConfirm, argVal: false })
+    KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
+    KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
 
-    // KeyBinder.keyBinder.setKey('M-r', { thisArg: this, func: () => { this.gameSetup.netState = "ref" } })
-    // KeyBinder.keyBinder.setKey('M-J', { thisArg: this, func: () => { this.gameSetup.netState = "new" } })
-    // KeyBinder.keyBinder.setKey('M-j', { thisArg: this, func: () => { this.gameSetup.netState = "join" } })
-    //KeyBinder.keyBinder.setKey('M-d', { thisArg: this, func: () => { this.gameSetup.netState = "no" } })
+    // diagnostics:
+    KeyBinder.keyBinder.setKey('t', { thisArg: this, func: () => {this.table.toggleText(); }})
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
+  }
+
+  chooseAction(action: string) {
+    // find action in actionSelectPanel, dispatch event to click highlighted button.
+    const [button, n] = this.table.activeButtons[action];
+    setTimeout(() => this.table.selectAction(action, button, n), 10);
+  }
+  clickDone() {
+    this.table.doneClicked({})
+  }
+  clickConfirm(val: boolean) {
+    this.table.panelForPlayer[this.curPlayerNdx].clickConfirm(val);
   }
 
   useReferee = true

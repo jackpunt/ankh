@@ -1,5 +1,5 @@
 import { C, S, stime } from "@thegraid/easeljs-lib";
-import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
+import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
 import { GP } from "./game-play";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
@@ -135,10 +135,20 @@ export class PlayerPanel extends Container {
     table.overlayCont.addChild(conf);
   }
 
+  /** keybinder access to areYouSure */
+  clickConfirm(yes = true) {
+    // let target = (this.confirmContainer.children[2] as UtilButton);
+    const event = new MouseEvent(S.click, false, true, 0, 0, undefined, -1, true, 0, 0);
+    (yes ? this.buttonYes : this.buttonCan).dispatchEvent(event);
+  }
+
+  buttonYes: UtilButton;
+  buttonCan: UtilButton;
   areYouSure(msg: string, yes: () => void, cancel: () => void, afterUpdate: () => void = () => {}) {
     const { panel, table } = this.objects;
-    const conf = this.confirmContainer, button1 = conf.children[2], button2 = conf.children[3];
-    const utilButton = button1 as UtilButton;
+    const conf = this.confirmContainer;
+    const button1 = this.buttonYes = conf.children[2] as UtilButton;
+    const button2 = this.buttonCan = conf.children[3] as UtilButton;
     const msgText = conf.children[4] as CenterText;
     msgText.text = msg;
     const clear = (func: () => void) => {
@@ -146,7 +156,7 @@ export class PlayerPanel extends Container {
       button1.removeAllEventListeners();
       button2.removeAllEventListeners();
       table.doneButton.mouseEnabled = table.doneButton.visible = true;
-      utilButton.updateWait(false, func);
+      button1.updateWait(false, func);
     }
 
     button1.on(S.click, () => clear(yes), this, true);
@@ -155,7 +165,7 @@ export class PlayerPanel extends Container {
     panel.localToLocal(0, 0, table.overlayCont, conf);
     conf.visible = true;
     table.doneButton.mouseEnabled = table.doneButton.visible = false;
-    utilButton.updateWait(false, afterUpdate);
+    button1.updateWait(false, afterUpdate);
     // setTimeout(cancel, 500);
   }
 
