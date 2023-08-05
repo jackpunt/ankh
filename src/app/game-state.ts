@@ -457,9 +457,11 @@ export class GameState {
     if (player.god.ankhPowers.includes('Revered')) player.coins += 1;
   }
 
+  /** score each monument type in conflictRegion */
   scoreMonuments(dom = false) {
     const allPlayers = this.gamePlay.allPlayers;
     const players = this.panelsInConflict.map(panel => panel.player);
+    console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]`), players);
     const hexes = this.gamePlay.hexMap.regions[this.conflictRegion].filter(hex => hex.tile instanceof Monument);
     const tiles = hexes.map(hex => hex.tile);
     const types = [Obelisk, Pyramid, Temple];
@@ -474,7 +476,7 @@ export class GameState {
     const deltas = sortedCount.map(pnary => ({ p: pnary[0].p, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) }));
     const winers = deltas.map(({ p, n, d }) => ({ p: ((n > 0 && d > 0) ? allPlayers[p] : undefined), n, d }));
     winers.forEach(({ p, n, d }) => {
-      console.log(stime(this, `.scoreMonuments - ${types[n].name}: Player=${p.Aname}, d=${d}, n=${n}`))
+      console.log(stime(this, `.scoreMonuments[${this.conflictRegion}] - ${types[n].name}: Player=${p?.Aname}, d=${d}, n=${n}`))
       if (players.includes(p)) p.score + 1;
     })
 

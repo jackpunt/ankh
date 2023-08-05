@@ -2,7 +2,7 @@
 // TODO: namespace or object for GameState names
 
 import { Constructor, S } from "@thegraid/common-lib";
-import { AnkhPiece, Figure, GodFigure, Monument, Obelisk, Pyramid, Temple, Warrior } from "./ankh-figure"
+import { Androsphinx, AnkhPiece, Apep, Figure, GodFigure, Guardian, Monument, MumCat, Mummy, Obelisk, Pyramid, Satet, Scorpion, Temple, Warrior } from "./ankh-figure"
 import { HexDir } from "./hex-intfs";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhMap, AnkhHex } from "./ankh-map";
@@ -11,14 +11,17 @@ import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { TileSource } from "./tile-source";
 import { GamePlay } from "./game-play";
+import { AnkhPowerCont } from "./player-panel";
+import { CircleShape, CenterText } from "./shapes";
 
 type GodName = string;
-type GuardName = string;
-type GuardIdent = { g1: GuardName, g2: GuardName, g3: GuardName };
+type GuardName = string | Constructor<Guardian>;
+type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
 type RegionElt = [row: number, col: number, bid: number];
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
 type ClaimElt = [row: number, col: number, pid: number];
-type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1]
+type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
+type AnkhElt = [pid: number, powers: string[], guards?: GuardIdent];
 
 /** [row, col, bid] -> new rid, with battle order = bid ;
  * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
@@ -29,12 +32,12 @@ type SplitElt = (SplitBid | SplitDir)
 
 type SetupElt = {
   coins?: number[],
-  score?: number[],
-  player?: number, // default to first player.
-  event0?: number,
+  scores?: number[],
+  events?: number,
   actions?: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
   guards?: GuardIdent,   // Guardian types in use.
-  stable?: GuardIdent[], // per-player
+  ankhs?: AnkhElt[], // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
+  player?: number, // default to first player.
 }
 
 type RegionSpec = { region: RegionElt[] }
@@ -177,17 +180,25 @@ export class AnkhScenario {
           [4, 7, GodFigure, 2],
         ]},
     { setup: {
-        event0: 2,
+        events: 3,
         actions: { Move: 2, Ankh: 2 },
         coins: [4, 5],
-        score: [2, 3],
+        scores: [2, 3],
+        guards: ['Satet', 'Apep', 'Scorpion'],
+        ankhs: [[0, ['Commanding', 'Revered'], ['Satet']], [1, ['Inspiring']]],
       }
     },
   )
 }
 
 export class ScenarioParser {
-  static classByName: { [index: string]: Constructor<GodFigure | Monument> } = { 'GodFigure': GodFigure, 'Obelisk': Obelisk, 'Pyramid': Pyramid, 'Temple': Temple, 'Warrior': Warrior }
+  static classByName: { [index: string]: Constructor<GodFigure | Monument | Figure > } =
+    { 'GodFigure': GodFigure, 'Warrior': Warrior,
+      'Obelisk': Obelisk, 'Pyramid': Pyramid, 'Temple': Temple,
+      'Satet': Satet, 'MumCat': MumCat,
+      'Apep': Apep, 'Mummy': Mummy,
+      'Androsphinx': Androsphinx, 'Scorpion': Scorpion,
+    }
   constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
   }
@@ -308,18 +319,19 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
   parseSetup(setup: SetupElt) {
     if (!setup) return;
+    const { coins, scores, events, actions, guards, ankhs, player } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
-    setup.coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
-    setup.score?.forEach((v, ndx) => allPlayers[ndx].score = v);
-    if (setup.event0 !== undefined) {
-      for (let ndx = 0; ndx < setup.event0; ndx++) {
+    coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
+    scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
+    if (events !== undefined) {
+      for (let ndx = 0; ndx < events; ndx++) {
         table.setEventMarker(ndx);
       }
       map.update();
     }
-    if (setup.actions !== undefined) {
+    if (actions !== undefined) {
       table.actionRows.forEach(({ id }) => {
-        const nSelected = setup.actions[id] ?? 0;
+        const nSelected = actions[id] ?? 0;
         for (let cn = 0; cn < nSelected; cn++) {
           const rowCont = table.actionPanels[id];
           const button = rowCont.getButton(cn);
@@ -327,6 +339,53 @@ export class ScenarioParser {
         }
       });
     }
+    guards?.forEach((name, ndx) => {
+      if (typeof name !== 'string') name = name.name;
+      const source = table.guardSources[ndx];
+      const type = ScenarioParser.classByName[name] as Constructor<Guardian>;
+      if (name !== source.type.name) {
+        const n = source.deleteAll();
+        for (let i = 0; i < n; i++) {
+          source.availUnit(new type(undefined, i + 1))
+        }
+        source.nextUnit();
+      }
+    });
+    ankhs?.forEach((elt: AnkhElt, n) => {
+      const [pid, powers, guards] = elt;
+      const player = Player.allPlayers[pid]
+      const god = player.god;
+      god.ankhPowers.length = 0;
+      god.ankhPowers.push(...powers);
+      const panel = table.panelForPlayer[pid];
+      // assume powers are in initial/default;
+      // else remove panel.powerCols from panel; and call makeAnkhPowerGUI();
+      // find {colCont, powerLine} in panel.powerCols where button.name === powers[i]
+      let found = false;
+      powers.forEach(power => {
+        panel.powerCols.find((colCont: AnkhPowerCont) => {
+          const { rank, ankhs, powerLines, guardianSlot } = colCont;
+          powerLines.find((pl) => {
+            const children = pl.children as [button: typeof CircleShape, text: typeof CenterText, token?: AnkhToken]
+            const [button, text, token] = children;
+            if (button.name === power) {
+              panel.addAnkhToPowerLine(pl);
+              found = true;
+            }
+            return found;
+          })
+          return found;
+        })
+      })
+      guards?.forEach((gName, ndx) => {
+        table.guardSources.find(source => {
+          if (source.type.name === gName) {
+            source.takeUnit().moveTo(panel.stableHexes[ndx + 1]);
+            return true;
+          } else return false;
+        })
+      })
+    })
   }
 
   /** debug utility */

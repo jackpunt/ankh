@@ -104,7 +104,7 @@ export class God {
     God.byName.set(Aname, this);
     this.name = Aname;
   }
-  ankhPowers: string[] = [];
+  readonly ankhPowers: string[] = [];
 
   radius = TP.ankh2Rad;
   getAnkhToken(rad = TP.ankhRad) {

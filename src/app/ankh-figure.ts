@@ -144,6 +144,7 @@ export class Portal extends AnkhPiece {
 // Figure == Meeple: [underlay, [baseShape, bitmapImage?], backSide]
 /** GodFigure, Warrior, Guardian */
 export class Figure extends Meeple {
+
   static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) }
 
   constructor(player: Player, serial: number, Aname?: string) {

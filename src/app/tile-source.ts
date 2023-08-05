@@ -64,6 +64,7 @@ export class TileSource<T extends Tile> {
     return this.hex.tile === unit;
   }
 
+  /** move unit to undefined, remove from parent container, remove from available and allUnits. */
   deleteUnit(unit: T) {
     if (unit && this.isAvailable(unit)) {
       unit.moveTo(undefined); // --> this.nextUnit();
@@ -76,6 +77,22 @@ export class TileSource<T extends Tile> {
       this.available.splice(adx, 1);
       this.updateCounter();
     }
+  }
+
+  /** move all units to undefined, and remove from parent container.
+   * remove all from available (and allUnits)
+   * @return number of units deleted (previous length of allUnits).
+   */
+  deleteAll() {
+    const n = this.allUnits.length;
+    this.allUnits.forEach(unit => {
+      unit.moveTo(undefined); // --> this.nextUnit();
+      unit.parent?.removeChild(unit);
+    })
+    this.allUnits.length = 0;
+    this.available.length = 0;
+    this.updateCounter();
+    return n;
   }
 
   get sourceHexUnit() {

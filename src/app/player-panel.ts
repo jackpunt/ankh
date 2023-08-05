@@ -21,7 +21,7 @@ interface PowerLine extends Container {
   button: CircleShape;
 }
 
-interface AnkhPowerCont extends Container {
+export interface AnkhPowerCont extends Container {
   rank: number;
   ankhs: AnkhToken[];
   powerLines: Container[]; // powerLine.children: CircleShape, Text, maybe AnkhToken
@@ -198,19 +198,22 @@ export class PlayerPanel extends Container {
     table.sourceOnHex(ankhSource, ankhHex);
   }
 
+  addAnkhToPowerLine(powerLine) {
+    const ankh = this.ankhArrays.shift();
+    if (ankh) {
+    // mark power as taken:
+      ankh.x = 0; ankh.y = 0;
+      powerLine?.addChild(ankh);
+      powerLine?.stage.update();
+    }
+    return ankh;
+  }
+
   /** the click handler for AnkhPower buttons; info supplied by on.Click() */
   selectAnkhPower(evt: Object, info?: AnkhPowerInfo) {
     const { button } = info;
-    const rank = this.nextAnkhRank;
-    const ankhs = this.ankhArrays[rank], ankh = ankhs.shift();
-    if (!ankh) return;
-    // mark power as taken:
-    if (button) {
-      const powerLine = button.parent;
-      ankh.x = 0; ankh.y = 0;
-      powerLine.addChild(ankh);
-      powerLine.stage.update();
-    }
+    const rank = this.nextAnkhRank, ankhCol = this.ankhArrays.length % 2;
+    const ankh = this.addAnkhToPowerLine(button?.parent)
     const colCont = this.powerCols[rank];
     this.activateAnkhPowerSelector(colCont, false);
 
@@ -223,12 +226,13 @@ export class PlayerPanel extends Container {
       ankh.sendHome();
     }
     // Maybe get Guardian:
-    if (colCont.guardianSlot === 1 - ankhs.length) {
+    if (colCont.guardianSlot === 1 - ankhCol) {
       this.takeGuardianIfAble(colCont.rank)
     }
     GP.gamePlay.selectedAction = 'Ankh';
     GP.gamePlay.phaseDone();
   };
+
   takeGuardianIfAble(rank: number) {
     const radius = [TP.ankh1Rad, TP.ankh2Rad, TP.ankh2Rad][rank];
     const nRank = Meeple.allMeeples.filter(meep => {
@@ -255,11 +259,9 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  get nextAnkhRank() {
-    return this.ankhArrays.findIndex(elt => elt.length > 0);
-  }
+  get nextAnkhRank() { return 3 - Math.floor(this.ankhArrays.length / 2) }
   powerCols: AnkhPowerCont[] = [];
-  ankhArrays: AnkhToken[][] =[] ;
+  ankhArrays: AnkhToken[] =[] ;
   makeAnkhPowerGUI() {
     const { rowh } = this.metrics;
     const { panel, player } = this.objects;
@@ -275,7 +277,7 @@ export class PlayerPanel extends Container {
       panel.powerCols.push(colCont);
 
       const ankhs = [this.ankhSource.takeUnit(), this.ankhSource.takeUnit(),];
-      this.ankhArrays.push(ankhs);
+      this.ankhArrays.push(...ankhs);
       ankhs.forEach((ankh, i) => {
         const mColor = (colCont.guardianSlot === i) ? 'purple' : C.black;
         const marker = new CircleShape(mColor, brad);
@@ -288,7 +290,7 @@ export class PlayerPanel extends Container {
       colCont.ankhs = ankhs;
 
       // place powerLines --> selectAnkhPower:
-      colCont.powerLines = []; // Container of { CircleShape, CenterText & maybe AnkhToken }
+      colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
       ary.forEach(([powerName, docString], nth) => {
         const powerLine = new Container() as PowerLine;
         powerLine.name = `Powerline-${nth}`
