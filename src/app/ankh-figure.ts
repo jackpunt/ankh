@@ -288,7 +288,16 @@ export class Figure extends Meeple {
 export class GodFigure extends Figure {
   /** so we can keep GodFigures as singlton instances of each type. */
   static named(name: string) {
-    return Meeple.allMeeples.find(meep => meep instanceof GodFigure && meep.name == name) as GodFigure;
+    const allMeeps = Meeple.allMeeples;
+    const allGodFigs = allMeeps.filter(meep => meep instanceof GodFigure );
+    const namedGod = allGodFigs.find(fig => fig.Aname === name) as GodFigure;
+    return namedGod;
+    // return Meeple.allMeeples.find(meep => meep instanceof GodFigure && meep.name == name) as GodFigure;
+  }
+
+  constructor(player: Player, serial?: number, Aname?: string) {
+    super(player, serial, Aname);
+    this.name = this.Aname;
   }
   override sendHome(): void {
     this.moveTo(undefined);   // "there's no place like home" (home is like no-place...)

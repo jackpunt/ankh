@@ -6,7 +6,7 @@ import { AnkhPiece, Figure, GodFigure, Monument, Obelisk, Pyramid, Temple, Warri
 import { HexDir } from "./hex-intfs";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhMap, AnkhHex } from "./ankh-map";
-import { AnkhToken, God } from "./god";
+import { AnkhToken } from "./god";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { TileSource } from "./tile-source";
@@ -14,6 +14,7 @@ import { GamePlay } from "./game-play";
 
 type GodName = string;
 type GuardName = string;
+type GuardIdent = { g1: GuardName, g2: GuardName, g3: GuardName };
 type RegionElt = [row: number, col: number, bid: number];
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
 type ClaimElt = [row: number, col: number, pid: number];
@@ -27,12 +28,14 @@ type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir,
 type SplitElt = (SplitBid | SplitDir)
 
 type SetupElt = {
-    coins?: number[],
-    score?: number[],
-    event0: number,
-    actions: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
-    guards?: [[g1: GuardName, g2: GuardName, g3: GuardName], []]
-  }
+  coins?: number[],
+  score?: number[],
+  player?: number, // default to first player.
+  event0?: number,
+  actions?: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
+  guards?: GuardIdent,   // Guardian types in use.
+  stable?: GuardIdent[], // per-player
+}
 
 type RegionSpec = { region: RegionElt[] }
 type PlaceSpec = { place: PlaceElt[] }
@@ -167,8 +170,19 @@ export class AnkhScenario {
     return acopy.concat(specs);
   }
   static AltMidKingom2 = AnkhScenario.setup(AnkhScenario.MiddleKingdom[0],
-    { place: []},
-    { setup: { event0: 3, actions: {} } },
+    { place: [
+          [3, 4, Warrior, 1],
+          [8, 2, GodFigure, 1],
+          [3, 6, Warrior, 2],
+          [4, 7, GodFigure, 2],
+        ]},
+    { setup: {
+        event0: 2,
+        actions: { Move: 2, Ankh: 2 },
+        coins: [4, 5],
+        score: [2, 3],
+      }
+    },
   )
 }
 
@@ -185,7 +199,7 @@ export class ScenarioParser {
     this.parseRegions(regionSpec?.region);
     this.parseSplits(splitSpecs);
     placeSpecs.forEach(placeSpec => this.parsePlaces(placeSpec?.place));
-    this.parseSetup(setupSpecs[setupSpecs.length]?.setup); // only the last 'setup' is used.
+    this.parseSetup(setupSpecs[setupSpecs.length - 1]?.setup); // only the last 'setup' is used.
   }
 
   parseRegions(region: RegionElt[]) {
@@ -214,7 +228,7 @@ export class ScenarioParser {
       const splitD = (splitElt.split as SplitDir[]); // we will skip splitD[0] !!
       // hex[row,col] will be in the NEW region, with NEW bid.
       const [row, col, bid] = splitN; // (split as any as (number)[][]).shift();
-      const newHex = this[row][col];
+      const newHex = map[row][col];
       const origNdx = map.regionOfHex(row, col, newHex);
       // console.log(stime(this, `.splits[${i}] hex: ${newHex} origNdx: ${origNdx} bid: ${bid}`))
       //splitD.shift();
@@ -225,7 +239,7 @@ export class ScenarioParser {
         const [row, col, d0, d1, d2, d3, d4, d5] = elt; // generally no more than 3 edges per cell...
         const dirs = [d0, d1, d2, d3, d4, d5].filter(dir => dir !== undefined);
         // add border on each edge of [row, col]
-        const hex = this[row][col];
+        const hex = map[row][col];
         // console.log(stime(this, `.split: border ${hex}`), dirs);
         dirs.forEach(dir => map.addEdge([row, col, dir], splitShape));
         return hex;
@@ -249,7 +263,7 @@ export class ScenarioParser {
   /** Place (or replace) all the Figures on the map. */
   parsePlaces(place: PlaceElt[]) {
     const map = this.map;
-    Figure.allFigures.forEach(fig => fig.sendHome());
+    Figure.allFigures.forEach(fig => (fig.hex?.isOnMap ? fig.sendHome() : undefined));
 
     //console.groupCollapsed('place');
     place.forEach(elt => {
@@ -257,11 +271,12 @@ export class ScenarioParser {
       const cons = (typeof cons0 === 'string') ? ScenarioParser.classByName[cons0] : cons0;
       const hex = map[row][col];
       const player = Player.allPlayers[pid - 1], pNdx = player?.index;
+      const godFigure = player
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(cons.name) ?? new cons(player, 0, player.god.Aname) as GodFigure;
+      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god.Aname) as GodFigure;
       let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
@@ -296,19 +311,22 @@ export class ScenarioParser {
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     setup.coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     setup.score?.forEach((v, ndx) => allPlayers[ndx].score = v);
-    if (setup.event0) {
+    if (setup.event0 !== undefined) {
       for (let ndx = 0; ndx < setup.event0; ndx++) {
         table.setEventMarker(ndx);
       }
+      map.update();
     }
-    table.actionRows.forEach(({ id }, row) => {
-      const nSelected = setup.actions[id];
-      for (let cn = 0; cn < nSelected; cn++) {
-        const rowCont = table.actionPanels[row];
-        const button = rowCont.getButton(cn);
-        table.setActionMarker(button);
-      }
-    });
+    if (setup.actions !== undefined) {
+      table.actionRows.forEach(({ id }) => {
+        const nSelected = setup.actions[id] ?? 0;
+        for (let cn = 0; cn < nSelected; cn++) {
+          const rowCont = table.actionPanels[id];
+          const button = rowCont.getButton(cn);
+          table.setActionMarker(button);
+        }
+      });
+    }
   }
 
   /** debug utility */

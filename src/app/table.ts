@@ -608,67 +608,66 @@ export class Table extends EventDispatcher  {
   }
 
   readonly emptyColor = 'rgb(240,240,240)';
-  makeScoreCont(row = TP.nHexes + .2, col = -7.2, np = Player.allPlayers.length, w = 34) {
-    const redzone = 'rgb(230,100,100)', empty = this.emptyColor, win = C.lightgreen;
-    const scoreCont = new Container()
+  makeScoreCont(row = TP.nHexes + .5, col = -7.2, np = Player.allPlayers.length, w = 34) {
+    const inRed = 20;
+    const redzone = 'rgb(230,100,100)', win = C.lightgreen;
+    const scoreCont = this.scoreCont = new Container();
     this.hexMap.mapCont.resaCont.addChild(scoreCont);
     this.setToRowCol(scoreCont, row, col);
-    const h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, rz = 20, ym = (np - 1) * h;
-    scoreCont.y += (5 - np) * np * h / 5;
-    const bg1 = new Shape();
-    bg1.graphics.f(redzone).dr(x - gap, y - gap, rz * dx + gap, np * h + 2 * gap);
-    scoreCont.addChild(bg1);
-    const bg2 = new Shape();
-    bg1.graphics.f(win).dr(x + 31 * dx - gap, y - gap, dx + gap, np * h + 2 * gap);
-    scoreCont.addChild(bg2);
+    const h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, sh = h * np; // stack height; ym = (np - 1) * h;
+    //scoreCont.y +=  sh / 2;
+    // a RectShape for each score slot:
     for (let cn = 0; cn < 32; cn++) {   // a value for 'score'
-      for (let pn = 0; pn < np; pn++) { // rank of player at that score
-        const box = new Shape() as ScoreShape;
-        box.x = cn * dx;
-        box.y = ym - pn * h;
-        scoreCont.addChild(box);
-        if (!this.scoreCells[cn]) this.scoreCells[cn] = [];
-        this.scoreCells[cn][pn] = box;
-        this.drawBox(box, empty);
-      }
+      const stroke = cn < inRed ? redzone : cn > 30 ? win : C.grey;
+      const stackRect = new RectShape({ x, y: -sh / 2, w, h: sh }, C.white, stroke, new Graphics().ss(gap));
+      stackRect.x = cn * dx;
+      scoreCont.addChild(stackRect);
+      this.scoreStacks.push([]);
     }
+    // make scoreMarks, and stack them on slot[0]:
+    // push on scoreStack; splice to remove; display at stackIndex*cellHeight
+    for (let i = 0; i < np; i++) {
+      const plyr = Player.allPlayers[np - i - 1];
+      const pmark = new RectShape({ x, y: - sh / 2, w, h }, plyr.color);
+      this.scoreStacks[0].push(pmark); // assuming score is zero.
+      this.playerMarks.push(pmark);
+      scoreCont.addChild(pmark);
+    }
+    this.showScoreMarks();
     return scoreCont;
   }
-  scoreCells: ScoreShape[][] = [[]];
-  drawBox(box: ScoreShape, color: string) {
-    const w = 36, h = 20, x = -w/2, y = -h/2, rz = 20;
-    box.color = color;
-    box.graphics.f(color).s(C.black).dr(x, y, w, h);
-  }
-
-  setPlayerScore(plyr: Player, score: number) {
-    const s1 = Math.min(score, 31);
-    const empty = this.emptyColor;
-    const s0 = plyr.score;
-    const stack0 = this.scoreCells[s0], np = Player.allPlayers.length;
-    const ndx0 = stack0.findIndex(box => box.color === plyr.color);
-    if (ndx0 > 0) {
-      this.drawBox(stack0[ndx0], empty);
-      for (let i = ndx0 + 1; i < np; i++) {
-        if (stack0[i].color === empty) break;
-        const color = stack0[i].color;
-        this.drawBox(stack0[i - 1], color);
-        this.drawBox(stack0[i], empty);
-      }
-    }
-    const stack1 = this.scoreCells[s1];
-    for (let i = 0; i < np; i++) {
-      if (stack1[i].color !== empty) continue;
-      this.drawBox(stack1[i], plyr.color);
-      plyr.score = score + i / 10; // record decimal score, for sort order;
-      break;
-    }
-  }
-
-  startGame(sname: string) {
-    // Place Pieces and Figures on map:
+  scoreCont: Container; // 31 RectShapes
+  scoreStacks: RectShape[][] = [[]]; // holding player's RectShape marker.
+  playerMarks: RectShape[] = [];
+  showScoreMarks() {
     const np = Player.allPlayers.length;
-    const scenario = AnkhScenario[sname][np-2];
+    this.scoreStacks.forEach((ss, cn) => {
+      const cnx = this.scoreCont.children[cn].x;
+      ss.forEach((pt, rank) => {
+        pt.x = cnx, pt.y = (np - rank - 1) * pt.rect.h;
+      })
+    })
+    this.hexMap.update();
+  }
+
+  // Assert: plyr.score will have a decimal value.
+  // Initially: 0.[np-pid-1], that is for 4 plyrs: 0.3, 0.2, 0.1, 0.0 (reverse player order)
+  setPlayerScore(plyr: Player, score: number, rank?: number) {
+    const empty = this.emptyColor, np = Player.allPlayers.length, pm = this.playerMarks[plyr.index];
+    const stack0 = this.scoreStacks.find(ss => ss.includes(pm));
+    const m = stack0.splice(stack0.indexOf(pm),1);
+    if (m[0] !== pm) debugger;
+    const score1 = Math.min(Math.floor(score), 31);
+    const stack1 = this.scoreStacks[score1];
+    if (rank === undefined) stack1.push(pm)
+    else stack1[rank] = pm;
+    this.showScoreMarks();
+  }
+
+  startGame(scenarioName: string, ngods: number) {
+    // Place Pieces and Figures on map:
+    // const scenario = AnkhScenario[scenarioName][ngods-2];
+    const scenario = AnkhScenario.AltMidKingom2;
     new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>, this.gamePlay).parseScenario(scenario);
     this.toggleText(false);
 

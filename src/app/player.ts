@@ -1,6 +1,6 @@
 import { Constructor, stime } from "@thegraid/common-lib";
 import { NumCounter } from "./counters";
-import { GamePlay, GamePlay0 } from "./game-play";
+import { GP, GamePlay, GamePlay0 } from "./game-play";
 import { God } from "./god";
 import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
@@ -27,7 +27,6 @@ export class Player {
   }
 
   god: God;
-  score: number = 0;
   get color() { return this.god.color; }
   readonly stableHexes: Hex2[] = [];
 
@@ -37,6 +36,14 @@ export class Player {
   get mapTiles() { return this.allOf(MapTile) as MapTile[] }
   // Player's Leaders, Police & Criminals
   get meeples() { return Meeple.allMeeples.filter(meep => meep.player == this) };
+
+  _score: number = 0;
+  get score() { return this._score }
+  set score(score: number) {
+    this._score = Math.floor(score);
+    const rank = Math.round((score - this._score) * 10);
+    GP.gamePlay.table.setPlayerScore(this, score, rank);
+  }
 
   // Created in masse by Table.layoutCounter
   coinCounter: NumCounter; // set by layoutCounters: `${'Coin'}Counter`
