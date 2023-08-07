@@ -1,6 +1,6 @@
 import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import type { AnkhMeeple, AnkhPiece, Figure } from "./ankh-figure";
+import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
 import { permute } from "./functions";
 import { God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
@@ -100,6 +100,17 @@ export class AnkhHex extends Hex2 {
     return this.linkDirs.filter((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
   }
 
+  addEdge(dir: HexDir, dirRot: typeof H.ewDirRot, rshape: Shape) {
+    const pt = this.cont.localToLocal(0, 0, rshape.parent);
+    const { x, y } = pt, r = this.radius;
+    // 0-degrees is 'North'; -sin() because y-axis goes South.
+    const a = dirRot[dir], a0 = a - 30, a1 = a + 30;
+    const x0 = x + r * Math.sin(a0 * H.degToRadians);
+    const y0 = y - r * Math.cos(a0 * H.degToRadians);
+    const x1 = x + r * Math.sin(a1 * H.degToRadians);
+    const y1 = y - r * Math.cos(a1 * H.degToRadians);
+    rshape.graphics.mt(x0, y0).lt(x1, y1);
+  }
 }
 
 /** row, col, terrain-type, edges(river) */
@@ -134,27 +145,11 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   bindKeys() {
-    KeyBinder.keyBinder.setKey('C-l', {
-      thisArg: this, func: () => {
-        this.noRegions();
-        this.findRegions();
-        this.showRegions();
-      }
-    });
     KeyBinder.keyBinder.setKey('l', { thisArg: this, func: () => this.showRegions() });
     KeyBinder.keyBinder.setKey('L', {
       thisArg: this, func: () => {
-        this.noRegions();
         this.hexAry.forEach(hex => { hex.overlay.visible = false; hex.cont.updateCache() })
         this.update();
-      }
-    });
-    KeyBinder.keyBinder.setKey('M-l', {
-      thisArg: this, func: () => {
-        this.noRegions();
-        const seedAry = [[3, 0], [4, 6], [0, 2]].map(([r, c]) => this[r][c])
-        const [regions] = this.findRegions(seedAry);
-        this.showRegions();
       }
     });
   }
@@ -191,30 +186,29 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return oHex;
   }
 
-  addEdge([row, col, ...e]: hexSpecr, rshape: Shape) {
+  /** add graphics to rshape to show edges
+   * @param border if true, include edge as border to region.
+   */
+  addEdges([row, col, ...e]: hexSpecr, rshape: Shape, border = true) {
     const hex = this[row][col];
     if (!hex) return;
-    const x = hex.x, y = hex.y, r = hex.radius;
+    const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
     e.forEach((dir: HexDir) => {
-      // 0-degrees is North
-      const a = H.nsDirRot[dir], a0 = a - 30, a1 = a + 30;
-      const x0 = x + r * Math.sin(a0 * H.degToRadians);
-      const y0 = y - r * Math.cos(a0 * H.degToRadians);
-      const x1 = x + r * Math.sin(a1 * H.degToRadians);
-      const y1 = y - r * Math.cos(a1 * H.degToRadians);
-      rshape.graphics.mt(x0, y0).lt(x1, y1);
-      this.addBorder(hex, dir);
+      hex.addEdge(dir, dirRot, rshape);
+      if (border) this.addBorder(hex, dir);
     });
   }
+
   edgeShape(color = '#4D5656') {
-    return new Shape(new Graphics().ss(12, 'round', 'round').s(color)); // slightly darker
+    const edgeShape = new Shape(new Graphics().ss(12, 'round', 'round').s(color)); // slightly darker
+    this.mapCont.infCont.addChild(edgeShape);
+    return edgeShape;
   }
 
   addTerrain() {
     // add Rivers: (one growing shape.graphics)
     const rshape = this.edgeShape('#90b2f4'); // slightly darker than water;
-    this.mapCont.infCont.addChild(rshape);
-    AnkhMap.rspec.forEach(spec => this.addEdge(spec, rshape));
+    AnkhMap.rspec.forEach(spec => this.addEdges(spec, rshape));
     AnkhMap.fspec.forEach(spec => this.setTerrain(spec, 'f'));
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));

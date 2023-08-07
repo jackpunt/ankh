@@ -36,7 +36,7 @@ type SetupElt = {
   Aname?: string,         // {orig-scene}#{turn}
   ngods: number,         // == nPlayers (used to select, verify scenario)
   places: PlaceElt[],    // must have some GodFigure on the board!
-  splits?: SplitElt[],   // added camel train borders
+  splits?: SplitElt[][], // added camel train borders
   regions: RegionElt[],  // delta, east, west, ...; after splits.
   // the rest assume defaults or random values:
   gods?: GodName[],      // ngods & gods as per URL parsing
@@ -110,7 +110,9 @@ export class AnkhScenario {
     {
       ngods: 4,
       regions: [[4, 5, 2], [3, 5, 3], [4, 6, 4],],
-      splits: [[3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      splits: [
+        [[3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      ],
       places: [
         [3, 1, GodFigure, 1],
         [3, 2, Warrior, 1],
@@ -140,8 +142,10 @@ export class AnkhScenario {
     {
       ngods: 5,
       regions: [[4, 5, 1], [4, 6, 2], [3, 5, 4]],
-      splits: [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE'],
-      [4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      splits: [
+        [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']],
+        [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+    ],
       places: [
         [2, 1, Temple, 1],
         [3, 1, GodFigure, 1],
@@ -239,14 +243,31 @@ export class ScenarioParser {
 
   }
 
+  parseRegions(region: RegionElt[]) {
+    const map = this.map;
+    region.forEach(elt => {
+      // assign battleOrder for region[seed]
+      // we will simply permute the regions array.
+      const [row, col, bid] = elt, hex = map[row][col], rid = bid - 1;
+      const rindex = map.regionOfHex(row, col, hex);
+      const xregion = map.regions[rid];
+      map.regions[rid] = map.regions[rindex];
+      map.regions[rid].forEach(hex => hex.district = bid);
+      map.regions[rindex] = xregion;
+      map.regions[rindex]?.forEach(hex => hex.district = rindex + 1);
+
+      map.regions[rid]['Aname'] = `${hex}`
+    });
+  }
+
   // console.log(stime(this, `.regions: input`), region0.region);
   // console.log(stime(this, `.regions: result`), map.regionList());
-  parseSplits(splits: SplitSpec[]) {
+  parseSplits(splits: SplitElt[][]) {
     const map = this.map;
-    splits.forEach((splitElt) => {
+    splits.forEach((splits) => {
       // console.log(stime(this, `.splits[${i}]`), splitElt, splitElt.split);
-      const splitN = (splitElt.split[0] as SplitBid);
-      const splitD = (splitElt.split as SplitDir[]); // we will skip splitD[0] !!
+      const splitN = (splits[0] as SplitBid);
+      const splitD = (splits as SplitDir[]); // we will skip splitD[0] !!
       // hex[row,col] will be in the NEW region, with NEW bid.
       const [row, col, bid] = splitN; // (split as any as (number)[][]).shift();
       const newHex = map[row][col];
@@ -254,7 +275,6 @@ export class ScenarioParser {
       // console.log(stime(this, `.splits[${i}] hex: ${newHex} origNdx: ${origNdx} bid: ${bid}`))
       //splitD.shift();
       const splitShape = map.edgeShape('#4D5656'); // grey
-      map.mapCont.infCont.addChild(splitShape);
       splitD.forEach((elt, i) => {
         if (i === 0) return undefined; // element 0 is SplitN: SplitInt;
         const [row, col, d0, d1, d2, d3, d4, d5] = elt; // generally no more than 3 edges per cell...
@@ -262,7 +282,7 @@ export class ScenarioParser {
         // add border on each edge of [row, col]
         const hex = map[row][col];
         // console.log(stime(this, `.split: border ${hex}`), dirs);
-        dirs.forEach(dir => map.addEdge([row, col, dir], splitShape));
+        dirs.forEach(dir => map.addEdges([row, col, dir], splitShape));
         return hex;
       });
       map.update();
@@ -318,7 +338,7 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
   parseScenario(setup: SetupElt) {
     if (!setup) return;
-    const { coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
+    const { regions, splits, coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -343,6 +363,8 @@ export class ScenarioParser {
         }
       });
     }
+    if (regions) this.parseRegions(regions);
+    if (splits) this.parseSplits(splits);
     guards?.forEach((name, ndx) => {
       if (typeof name !== 'string') name = name.name;
       const source = table.guardSources[ndx];
