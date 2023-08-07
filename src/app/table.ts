@@ -706,7 +706,7 @@ export class Table extends EventDispatcher  {
 
   startGame(scenarioName: string, ngods: number) {
     // Place Pieces and Figures on map:
-    const scenario = (ngods === 2) ? AnkhScenario.AltMidKingom2 : AnkhScenario[scenarioName][ngods - 2];
+    const scenario = (ngods === 2) ? AnkhScenario.AltMidKingom2 : AnkhScenario[scenarioName].find(scen => scen.ngods === ngods);
     this.parseScenenario(scenario);
 
     // All Tiles (& Meeple) are Draggable:

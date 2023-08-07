@@ -33,11 +33,13 @@ type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir,
 type SplitElt = (SplitBid | SplitDir)
 
 type SetupElt = {
-  name?: string,         // {orig-scene}#{turn}
+  Aname?: string,         // {orig-scene}#{turn}
   ngods: number,         // == nPlayers (used to select, verify scenario)
-  gods?: GodName[],      // ngods & gods as per URL parsing
+  places: PlaceElt[],    // must have some GodFigure on the board!
   splits?: SplitElt[],   // added camel train borders
-  regions?: RegionElt[], // delta, east, west
+  regions: RegionElt[],  // delta, east, west, ...; after splits.
+  // the rest assume defaults or random values:
+  gods?: GodName[],      // ngods & gods as per URL parsing
   coins?: number[],      // 1
   scores?: number[],     // 0
   events?: number,
@@ -45,7 +47,6 @@ type SetupElt = {
   stable?: GuardIdent[], // Guardians in player's stable.
   actions?: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
-  places?: PlaceElt[],
   turn?: number;   // default to 0; (or 1...)
 }
 
@@ -57,151 +58,145 @@ type SetupSpec = { setup: SetupElt }
 
 type SwapSpec = { swap: [rid: number, bid: number][] }
 export type ScenarioSpec = RegionSpec | PlaceSpec | SplitSpec | SetupSpec;
-export type Scenario = ScenarioSpec[];
+export type Scenario = SetupElt;
 
 // Rivers make first 3 Regions: West(1), East(2), Delta(3)
 export class AnkhScenario {
-  static readonly MiddleKingdom: Scenario[] = [
+  static readonly MiddleKingdom: SetupElt[] = [
     // 2 Player:
-    [
-      { region: [[4, 5, 1], [4, 6, 2], [3, 5, 3],] },
-      {
-        place: [
-          [0, 3, Temple],
-          [2, 5, Pyramid],
-          [1, 8, Obelisk],
-          [5, 0, Obelisk, 1],
-          [4, 1, Warrior, 1],
-          [5, 1, GodFigure, 1],
-          [8, 1, Pyramid],
-          [6, 5, Temple, 2],
-          [6, 6, Warrior, 2],
-          [7, 6, GodFigure, 2],
-          [5, 8, Pyramid],
-        ]
-      }
-    ],
+    {
+      ngods: 2,
+      regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3],],
+      places: [
+        [0, 3, Temple],
+        [2, 5, Pyramid],
+        [1, 8, Obelisk],
+        [5, 0, Obelisk, 1],
+        [4, 1, Warrior, 1],
+        [5, 1, GodFigure, 1],
+        [8, 1, Pyramid],
+        [6, 5, Temple, 2],
+        [6, 6, Warrior, 2],
+        [7, 6, GodFigure, 2],
+        [5, 8, Pyramid],
+      ],
+    },
     // 3 player
-    [
-      { region: [[4, 5, 1], [4, 6, 2], [3, 5, 3],] },
-      {
-        place: [
-          [4, 3, GodFigure, 1],
-          [4, 4, Warrior, 1],
-          [5, 4, Temple, 1],
-          [3, 0, Pyramid],
-          [7, 2, Obelisk],
+    {
+      ngods: 3,
+      regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3],],
+      places: [
+        [4, 3, GodFigure, 1],
+        [4, 4, Warrior, 1],
+        [5, 4, Temple, 1],
+        [3, 0, Pyramid],
+        [7, 2, Obelisk],
 
-          [7, 6, GodFigure, 2],
-          [6, 6, Warrior, 2],
-          [6, 5, Obelisk, 2],
-          [5, 9, Temple],
-          [3, 7, Pyramid],
+        [7, 6, GodFigure, 2],
+        [6, 6, Warrior, 2],
+        [6, 5, Obelisk, 2],
+        [5, 9, Temple],
+        [3, 7, Pyramid],
 
-          [2, 5, GodFigure, 3],
-          [3, 4, Warrior, 3],
-          [2, 4, Pyramid, 3],
-          [1, 8, Obelisk],
-          [3, 5, Temple],
-        ]
-      }
-    ],
+        [2, 5, GodFigure, 3],
+        [3, 4, Warrior, 3],
+        [2, 4, Pyramid, 3],
+        [1, 8, Obelisk],
+        [3, 5, Temple],
+      ],
+    },
+
     // 4 player
-    [
-      { region: [[4, 5, 2], [3, 5, 3], [4, 6, 4],] },
-      { split: [[3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']] },
-      {
-        place: [
-          [3, 1, GodFigure, 1],
-          [3, 2, Warrior, 1],
-          [4, 2, Temple, 1],
-          [5, 5, Pyramid],
+    {
+      ngods: 4,
+      regions: [[4, 5, 2], [3, 5, 3], [4, 6, 4],],
+      splits: [[3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      places: [
+        [3, 1, GodFigure, 1],
+        [3, 2, Warrior, 1],
+        [4, 2, Temple, 1],
+        [5, 5, Pyramid],
 
-          [7, 3, GodFigure, 2],
-          [7, 4, Warrior, 2],
-          [8, 4, Temple, 2],
-          [7, 0, Pyramid],
-          [4, 1, Obelisk],
+        [7, 3, GodFigure, 2],
+        [7, 4, Warrior, 2],
+        [8, 4, Temple, 2],
+        [7, 0, Pyramid],
+        [4, 1, Obelisk],
 
-          [2, 5, GodFigure, 3],
-          [3, 4, Warrior, 3],
-          [3, 5, Obelisk, 3],
-          [1, 3, Temple],
-          [2, 8, Pyramid],
+        [2, 5, GodFigure, 3],
+        [3, 4, Warrior, 3],
+        [3, 5, Obelisk, 3],
+        [1, 3, Temple],
+        [2, 8, Pyramid],
 
-          [4, 7, GodFigure, 4],
-          [5, 6, Warrior, 4],
-          [5, 7, Pyramid, 4],
-          [3, 8, Obelisk],
-          [8, 6, Temple],
-        ]
-      }],
+        [4, 7, GodFigure, 4],
+        [5, 6, Warrior, 4],
+        [5, 7, Pyramid, 4],
+        [3, 8, Obelisk],
+        [8, 6, Temple],
+      ],
+    },
     // 5-player
-    [
-      { region: [[4, 5, 1], [4, 6, 2], [3, 5, 4]] },
-      { split: [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']] },
-      { split: [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']] },
-      {
-        place: [
-          [2, 1, Temple, 1],
-          [3, 1, GodFigure, 1],
-          [3, 2, Warrior, 1],
-          [4, 5, Pyramid],
-          [4, 1, Obelisk],
-          [6, 1, GodFigure, 5],
-          [7, 1, Pyramid, 5],
-          [7, 2, Warrior, 5],
-          [8, 4, Temple],
-          [7, 6, Obelisk],
-          [8, 7, Warrior, 3],
-          [8, 8, GodFigure, 3],
-          [8, 9, Temple, 3],
+    {
+      ngods: 5,
+      regions: [[4, 5, 1], [4, 6, 2], [3, 5, 4]],
+      splits: [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE'],
+      [4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      places: [
+        [2, 1, Temple, 1],
+        [3, 1, GodFigure, 1],
+        [3, 2, Warrior, 1],
+        [4, 5, Pyramid],
+        [4, 1, Obelisk],
+        [6, 1, GodFigure, 5],
+        [7, 1, Pyramid, 5],
+        [7, 2, Warrior, 5],
+        [8, 4, Temple],
+        [7, 6, Obelisk],
+        [8, 7, Warrior, 3],
+        [8, 8, GodFigure, 3],
+        [8, 9, Temple, 3],
 
-          [6, 6, Pyramid],
-          [4, 8, GodFigure, 2],
-          [3, 8, Obelisk, 2],
-          [3, 7, Warrior, 2],
-          [1, 6, Temple],
-          [3, 4, GodFigure, 4],
-          [2, 5, Warrior, 4],
-          [3, 5, Pyramid, 4],
-          [0, 2, Temple],
-        ]
-      }
-    ],
+        [6, 6, Pyramid],
+        [4, 8, GodFigure, 2],
+        [3, 8, Obelisk, 2],
+        [3, 7, Warrior, 2],
+        [1, 6, Temple],
+        [3, 4, GodFigure, 4],
+        [2, 5, Warrior, 4],
+        [3, 5, Pyramid, 4],
+        [0, 2, Temple],
+      ],
+    },
   ];
 
-  // just push/concat more ScenarioSpec on the end:
-  static setup(scenario: Scenario, ...specs: Scenario) {
-    // First: convert PlaceElt Constructor<> to use 'string':
-    const place0 = scenario.find(elt => elt['place']) as PlaceSpec; // initial placements, before Move
-    const placeElt0 = place0.place;
-    const placeElt2 = placeElt0.map(([row, col, cons, pid]) => [row, col, (typeof cons === 'string') ? cons : cons.name, pid]) as PlaceElt[];
-    place0.place = placeElt2;
-    const acopy = structuredClone(scenario);
-    return acopy.concat(specs);
-  }
+  static AltMidKingom2 =
+    {
+      ngods: 2,
+      turn: 3,
+      regions: [[2, 0, 1], [2, 10, 2], [0, 2, 3]],
+      guards: ['Satet', 'Apep', 'Scorpion'],
+      events: 3,
+      actions: { Move: 2, Ankh: 2 },
+      coins: [4, 5],
+      scores: [2, 3],
+      stable: [['Satet'], []],
+      ankhs: [['Commanding', 'Revered'], ['Inspiring', 'Omnipresent', 'Temple']],
+      places: [
+        [3, 4, Warrior, 1],
+        [8, 2, GodFigure, 1],
+        [3, 6, Warrior, 2],
+        [4, 7, GodFigure, 2],
 
-  static AltMidKingom2 = AnkhScenario.setup(AnkhScenario.MiddleKingdom[0],
-    { setup: {
-        ngods: 2,
-        turn: 3,
-        guards: ['Satet', 'Apep', 'Scorpion'],
-        events: 3,
-        actions: { Move: 2, Ankh: 2 },
-        coins: [4, 5],
-        scores: [2, 3],
-        stable: [['Satet'], []],
-        ankhs: [['Commanding', 'Revered'], ['Inspiring', 'Omnipresent', 'Temple']],
-        places: [
-          [3, 4, Warrior, 1],
-          [8, 2, GodFigure, 1],
-          [3, 6, Warrior, 2],
-          [4, 7, GodFigure, 2],
-        ]
-      }
-    },
-  );
+        [0, 3, Temple],
+        [2, 5, Pyramid],
+        [1, 8, Obelisk],
+        [5, 0, Obelisk, 1],
+        [8, 1, Pyramid],
+        [6, 5, Temple, 2],
+        [5, 8, Pyramid],
+      ]
+    }
 
   static saveState(gamePlay: GamePlay) {
     const table = gamePlay.table;
@@ -210,6 +205,7 @@ export class AnkhScenario {
     const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;
     const events = table.nextEventIndex;
     const actions = {};
+    const regions = gamePlay.hexMap.regions.map((region, n) => [region[0].row, region[0].col, n + 1]);
     table.actionRows.forEach(({id}) => {
       const rowCont = table.actionPanels[id] as ActionContainer;
       const buttons = rowCont.children.filter(ch => ch instanceof Container) as EventButton[];
@@ -226,7 +222,7 @@ export class AnkhScenario {
       return [row, col, cons, pid] as PlaceElt;
     })
 
-    return {ngods, turn, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;
+    return { ngods, turn, regions, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;
   }
 }
 
@@ -238,36 +234,11 @@ export class ScenarioParser {
       'Apep': Apep, 'Mummy': Mummy,
       'Androsphinx': Androsphinx, 'Scorpion': Scorpion,
     }
+
   constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
   }
-  parseScenario(scenario: Scenario) {
-    const regionSpec = scenario.find(elt => elt['region']) as RegionSpec;
-    const splitSpecs = scenario.filter(elt => elt['split']) as SplitSpec[];
-    const placeSpecs = scenario.filter(elt => elt['place']) as PlaceSpec[];
-    const setupSpecs = scenario.filter(elt => elt['setup']) as SetupSpec[];
-    this.parseRegions(regionSpec?.region);
-    this.parseSplits(splitSpecs);
-    placeSpecs.forEach(placeSpec => this.parsePlaces(placeSpec?.place));
-    this.parseSetup(setupSpecs[setupSpecs.length - 1]?.setup); // only the last 'setup' is used.
-  }
 
-  parseRegions(region: RegionElt[]) {
-    const map = this.map;
-    region.forEach(elt => {
-      // assign battleOrder for region[seed]
-      // we will simply permute the regions array.
-      const [row, col, bid] = elt, hex = map[row][col], rid = bid - 1;
-      const rindex = map.regionOfHex(row, col, hex);
-      const xregion = map.regions[rid];
-      map.regions[rid] = map.regions[rindex];
-      map.regions[rid].forEach(hex => hex.district = bid);
-      map.regions[rindex] = xregion;
-      map.regions[rindex]?.forEach(hex => hex.district = rindex + 1);
-
-      map.regions[rid]['Aname'] = `${hex}`
-    });
-  }
   // console.log(stime(this, `.regions: input`), region0.region);
   // console.log(stime(this, `.regions: result`), map.regionList());
   parseSplits(splits: SplitSpec[]) {
@@ -344,26 +315,8 @@ export class ScenarioParser {
     console.log(stime(this, `.claimHex: ${hex}`), player.color);
   }
 
-  // {claim: [row, col, pid]}
-  parseClaim(claimSpec: ClaimElt[]) {
-    const map = this.map;
-    claimSpec.forEach(spec => {
-      const [row, col, pid] = spec;
-      const hex = map[row][col];
-      const player: Player | false | undefined = (pid !== undefined) && Player.allPlayers[pid - 1];
-      const piece = hex.tile;
-      if (player && (piece instanceof Monument)) {
-        this.claimHex(hex, player);
-      }
-    })
-  }
-
-  parseMove(moveSpec: MoveElt[]) {
-    const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
-  }
-
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
-  parseSetup(setup: SetupElt) {
+  parseScenario(setup: SetupElt) {
     if (!setup) return;
     const { coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
@@ -445,7 +398,7 @@ export class ScenarioParser {
         );
       })
     });
-    if (places) this.parsePlaces(places);
+    this.parsePlaces(places);
   }
 
   /** debug utility */
