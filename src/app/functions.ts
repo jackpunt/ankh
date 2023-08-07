@@ -20,6 +20,9 @@ export function permute(stack: any[]) {
   }
   return stack;
 }
+export function removeEltFromArray(elt: any, array: any[]) {
+  return array.splice(array.indexOf(elt), 1);
+}
 export function removeChildType<T>(type: Constructor<T>, pred = (dobj: T) => true ): T[] {
   const rems = this.children.filter((c: DisplayObject) => (c instanceof type) && pred(c));
   this.removeChild(...rems);

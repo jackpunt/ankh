@@ -1,56 +1,118 @@
-import { C, S, stime } from "@thegraid/easeljs-lib";
+import { C, Constructor, DragInfo, S, className, stime } from "@thegraid/easeljs-lib";
 import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
 import { GP } from "./game-play";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
 import { CenterText, CircleShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { TP } from "./table-params";
-import { AnkhSource, Figure, Guardian, Warrior } from "./ankh-figure";
+import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { TileSource, UnitSource } from "./tile-source";
 import { AnkhToken } from "./god";
-import { Table } from "./table";
+import { DragContext, Table } from "./table";
 import { NumCounter, NumCounterBox } from "./counters";
 import { Meeple } from "./meeple";
+import { Hex2 } from "./hex";
 
-interface AnkhPowerInfo {
-  button?: Shape;
-  radius?: number;
-}
-interface PowerLine extends Container {
+
+/** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */
+export interface PowerLine extends Container {
   ankhToken: AnkhToken;
   button: CircleShape;
+  showDocText: (vis?: boolean) => void
 }
 
 export interface AnkhPowerCont extends Container {
   rank: number;
   ankhs: AnkhToken[];
-  powerLines: Container[]; // powerLine.children: CircleShape, Text, maybe AnkhToken
+  powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
   guardianSlot: number;
 }
 
+interface CardSelector extends Container {
+  y0: number;    // drag keep this.y = y0;
+  x0: number;    //
+  dxmax: number; // drag is not to exceed Math.abs(this.x - x0) > dxmax;
+  dragFunc0: (hex: Hex2, ctx: DragContext) => void;
+  dropFunc0: () => void;
+  powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
+}
+type CardSpec = [name: string, doc: string, power: number];
+
 export class PlayerPanel extends Container {
-  strength: any;
-  isPlayerInRegion(conflictRegion: number) {
-    const region = this.table.gamePlay.hexMap.regions[conflictRegion];
+  canUseTiebreaker = false;
+
+  isPlayerInRegion(regionId: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionId];
     return region.find(hex => hex.meep?.player === this.player) ?? false;
   }
-  plagueBid = 0;
+  templeHexesInRegion(regionId: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionId];
+    return region.filter(hex => hex.meep?.player === this.player && hex.tile instanceof Temple);
+  }
+  nFiguresInRegion(regionId: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionId];
+    return region.filter(hex => hex.meep?.player === this.player && hex.meep instanceof Figure).length;
+  }
+  figuresInRegion(regionId: number, player = this.player) {
+    const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
+    const belongsTo = (fig: Figure, player: Player) => { return fig.player === player } // consider Set power.
+    return figuresInRegion.filter(fig => belongsTo(fig, player))
+  }
+  hasAnkhPower(power: string) {
+    return this.god.ankhPowers.includes(power);
+  }
+  get isResplendent() {
+    const hasThreeOfMonu = (typeName: string) => Figure.allFigures.filter(fig => fig.hex?.isOnMap && fig.player == this.player && (fig.name === typeName)).length >= 3;
+    return this.hasAnkhPower('Resplendent') && Monument.typeNames.find(type => hasThreeOfMonu(type));
+  }
+
+  /** at start of Battle */
+  nFigsInBattle: number;
+  strength = 0;
+  reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
+  /** BattleResolution phase */
+  strengthInRegion(regionId: number) {
+    this.reasons = {name: this.name, total: 0};
+    this.strength = 0;
+    const addStrength = (val, why) => { this.strength += val; this.reasons[why] = val; this.reasons.total = this.strength; }
+    const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionId); addStrength(nFigures, 'Figures');
+    const cardsInPlay = this.cardsInBattle;
+    const cardSpecsInPlay = cardsInPlay.map(pl => PlayerPanel.cardSpecs.find(([name, doc, power]) => name === pl.name));
+    cardSpecsInPlay.forEach(([name, doc, power]) => addStrength(power, name));
+    if (this.hasAnkhPower('Temple')) {
+      const temples = this.templeHexesInRegion(regionId);
+      const activeTemples = temples.filter(tmpl => tmpl.filterAdjHex(hex => hex.meep?.player == this.player));
+      addStrength(2 * activeTemples.length, `Temple`)
+    }
+    if (this.isResplendent) addStrength(3, 'Resplendent');
+    // TODO: add Bastet-Cats
+    return this.strength;
+  }
+
+  plagueBid = 0;  // TODO wireup a NumCounter (with a close-gesture)
   enablePlagueBid(region: number): void {
     this.plagueBid = 0;
     GP.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
-  // really: detectBuild.
-  enableBuild(region: number): void {
-    // TODO: Table to emit event on AnkhPiece.moveTo?
-    //       so panel/state know when move happens/done?
-    this.table.on('moveTo', () => {
+  canBuildInRegion: number = -1; // disabled.
+  // really: detectBuildDne.
+  enableBuild(regionId: number): void {
+    this.canBuildInRegion = regionId;
+    const panel = this;
+    const onBuildDone = this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
+      const { panel0, monument } = evt;
       // Monument, hex.isOnMap, mont.player === this.player,
-      GP.gamePlay.phaseDone(this);
+      console.log(stime(this, `.enableBuild[${this.player.color}]: buildDone eq? ${panel0 === this} `), panel0.player.color, monument)
+      if (panel0 === panel) {
+        this.table.off('buildDone', onBuildDone);
+        panel0.canBuildInRegion = -1;
+        GP.gamePlay.phaseDone(panel0);
+      }
     })
   }
   // detectObeliskTeleport... oh! this requires a 'Done' indication.
   enableObeliskTeleport(region: number): void {
-    // TODO: per-panel 'Done' button
+    this.activateCardSelector(true);
   }
   outline: RectShape;
   ankhSource: TileSource<AnkhToken>;
@@ -64,16 +126,18 @@ export class PlayerPanel extends Container {
     public dir = -1
   ) {
     super();
+    this.name = this.god.name;   // for debugger
     table.hexMap.mapCont.resaCont.addChild(this);
     table.setToRowCol(this, row, col);
     this.setOutline();
     this.makeConfirmation();
     this.makeAnkhSource();
     this.makeAnkhPowerGUI();
+    this.makeCardSelector();
     this.makeFollowers();
     this.makeStable();
   }
-  readonly ankhPowers = [
+  static readonly ankhPowers = [
     [
       ['Commanding', '+3 Followers when win battle'],
       ['Inspiring', 'Monument cost is 0'],
@@ -88,7 +152,7 @@ export class PlayerPanel extends Container {
     ],
     [
       ['Glorious', '+3 Devotion when win by 3 Strength'],
-      ['Magnanimous', '+2 Devotion when lose with 2 Figures'],
+      ['Magnanimous', '+2 Devotion when 2 Figures in battle and lose'],
       ['Bountiful', '+1 Devotion when gain Devotion in Red'],
       ['Worshipful', '+1 Devotion when sacrifice 2 after Battle']
     ], // rank 2
@@ -102,8 +166,8 @@ export class PlayerPanel extends Container {
   }
   get objects() {
     const player = this.player, index = player.index, panel = this, god = this.player.god;
-    const table  = this.table;
-    return { panel, player, index, god, table }
+    const table  = this.table, gamePlay = GP.gamePlay;
+    return { panel, player, index, god, table, gamePlay }
   }
 
   setOutline(t1 = 2, bg = this.bg0) {
@@ -183,7 +247,7 @@ export class PlayerPanel extends Container {
   highlightStable(show = true) {
     // we want to HIGHLIGHT when 'Move' action is choosen.
     // if stable is normally faceDown, then we can face them up when activated !?
-    return this.stableHexes.map(hex => hex.meep?.highlight(show, C.BLACK)).filter(m => (m !== undefined))
+    return this.stableHexes.map(hex => hex.meep?.highlight(show, C.BLACK) as Figure).filter(m => (m !== undefined))
   }
 
   makeAnkhSource() {
@@ -198,22 +262,25 @@ export class PlayerPanel extends Container {
     table.sourceOnHex(ankhSource, ankhHex);
   }
 
-  addAnkhToPowerLine(powerLine) {
+  addAnkhToPowerLine(powerLine: PowerLine) {
     const ankh = this.ankhArrays.shift();
     if (ankh) {
-    // mark power as taken:
+      // mark power as taken:
       ankh.x = 0; ankh.y = 0;
-      powerLine?.addChild(ankh);
-      powerLine?.stage.update();
+      if (powerLine) {
+        powerLine.addChild(ankh);
+        powerLine.stage.update();
+      } else {
+        ankh.sendHome();
+      }
     }
     return ankh;
   }
 
   /** the click handler for AnkhPower buttons; info supplied by on.Click() */
-  selectAnkhPower(evt: Object, info?: AnkhPowerInfo) {
-    const { button } = info;
+  selectAnkhPower(evt?: Object, button?: CircleShape) {
     const rank = this.nextAnkhRank, ankhCol = this.ankhArrays.length % 2;
-    const ankh = this.addAnkhToPowerLine(button?.parent)
+    const ankh = this.addAnkhToPowerLine(button?.parent as PowerLine);
     const colCont = this.powerCols[rank];
     this.activateAnkhPowerSelector(colCont, false);
 
@@ -260,15 +327,15 @@ export class PlayerPanel extends Container {
   }
 
   get nextAnkhRank() { return 3 - Math.floor(this.ankhArrays.length / 2) }
-  powerCols: AnkhPowerCont[] = [];
-  ankhArrays: AnkhToken[] =[] ;
+  readonly powerCols: AnkhPowerCont[] = [];
+  readonly ankhArrays: AnkhToken[] = [];
   makeAnkhPowerGUI() {
     const { rowh } = this.metrics;
     const { panel, player } = this.objects;
     // select AnkhPower: onClick->selectAnkhPower(info)
     // Ankh Power line: circle + text; Ankhs
-    const { brad, gap, ankhRowy, colWide, dir } = this.metrics;
-    this.ankhPowers.forEach((ary, colNdx) => {
+    const { brad, gap, ankhRowy, colWide } = this.metrics;
+    PlayerPanel.ankhPowers.forEach((powerList, colNdx) => {
       const colCont = new Container() as AnkhPowerCont, rank = colNdx +1;
       colCont.rank = rank;
       colCont.guardianSlot = (colNdx < 2) ? 1 : 0;
@@ -288,12 +355,18 @@ export class PlayerPanel extends Container {
         colCont.addChild(marker, ankh);
       });
       colCont.ankhs = ankhs;
+      this.makePowerLines(colCont, powerList, this.selectAnkhPower); // ankhPower element [name: string, docstring: string][]
+    });
+  }
 
+  makePowerLines(colCont: AnkhPowerCont, powerList, onClick) {
+    const {brad, gap, rowh, dir,} = this.metrics;
+    const { player } = this.objects;
       // place powerLines --> selectAnkhPower:
       colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
-      ary.forEach(([powerName, docString], nth) => {
+      powerList.forEach(([powerName, docString], nth) => {
         const powerLine = new Container() as PowerLine;
-        powerLine.name = `Powerline-${nth}`
+        powerLine.name = powerName;
         powerLine.x = brad + gap;
         powerLine.y = nth * rowh;
         colCont.addChild(powerLine);
@@ -301,7 +374,7 @@ export class PlayerPanel extends Container {
 
         const button = new CircleShape(C.white, brad, );
         button.name = powerName;
-        button.on(S.click, this.selectAnkhPower, this, false, { button } as AnkhPowerInfo);
+        button.on(S.click, onClick, this, false, button);
         button.mouseEnabled = false;
         powerLine.addChild(button);
         powerLine.button = button;
@@ -323,21 +396,21 @@ export class PlayerPanel extends Container {
         const doctext = new UtilButton('rgb(240,240,240)', docString, 2 * brad);
         doctext.name = `doctext`;
         doctext.visible = false;
-        doctext.x = text.x - dir * (60 + doctext.label.getMeasuredWidth()/2); doctext.y = text.y;
         this.table.overlayCont.addChild(doctext);
         powerLine.localToLocal(doctext.x, doctext.y, this.table.overlayCont.parent, doctext);
-        const showDocText = (doctext: UtilButton) => {
-          if (doctext.visible) {
+        const showDocText = powerLine.showDocText = (vis = !doctext.visible) => {
+          const pt = text.parent.localToLocal(text.x, text.y, doctext.parent, doctext);
+          doctext.x -= dir * (60 + doctext.label.getMeasuredWidth() / 2);
+          if (!vis) {
             this.table.overlayCont.children.forEach(doctext => doctext.visible = false)
           } else {
             doctext.visible = true;
           }
           doctext.stage.update();
         }
-        doctext.on(S.click, () => showDocText(doctext) );
-        text.on(S.click, () => showDocText(doctext));
+        doctext.on(S.click, () => showDocText() );
+        text.on(S.click, () => showDocText());
       });
-    });
   }
 
   makeFollowers(initialCoins = 1) {
@@ -403,12 +476,115 @@ export class PlayerPanel extends Container {
     god.makeSpecial(specl, { width: swidth, height: shigh }, table);
   }
 
-  makeCardSelector() {
+  static readonly cardSpecs: CardSpec[] = [
+    ['Flood', '+1 Follower for each Figure in fertile space; they cannot be killed in Battle.', 0],
+    ['Build Monument', 'Build a monument for 3 Followers', 0],
+    ['Plague of Locusts', 'Kill units unless highest bid', 1],
+    ['Chariots', '+3 strength in battle resolution', 3],
+    ['Miracle', '+1 devotion for each Figure killed', 0],
+    ['Drought', '+1 devotion per Figure in desert, if you win', 1],
+    ['Cycle of Ma`at', 'Reclaim all Battle Cards after battle resolution', 0],
+  ]
 
+  cardSelector: CardSelector;
+  makeCardSelector() {
+    const cardSelector = this.cardSelector = new Container as CardSelector;
+    const apCont = cardSelector as Container as AnkhPowerCont;
+    const { wide, high, dir, brad, gap, rowh } = this.metrics;
+    const { panel, table, player, gamePlay } = this.objects;
+    const dragFunc = (dobj: CardSelector, info: DragInfo) => {
+      const dxmax = wide * table.scaleCont.scaleX;
+      if (dobj.x0 === undefined) {
+        dobj.x0 = dobj.x;
+        dobj.y0 = dobj.y;
+      }
+      dobj.y = dobj.y0;
+      dobj.x = Math.max(dobj.x0-dxmax, Math.min(dobj.x0+dxmax, dobj.x));
+    }
+    const dropFunc = () => {}
+    table.dragger.makeDragable(cardSelector, this, dragFunc, dropFunc);
+    const x = 0, y = -(brad + gap), w = wide / 2, h = high;
+    const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.9)', )
+    cardSelector.addChild(bg);
+    this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
+    const inHand = PlayerPanel.colorForState['inHand'];
+    cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
+    // add a Done button:
+    const doneButton = new UtilButton(player.color, 'Done');
+    cardSelector.addChild(doneButton);
+    doneButton.y = 4 * rowh;
+    doneButton.x = w - 2 * (brad + gap);
+    doneButton.on(S.click, () => {
+      this.showCardSelector(false);
+      doneButton.updateWait(false, () => {
+        gamePlay.phaseDone(panel);
+      }, this);
+    });
+
+    const cont = table.hexMap.mapCont.eventCont;
+    cont.addChild(cardSelector);
+    panel.localToLocal(w / 2 * (1 - dir), 0, cont, cardSelector, );
+    this.activateCardSelector(false);
   }
 
-  selectCards(): void {
-    throw new Error("Method not implemented.");
+  get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
+  activateCardSelector(activate = true) {
+    const selector = this.cardSelector;
+    selector.powerLines.forEach(pl => {
+      const color = pl.button.colorn, inHand = PlayerPanel.colorForState['inHand'];
+      if (pl.name === 'Build Monument' && (color === inHand)) {
+        const colorB = this.canAffordMonument ? inHand : PlayerPanel.dubiusBuildColor;
+        pl.button.paint(colorB, true);
+        pl.button.colorn = color;
+      }
+      pl.button.mouseEnabled = activate && (color === inHand);
+    });
+    this.showCardSelector(activate);
+  }
+
+  showCardSelector(vis = true) {
+    this.cardSelector.visible = vis;
+    this.cardSelector.powerLines.forEach(pl => pl.showDocText(false));
+  }
+
+  static colorForState = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
+  static dubiusBuildColor = C.nameToRgbaString(PlayerPanel.colorForState['inHand'], .5);
+
+  cardsInState(state: keyof typeof PlayerPanel.colorForState) {
+    const color = PlayerPanel.colorForState[state];
+    return this.cardSelector.powerLines.filter(pl => pl.button.colorn === color);
+  }
+
+  get cardsInHand() { return this.cardsInState('inHand'); }
+  get cardsOnTable() { return this.cardsInState('onTable'); }
+  get cardsInBattle() { return this.cardsInState('inBattle'); }
+
+  revealCards(vis = true): void {
+    const inBattle = this.cardsInBattle.map(pl => pl.name);
+    if (vis) console.log(stime(this, `.showCards: ${this.god.Aname}`), ... inBattle);
+    this.showCardSelector(vis);
+    this.stage.update();
+  }
+
+  battleCardsToTable() {
+    this.cardsInBattle.forEach(pl => pl.button.paint(PlayerPanel.colorForState['onTable']));
+    this.stage.update();
+  }
+
+  hasCardInBattle(cardName: string) {
+    return this.cardsInBattle.find(pl => pl.name === cardName);
+  }
+
+  allCardsToHand(vis = false) {
+    this.cardSelector.powerLines.forEach(pl => pl.button.paint(PlayerPanel.colorForState['inHand']));
+  }
+
+  // button.parent is the PowerLine.
+  selectForBattle(evt, button: CircleShape) {
+    const colorInHand = PlayerPanel.colorForState['inHand']
+    const colorInBattle = PlayerPanel.colorForState['inBattle']
+    button.paint(button.colorn === colorInHand ? colorInBattle : colorInHand);
+    button.stage.update();
   }
 
 }

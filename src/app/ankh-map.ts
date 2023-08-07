@@ -1,6 +1,6 @@
 import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
 import { Graphics, Shape } from "@thegraid/easeljs-module";
-import type { AnkhPiece, Figure } from "./ankh-figure";
+import type { AnkhMeeple, AnkhPiece, Figure } from "./ankh-figure";
 import { permute } from "./functions";
 import { God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
@@ -78,7 +78,7 @@ export class AnkhHex extends Hex2 {
   overlay: HexShape;
   get piece() { return this.tile ?? this.meep }
 
-  override get meep(): Figure { return super.meep as Figure; }
+  override get meep(): AnkhMeeple { return super.meep as AnkhMeeple; }
   override set meep(meep: Meeple) { super.meep = meep; }
 
   override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
@@ -282,11 +282,11 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     this.update();
   }
 
-  showRegion(regionId = 0, colors = God.allGods.map(g => g.color)) {
-    const region = this.regions[regionId], color = C.nameToRgbaString(colors[regionId % colors.length], .4);
-    region.forEach(ahex => {
-      ahex.overlay.paint(color);
-      ahex.overlay.visible = true;
+  showRegion(regionId = 0, color?: string) {
+    const region = this.regions[regionId]
+    region?.forEach(ahex => {
+      ahex.overlay.paint(color ?? 'rgba(240,240,240,.2');
+      ahex.overlay.visible = !!color;
       ahex.cont.updateCache();
     });
     this.update();

@@ -6,6 +6,7 @@ import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";
+import type { PlayerPanel } from "./player-panel";
 import { TP } from "./table-params";
 import { MapTile, Tile, } from "./tile";
 
@@ -27,6 +28,8 @@ export class Player {
   }
 
   god: God;
+  /** much useful context about this Player. */
+  panel: PlayerPanel;
   get color() { return this.god.color; }
   readonly stableHexes: Hex2[] = [];
 
@@ -41,8 +44,7 @@ export class Player {
   get score() { return this._score }
   set score(score: number) {
     this._score = Math.floor(score);
-    const rank = Math.round((score - this._score) * 10);
-    GP.gamePlay.table.setPlayerScore(this, score, rank);
+    GP.gamePlay.table.setPlayerScore(this, score);
   }
 
   // Created in masse by Table.layoutCounter

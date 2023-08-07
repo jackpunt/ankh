@@ -1,6 +1,6 @@
-import { C, Constructor, XY, stime } from "@thegraid/common-lib";
-import { Container, Graphics } from "@thegraid/easeljs-module";
-import { AnkhHex } from "./ankh-map";
+import { C, Constructor, XY, className, stime } from "@thegraid/common-lib";
+import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
+import { AnkhHex, AnkhMap } from "./ankh-map";
 import { NumCounter } from "./counters";
 import { GP } from "./game-play";
 import { Hex, Hex1, Hex2 } from "./hex";
@@ -43,6 +43,7 @@ export class AnkhSource<T extends Tile> extends TileSource<T> {
 export class AnkhPiece extends MapTile {
   constructor(player: Player, serial: number, Aname?: string) {
     super(`${Aname}\n${serial}`, player);
+    this.name = className(this);         // lookup className and store it.
   }
   override get hex() { return super.hex as AnkhHex; }
   override set hex(hex: AnkhHex) { super.hex = hex; }
@@ -61,8 +62,12 @@ export class AnkhPiece extends MapTile {
     return GP.gamePlay.isPhase(name);
   }
 
+  isLegalWater(hex: AnkhHex) {
+    return (hex.terrain !== 'w');
+  }
+
   isStableHex(hex: Hex1) {
-    return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2)));
+    return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2))); // Dubious...
   }
 
   override sendHome(): void {
@@ -70,22 +75,56 @@ export class AnkhPiece extends MapTile {
   }
 }
 export class Monument extends AnkhPiece {
+  static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
 
   override get radius() { return TP.ankh2Rad }
   override textVis(vis?: boolean): void {
-      super.textVis(true);
+      super.textVis(vis);
   }
 
   constructor(player: Player, serial: number, Aname = 'Monument') {
     super(player, serial, Aname);
     this.nameText.y -= this.radius/2;
+    const hitArea = new Shape(new Graphics().f(C.black).dc(0, 0, this.radius))
+    this.hitArea = hitArea;
   }
 
+  override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
+    if (!GP.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
+    const panel = GP.gamePlay.gameState.state.panels[0];
+    if (panel.canBuildInRegion < 0) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
+    const regionId = GP.gamePlay.gameState.conflictRegion - 1;
+    const region = GP.gamePlay.hexMap.regions[regionId];
+    if (!region?.includes(toHex) && !ctx.lastShift) return false;  // now: toHex !== undefined, toHex.isOnMap
+    if (toHex.meep) return false;
+    if (toHex.terrain == 'w') return false;
+    if ((this.hex as Hex2)?.isOnMap && !ctx?.lastShift) return false;
+    return true;
+  }
+
+  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
+    super.dropFunc(targetHex, ctx);
+    if (targetHex.isOnMap && !targetHex.meep) {
+      const tohex = targetHex as AnkhHex, map = tohex.map as AnkhMap<AnkhHex>;
+      const gamePlay = GP.gamePlay, gameState = gamePlay.gameState;
+      if (!this.isPhase('BuildMonument')) return;
+      const panel0 = gameState.state.panels[0]; // 'active' player.
+      const regionId = panel0.canBuildInRegion, region = map.regions[regionId - 1];
+      if (region?.includes(tohex)) {
+        const ankh = panel0.ankhSource.takeUnit(), monument = this;
+        ankh.moveTo(this.hex);
+        console.log(stime(this, `.dropFunc: emit buildDone panel0=`), panel0);
+        setTimeout( () => GP.gamePlay.table.dispatchEvent({ type: 'buildDone', panel0, monument }), 10);
+      }
+    }
+  }
 }
+
 export class Pyramid extends Monument {
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Pyramid');
-    this.baseShape.cgf = (color) =>  new Graphics().f(color).dp(0, 0, this.radius, 3, 0, 30);;
+    this.baseShape.cgf = (color) => new Graphics().f(color).dp(0, 0, this.radius, 3, 0, 30);
+    this.updateCache();
   }
 }
 
@@ -96,6 +135,7 @@ export class Obelisk extends Monument {
       const r = this.radius, h = 1.8 * r, w = h/8;
       return new Graphics().f(color).dr(-w/2, -h / 2, w, h);
     }
+    this.updateCache();
   }
 }
 
@@ -104,6 +144,7 @@ export class Temple extends Monument {
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Temple');
     this.baseShape.cgf = (color) =>  new Graphics().f(color).dp(0, 0, this.radius, 4, 0, 45);;
+    this.updateCache();
   }
 }
 
@@ -118,7 +159,7 @@ export class Portal extends AnkhPiece {
 
   constructor(player: Player, serial?: number) {
     super(player, serial, 'Portal');
-    const base = this.baseShape;
+    const base = this.baseShape; // lexical bind the original baseShape
     const hscgf = base.cgf;
     base.cgf = (color) => {
       base.graphics.c().f(color).dp(0, 0, this.radius, 6, 0, 0);
@@ -132,8 +173,11 @@ export class Portal extends AnkhPiece {
 
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
     if (this.isPhase('Summon')) {
-      if (this.isStableHex(this.hex)) {
-
+      if (this.hex === this.source.hex) { // assert: one of those is true...
+        // TODO: isOnMap && isOccupiedLegal
+        return super.isLegalTarget(toHex, ctx);
+      } else if (this.isPhase('Battle')) {
+        if (GP.gamePlay.gameState.battleResults) return true;
       }
     }
     return false;
@@ -143,9 +187,7 @@ export class Portal extends AnkhPiece {
 
 // Figure == Meeple: [underlay, [baseShape, bitmapImage?], backSide]
 /** GodFigure, Warrior, Guardian */
-export class Figure extends Meeple {
-
-  static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) }
+export class AnkhMeeple extends Meeple {
 
   constructor(player: Player, serial: number, Aname?: string) {
     super(Aname ?? `${Aname}\n${serial}`, player);
@@ -205,6 +247,11 @@ export class Figure extends Meeple {
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
   }
+
+}
+export class Figure extends AnkhMeeple {
+
+  static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) as Figure[] }
 
   isPhase(name: string) {
     return GP.gamePlay.isPhase(name);
@@ -283,8 +330,8 @@ export class Figure extends Meeple {
     }
     return loop(hex, n);
   }
-
 }
+
 
 export class GodFigure extends Figure {
   /** so we can keep GodFigures as singlton instances of each type. */
@@ -298,10 +345,10 @@ export class GodFigure extends Figure {
 
   constructor(player: Player, serial?: number, Aname?: string) {
     super(player, serial, Aname);
-    this.name = this.Aname;
   }
   override sendHome(): void {
-    this.moveTo(undefined);   // "there's no place like home" (home is like no-place...)
+    // this.moveTo(undefined);   // "there's no place like home" (home is like no-place...)
+    // "whereever you hang your hat, that's Home..."
     return;
   }
 

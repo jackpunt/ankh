@@ -1,6 +1,6 @@
-import { C, Constructor, WH } from "@thegraid/common-lib";
+import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhPiece, AnkhSource, Figure, Monument, Portal } from "./ankh-figure";
+import { AnkhMeeple, AnkhPiece, AnkhSource, Figure, Monument, Portal } from "./ankh-figure";
 import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Meeple } from "./meeple";
@@ -11,10 +11,10 @@ import { TP } from "./table-params";
 import { Tile } from "./tile";
 
 
-export class AnkhToken extends Figure {
+export class AnkhToken extends AnkhMeeple {
   static source: AnkhSource<AnkhToken>[] = [];
 
-  static makeSource(player: Player, hex: Hex2, token: Constructor<Figure>, n: number) {
+  static makeSource(player: Player, hex: Hex2, token: Constructor<AnkhMeeple>, n: number) {
     return AnkhToken.makeSource0(AnkhSource<AnkhToken>, token, player, hex, n);
   }
   override get radius() { return TP.ankhRad; }
@@ -73,7 +73,7 @@ export class AnkhToken extends Figure {
 export class AnkhMarker extends Container {
   constructor(color: string, rad = TP.ankhRad) {
     super();
-    this.name = 'AnkhMarker';
+    this.name = className(this);
     const shape = new CircleShape(color, rad, );
     const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
     ankh.y += rad * .1;
@@ -101,7 +101,7 @@ export class God {
     public color: string,
   ) {
     // constructor here:
-    God.byName.set(Aname, this);
+    God.byName.set(Aname, this); // Aname === className(this);
     this.name = Aname;
   }
   readonly ankhPowers: string[] = [];

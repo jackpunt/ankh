@@ -12,7 +12,7 @@ import { removeChildType } from "./functions";
 
 declare module "@thegraid/easeljs-module" {
   interface Container {
-    removeChildType<T extends DisplayObject>(type: Constructor<T>, pred?: (dobj: T) => true ): T[];
+    removeChildType<T extends DisplayObject>(type: Constructor<T>, pred?: (dobj: T) => boolean ): T[];
   }
 }
 Container.prototype.removeChildType = removeChildType;
@@ -158,7 +158,8 @@ export class Tile extends Tile0 {
   ) {
     super()
     Tile.allTiles.push(this);
-    if (!Aname) this.Aname = `${className(this)}\n${Tile.allTiles.length}`;
+    this.name = className(this);
+    if (!Aname) this.Aname = `${this.name}\n${Tile.allTiles.length}`;
     const rad = this.radius;
     if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
     this.addChild(this.baseShape);

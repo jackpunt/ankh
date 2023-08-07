@@ -1,27 +1,29 @@
 
 // TODO: namespace or object for GameState names
 
-import { Constructor, S } from "@thegraid/common-lib";
+import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { Androsphinx, AnkhPiece, Apep, Figure, GodFigure, Guardian, Monument, MumCat, Mummy, Obelisk, Pyramid, Satet, Scorpion, Temple, Warrior } from "./ankh-figure"
 import { HexDir } from "./hex-intfs";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhMap, AnkhHex } from "./ankh-map";
-import { AnkhToken } from "./god";
+import { AnkhMarker, AnkhToken } from "./god";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { TileSource } from "./tile-source";
 import { GamePlay } from "./game-play";
-import { AnkhPowerCont } from "./player-panel";
-import { CircleShape, CenterText } from "./shapes";
+import { ActionContainer, EventButton } from "./table";
+import { Tile } from "./tile";
+import { Container } from "@thegraid/easeljs-module";
 
 type GodName = string;
 type GuardName = string | Constructor<Guardian>;
 type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
+type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorius' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
 type RegionElt = [row: number, col: number, bid: number];
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
 type ClaimElt = [row: number, col: number, pid: number];
 type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
-type AnkhElt = [pid: number, powers: string[], guards?: GuardIdent];
+type AnkhElt = PowerIdent[];
 
 /** [row, col, bid] -> new rid, with battle order = bid ;
  * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
@@ -31,13 +33,20 @@ type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir,
 type SplitElt = (SplitBid | SplitDir)
 
 type SetupElt = {
-  coins?: number[],
-  scores?: number[],
+  name?: string,         // {orig-scene}#{turn}
+  ngods: number,         // == nPlayers (used to select, verify scenario)
+  gods?: GodName[],      // ngods & gods as per URL parsing
+  splits?: SplitElt[],   // added camel train borders
+  regions?: RegionElt[], // delta, east, west
+  coins?: number[],      // 1
+  scores?: number[],     // 0
   events?: number,
+  guards?: GuardIdent,   // Guardian types in use. default to random
+  stable?: GuardIdent[], // Guardians in player's stable.
   actions?: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
-  guards?: GuardIdent,   // Guardian types in use.
-  ankhs?: AnkhElt[], // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
-  player?: number, // default to first player.
+  ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
+  places?: PlaceElt[],
+  turn?: number;   // default to 0; (or 1...)
 }
 
 type RegionSpec = { region: RegionElt[] }
@@ -47,8 +56,8 @@ type ClaimSpec = { claim: ClaimElt[] }
 type SetupSpec = { setup: SetupElt }
 
 type SwapSpec = { swap: [rid: number, bid: number][] }
-type ScenarioSpec = RegionSpec | PlaceSpec | SplitSpec | SetupSpec;
-type Scenario = ScenarioSpec[];
+export type ScenarioSpec = RegionSpec | PlaceSpec | SplitSpec | SetupSpec;
+export type Scenario = ScenarioSpec[];
 
 // Rivers make first 3 Regions: West(1), East(2), Delta(3)
 export class AnkhScenario {
@@ -172,23 +181,53 @@ export class AnkhScenario {
     const acopy = structuredClone(scenario);
     return acopy.concat(specs);
   }
+
   static AltMidKingom2 = AnkhScenario.setup(AnkhScenario.MiddleKingdom[0],
-    { place: [
-          [3, 4, Warrior, 1],
-          [8, 2, GodFigure, 1],
-          [3, 6, Warrior, 2],
-          [4, 7, GodFigure, 2],
-        ]},
     { setup: {
+        ngods: 2,
+        turn: 3,
+        guards: ['Satet', 'Apep', 'Scorpion'],
         events: 3,
         actions: { Move: 2, Ankh: 2 },
         coins: [4, 5],
         scores: [2, 3],
-        guards: ['Satet', 'Apep', 'Scorpion'],
-        ankhs: [[0, ['Commanding', 'Revered'], ['Satet']], [1, ['Inspiring']]],
+        stable: [['Satet'], []],
+        ankhs: [['Commanding', 'Revered'], ['Inspiring', 'Omnipresent', 'Temple']],
+        places: [
+          [3, 4, Warrior, 1],
+          [8, 2, GodFigure, 1],
+          [3, 6, Warrior, 2],
+          [4, 7, GodFigure, 2],
+        ]
       }
     },
-  )
+  );
+
+  static saveState(gamePlay: GamePlay) {
+    const table = gamePlay.table;
+    const ngods = gamePlay.allPlayers.length;
+    const turn = gamePlay.turnNumber - 1;
+    const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;
+    const events = table.nextEventIndex;
+    const actions = {};
+    table.actionRows.forEach(({id}) => {
+      const rowCont = table.actionPanels[id] as ActionContainer;
+      const buttons = rowCont.children.filter(ch => ch instanceof Container) as EventButton[];
+      actions[id] = buttons.findIndex(elt => !elt.children.find(ch => ch instanceof AnkhMarker));
+    })
+    const coins = gamePlay.allPlayers.map(p => p.coins);
+    const scores = table.playerScores;
+    const stable = table.panelForPlayer.map(panel => {
+      return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
+    })
+    const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());
+    const places = Tile.allTiles.filter(t => t.hex?.isOnMap).map(t => {
+      const row = t.hex.row, col = t.hex.col, cons = className(t), pid = t.player ? t.player.index + 1 : undefined;
+      return [row, col, cons, pid] as PlaceElt;
+    })
+
+    return {ngods, turn, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;
+  }
 }
 
 export class ScenarioParser {
@@ -218,15 +257,15 @@ export class ScenarioParser {
     region.forEach(elt => {
       // assign battleOrder for region[seed]
       // we will simply permute the regions array.
-      const [row, col, bid] = elt, hex = map[row][col];
+      const [row, col, bid] = elt, hex = map[row][col], rid = bid - 1;
       const rindex = map.regionOfHex(row, col, hex);
-      const xregion = map.regions[bid - 1];
-      map.regions[bid - 1] = map.regions[rindex];
-      map.regions[bid - 1].forEach(hex => hex.district = bid);
+      const xregion = map.regions[rid];
+      map.regions[rid] = map.regions[rindex];
+      map.regions[rid].forEach(hex => hex.district = bid);
       map.regions[rindex] = xregion;
       map.regions[rindex]?.forEach(hex => hex.district = rindex + 1);
 
-      map.regions[bid - 1]['Aname'] = `${hex}`
+      map.regions[rid]['Aname'] = `${hex}`
     });
   }
   // console.log(stime(this, `.regions: input`), region0.region);
@@ -281,8 +320,7 @@ export class ScenarioParser {
       const [row, col, cons0, pid] = elt;
       const cons = (typeof cons0 === 'string') ? ScenarioParser.classByName[cons0] : cons0;
       const hex = map[row][col];
-      const player = Player.allPlayers[pid - 1], pNdx = player?.index;
-      const godFigure = player
+      const player = (pid !== undefined) && Player.allPlayers[pid - 1];
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
@@ -292,22 +330,30 @@ export class ScenarioParser {
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
-      if ((pNdx !== undefined) && (piece instanceof Monument)) {
-        AnkhToken.source[pNdx].takeUnit().moveTo(hex);// this.parseClaim([row, col, pNdx + 1]);
+      if (player && (piece instanceof Monument)) {
+        this.claimHex(hex, player); // claimMonument?
       }
     })
     //console.groupEnd();
   }
+
+  claimHex(hex: AnkhHex, player: Player) {
+    const unit = AnkhToken.source[player.index].takeUnit();
+    unit.moveTo(hex);
+    unit.setPlayerAndPaint(player);
+    console.log(stime(this, `.claimHex: ${hex}`), player.color);
+  }
+
   // {claim: [row, col, pid]}
   parseClaim(claimSpec: ClaimElt[]) {
     const map = this.map;
     claimSpec.forEach(spec => {
       const [row, col, pid] = spec;
       const hex = map[row][col];
-      const player = Player.allPlayers[pid - 1], pNdx = player?.index;
+      const player: Player | false | undefined = (pid !== undefined) && Player.allPlayers[pid - 1];
       const piece = hex.tile;
-      if ((pNdx !== undefined) && (piece instanceof Monument)) {
-        AnkhToken.source[pNdx].takeUnit().moveTo(hex);
+      if (player && (piece instanceof Monument)) {
+        this.claimHex(hex, player);
       }
     })
   }
@@ -319,14 +365,19 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
   parseSetup(setup: SetupElt) {
     if (!setup) return;
-    const { coins, scores, events, actions, guards, ankhs, player } = setup;
+    const { coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
+    if (turn !== undefined) {
+      table.turnLog.log(`turn = ${turn}`, `parseSetup`);
+      table.gamePlay.turnNumber = turn - 1;
+    }
     if (events !== undefined) {
       for (let ndx = 0; ndx < events; ndx++) {
         table.setEventMarker(ndx);
       }
+      gamePlay.eventName = undefined;
       map.update();
     }
     if (actions !== undefined) {
@@ -345,47 +396,56 @@ export class ScenarioParser {
       const type = ScenarioParser.classByName[name] as Constructor<Guardian>;
       if (name !== source.type.name) {
         const n = source.deleteAll();
-        for (let i = 0; i < n; i++) {
-          source.availUnit(new type(undefined, i + 1))
-        }
-        source.nextUnit();
+        const newSource = Guardian.makeSource(source.hex, type, n);
+        gamePlay.guards[ndx] = type;
+        table.guardSources[ndx] = newSource;
+        newSource.nextUnit();
       }
     });
-    ankhs?.forEach((elt: AnkhElt, n) => {
-      const [pid, powers, guards] = elt;
-      const player = Player.allPlayers[pid]
-      const god = player.god;
-      god.ankhPowers.length = 0;
-      god.ankhPowers.push(...powers);
-      const panel = table.panelForPlayer[pid];
-      // assume powers are in initial/default;
-      // else remove panel.powerCols from panel; and call makeAnkhPowerGUI();
-      // find {colCont, powerLine} in panel.powerCols where button.name === powers[i]
-      let found = false;
-      powers.forEach(power => {
-        panel.powerCols.find((colCont: AnkhPowerCont) => {
-          const { rank, ankhs, powerLines, guardianSlot } = colCont;
-          powerLines.find((pl) => {
-            const children = pl.children as [button: typeof CircleShape, text: typeof CenterText, token?: AnkhToken]
-            const [button, text, token] = children;
-            if (button.name === power) {
-              panel.addAnkhToPowerLine(pl);
-              found = true;
-            }
-            return found;
-          })
-          return found;
-        })
-      })
-      guards?.forEach((gName, ndx) => {
+    stable?.forEach((gNames, pid) => {
+      const player = allPlayers[pid], panel = player.panel;
+      console.log(stime(this, `.stable:[${pid}]`), gNames)
+      gNames.forEach((gName, ndx) => {
         table.guardSources.find(source => {
           if (source.type.name === gName) {
-            source.takeUnit().moveTo(panel.stableHexes[ndx + 1]);
+            const unit = source.takeUnit();
+            unit.moveTo(panel.stableHexes[ndx + 1]);
+            unit.setPlayerAndPaint(player);
             return true;
-          } else return false;
+          }
+          return false;
         })
       })
-    })
+    });
+    ankhs?.forEach((powers: AnkhElt, pid) => {
+      console.log(stime(this, `.ankhs[${pid}]`), powers);
+      const player = allPlayers[pid], panel = player.panel;
+      const god = player.god;
+      // remove existing AnkhPowers & AnkhTokens
+      god.ankhPowers.length = 0;
+      god.ankhPowers.push(...powers);
+      panel.ankhArrays.length = 0;
+      // add ankhs for each colCont:
+      panel.powerCols.forEach((colCont, cn) => {
+        colCont.removeChildType(AnkhToken).forEach(ankhToken => ankhToken.sendHome());
+        // leaving only the marker children!
+        const ankhs = [panel.ankhSource.takeUnit(), panel.ankhSource.takeUnit(),];
+        ankhs.forEach((ankh, cn) => {
+          const marker = colCont.children[cn];
+          ankh.x = marker.x; ankh.y = marker.y;
+        })
+        panel.ankhArrays.push(...ankhs); // add 2 ankhs to supply
+        colCont.addChild(...ankhs);
+        colCont.ankhs = ankhs;
+      })
+      // find {colCont, powerLine} in panel.powerCols where button.name === powers[i]
+      powers.forEach(power => {
+        panel.powerCols.find(colCont =>
+          colCont.powerLines.find(pl => (pl.button.name === power) && (panel.addAnkhToPowerLine(pl), true))
+        );
+      })
+    });
+    if (places) this.parsePlaces(places);
   }
 
   /** debug utility */

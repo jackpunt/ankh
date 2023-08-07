@@ -13,6 +13,7 @@ import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
+import { AnkhScenario } from "./ankh-scenario";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -304,10 +305,31 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
     KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
+    KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.pushState, argVal: true })
+    KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.popState, argVal: true })
+    KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
 
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
+  }
+  states = [];
+  pushState() {
+    const state = AnkhScenario.saveState(this);
+    this.states.push(state);
+    console.log(stime(this, `.pushState`), state);
+  }
+  popState() {
+    const state = this.states.pop();
+    console.log(stime(this, `.popState`), state);
+    this.table.parseScenenario(state);
+  }
+
+  cardShowing: boolean = false;
+  showCards(vis = !this.cardShowing) {
+    this.cardShowing = vis;
+    this.forEachPlayer(player => player.panel.showCardSelector(vis));
+    this.hexMap.update();
   }
 
   chooseAction(action: string) {
@@ -319,7 +341,7 @@ export class GamePlay extends GamePlay0 {
     this.table.doneClicked({})
   }
   clickConfirm(val: boolean) {
-    this.table.panelForPlayer[this.curPlayerNdx].clickConfirm(val);
+    this.curPlayer.panel.clickConfirm(val);
   }
 
   useReferee = true
@@ -424,17 +446,17 @@ export class GamePlay extends GamePlay0 {
 
 
   override endTurn(): void {
-    // this.table.panelForPlayer[this.curPlayerNdx].visible = false;
+    // this.curPlayer.panel.visible = false;
     super.endTurn();
   }
 
   override setNextPlayer(plyr?: Player) {
-    this.table.panelForPlayer[this.curPlayerNdx].showPlayer(false);
+    this.curPlayer.panel.showPlayer(false);
     super.setNextPlayer(plyr); // update player.coins
-    this.table.panelForPlayer[this.curPlayerNdx].showPlayer(true);
+    this.curPlayer.panel.showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...
-    this.table.panelForPlayer[this.curPlayerNdx].visible = true;
+    this.curPlayer.panel.visible = true;
     this.table.showNextPlayer(); // get to nextPlayer, waitPaused when Player tries to make a move.?
     this.hexMap.update();
     this.startTurn();

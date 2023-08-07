@@ -1,8 +1,8 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
-import { AnkhSource, Guardian } from "./ankh-figure";
+import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { AnkhScenario, ScenarioParser } from "./ankh-scenario";
+import { AnkhScenario, Scenario, ScenarioParser } from "./ankh-scenario";
 import { GP, type GamePlay } from "./game-play";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
@@ -19,8 +19,9 @@ function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpper
 
 export interface EventButton extends Container { isEvent: boolean; }
 interface EventIcon extends Container { eventName: string; }
+interface ScoreMark extends RectShape { score: number, rank: number }
 
-/** rowCont is an ActionContainer; each child is a CircleButton Container. */
+/** rowCont is an ActionContainer; children as EventButton[]. */
 export class ActionContainer extends Container {
   constructor(public rad = 30) {
     super();
@@ -220,7 +221,7 @@ export class Table extends EventDispatcher  {
       // dropFunc:
       (qShape: Shape, ctx: DragInfo) => {
         this.downClick = true;
-        const hex = this.hexUnderObj(qShape);
+        const hex = this.hexUnderObj(qShape, false);  // also check hexCont!
         qShape.x = 0; qShape.y = qY; // return to regular location
         cont.addChild(qShape);
         if (!hex) return;
@@ -315,10 +316,11 @@ export class Table extends EventDispatcher  {
     hexCont.cache(p00.x, p00.y, pbr.x - p00.x, pbr.y - p00.y); // cache hexCont (bounded by bgr)
 
     this.makeGuardSources();
+    this.makeMounumentSources();
 
     this.makeActionCont();
     this.makeEventCont();
-    this.makeScoreCont();
+    this.makeScoreStacks();
     this.makePerPlayer();
 
     this.gamePlay.recycleHex = this.makeRecycleHex();
@@ -354,11 +356,11 @@ export class Table extends EventDispatcher  {
     const seq = [[], [0], [0, 3], [0, 3, 1], [0, 3, 4, 1], [0, 3, 4, 2, 1]];
     const np = Player.allPlayers.length, seqn = seq[np];
     this.panelForPlayer.length = 0; // TODO: maybe deconstruct
-    Player.allPlayers.forEach((p, pIndex) => {
+    Player.allPlayers.forEach((player, pIndex) => {
       const ndx = seqn[pIndex];
       const [row, col] = panelLocs[ndx];
-      this.panelForPlayer[pIndex] = new PlayerPanel(this, p, row, col, ndx < 3 ? -1 : 1);
-      p.makePlayerBits();
+      this.panelForPlayer[pIndex] = player.panel = new PlayerPanel(this, player, row, col, ndx < 3 ? -1 : 1);
+      player.makePlayerBits();
     });
   }
 
@@ -410,7 +412,7 @@ export class Table extends EventDispatcher  {
     return button;
   }
 
-  makeRecycleHex(row = 7, col = TP.nHexes + 6) {
+  makeRecycleHex(row = 9.2, col = 0) {
     const name = 'Recycle'
     const image = new Tile(name).addImageBitmap(name); // ignore Tile, get image.
     image.y = -TP.hexRad / 2; // recenter
@@ -423,13 +425,14 @@ export class Table extends EventDispatcher  {
     rHex.cont.updateCache();
     return rHex;
   }
+
   guardSources: AnkhSource<Guardian>[] = [];
-  makeGuardSources(row = 7, col = TP.nHexes + 1.7) {
+  makeGuardSources(row = 7, col = TP.nHexes + 6.8) {
     const guards = this.gamePlay.guards;
     guards.forEach((guard, i) => { // .filter((g, i) => i > 0)
-      const ci = col + i * 1.25;
-      const hex = this.newHex2(row, ci, `gs-${i}`, AnkhHex);
-      this.setToRowCol(hex.cont, row, ci);
+      const rowi = row + i * 1.25;
+      const hex = this.newHex2(rowi, col, `gs-${i}`, AnkhHex);
+      this.setToRowCol(hex.cont, rowi, col);
       const np = Player.allPlayers.length;
       const n = [[0],[1,1,1],[1,1,1],[2,2,2],[3,2,2],[3,2,2],[3,2,2]][np][i];
       const source = Guardian.makeSource(hex, guard, n);
@@ -438,9 +441,23 @@ export class Table extends EventDispatcher  {
     });
   }
 
+  monumentSources: AnkhSource<Monument>[] = [];
+  makeMounumentSources(row = 7, col = TP.nHexes + 1.7) {
+    const monmts = Monument.typeNames.map(name => ScenarioParser.classByName[name]);
+    monmts.forEach((momnt, i) => { // .filter((g, i) => i > 0)
+      const ci = col + i * 1.25;
+      const hex = this.newHex2(row, ci, `ms-${i}`, AnkhHex);
+      this.setToRowCol(hex.cont, row, ci);
+      const source = Monument.makeSource0(AnkhSource<Monument>, momnt, undefined, hex, 12)  //(hex, monmt, n);
+      this.monumentSources.push(source);
+      this.sourceOnHex(source, hex);
+      // source.nextUnit();
+    });
+  }
+
   actionPanels: ActionContainer[] = [];
   actionRows: { id: 'Move' | 'Summon' | 'Gain' | 'Ankh', dn?: number }[] = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
-  makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.6) {
+  makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.2) {
     const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
     const wide = 400;
     console.log(stime(this, `.makeActionCont`), np);
@@ -530,12 +547,12 @@ export class Table extends EventDispatcher  {
   doneButton: UtilButton;
   doneClicked = (evt?) => {
     this.activateActionSelect(false); // deactivate all
-    GP.gamePlay.phaseDone();
+    GP.gamePlay.phaseDone();   // <--- main button does not supply 'panel'
   }
   addDoneButton(actionCont: Container, rh: number) {
     const w = 90, h = 56;
     const doneButton = this.doneButton = new UtilButton('lightgreen', 'Done', 36, C.black);
-    doneButton.x = -(w + 10);
+    doneButton.x = -(w);
     doneButton.y = 3 * rh;
     doneButton.label.textAlign = 'right';
     doneButton.on(S.click, this.doneClicked, this);
@@ -608,7 +625,7 @@ export class Table extends EventDispatcher  {
   }
 
   readonly emptyColor = 'rgb(240,240,240)';
-  makeScoreCont(row = TP.nHexes + .5, col = -7.2, np = Player.allPlayers.length, w = 34) {
+  makeScoreStacks(row = TP.nHexes + .5, col = -7.2, np = Player.allPlayers.length, w = 34) {
     const inRed = 20;
     const redzone = 'rgb(230,100,100)', win = C.lightgreen;
     const scoreCont = this.scoreCont = new Container();
@@ -626,19 +643,29 @@ export class Table extends EventDispatcher  {
     }
     // make scoreMarks, and stack them on slot[0]:
     // push on scoreStack; splice to remove; display at stackIndex*cellHeight
-    for (let i = 0; i < np; i++) {
-      const plyr = Player.allPlayers[np - i - 1];
-      const pmark = new RectShape({ x, y: - sh / 2, w, h }, plyr.color);
-      this.scoreStacks[0].push(pmark); // assuming score is zero.
-      this.playerMarks.push(pmark);
+    this.scoreMarks.length = 0;
+    for (let ndx = 0; ndx < np; ndx++) {
+      const index = np - ndx - 1;             // initial stack in reverse order.
+      const plyr = Player.allPlayers[index];
+      const pmark = new RectShape({ x, y: - sh / 2, w, h }, plyr.color) as ScoreMark;
+      pmark.name = `pmark-${plyr.index}`;
+      this.scoreMarks[index] = (pmark);
+      this.pushScoreMark(pmark, 0);      // score is zero initially.
       scoreCont.addChild(pmark);
     }
     this.showScoreMarks();
     return scoreCont;
   }
+
+  pushScoreMark(pmark: ScoreMark, score: number, rank?: number) {
+    pmark.score = score;
+    pmark.rank = rank ?? this.scoreStacks[score].length;
+    this.scoreStacks[score][pmark.rank] = (pmark); // .push(pmark) if rank not supplied.
+  }
+
   scoreCont: Container; // 31 RectShapes
-  scoreStacks: RectShape[][] = [[]]; // holding player's RectShape marker.
-  playerMarks: RectShape[] = [];
+  readonly scoreStacks: RectShape[][] = []; // each player's RectShape marker, indexed by score;
+  readonly scoreMarks: ScoreMark[] = [];    // each player's marker, indexed by player.index
   showScoreMarks() {
     const np = Player.allPlayers.length;
     this.scoreStacks.forEach((ss, cn) => {
@@ -650,26 +677,37 @@ export class Table extends EventDispatcher  {
     this.hexMap.update();
   }
 
-  // Assert: plyr.score will have a decimal value.
+  get playerScores() {
+    return this.scoreMarks.map(pm => pm.score + pm.rank/10);
+  }
+  get panelsInRank() {
+    const scores = this.playerScores
+    return this.panelForPlayer.sort((pa, pb) => scores[pa.player.index] - scores[pb.player.index]);
+  }
+
   // Initially: 0.[np-pid-1], that is for 4 plyrs: 0.3, 0.2, 0.1, 0.0 (reverse player order)
   setPlayerScore(plyr: Player, score: number, rank?: number) {
-    const empty = this.emptyColor, np = Player.allPlayers.length, pm = this.playerMarks[plyr.index];
-    const stack0 = this.scoreStacks.find(ss => ss.includes(pm));
-    const m = stack0.splice(stack0.indexOf(pm),1);
+    if (!this.scoreStacks) this.makeScoreStacks();
+    const pm = this.scoreMarks[plyr.index];
+    const stack0 = this.scoreStacks[pm.score]; // pm in on stack0
+    const index = stack0.indexOf(pm);
+    const m = stack0.splice(index, 1); // remove it;
     if (m[0] !== pm) debugger;
     const score1 = Math.min(Math.floor(score), 31);
-    const stack1 = this.scoreStacks[score1];
-    if (rank === undefined) stack1.push(pm)
-    else stack1[rank] = pm;
+    this.pushScoreMark(pm, score1, rank);
     this.showScoreMarks();
+  }
+
+  scenarioParser: ScenarioParser;
+  parseScenenario(scenario: Scenario) {
+    if (!this.scenarioParser) this.scenarioParser = new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>, this.gamePlay);
+    this.scenarioParser.parseScenario(scenario);
   }
 
   startGame(scenarioName: string, ngods: number) {
     // Place Pieces and Figures on map:
-    // const scenario = AnkhScenario[scenarioName][ngods-2];
-    const scenario = AnkhScenario.AltMidKingom2;
-    new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>, this.gamePlay).parseScenario(scenario);
-    this.toggleText(false);
+    const scenario = (ngods === 2) ? AnkhScenario.AltMidKingom2 : AnkhScenario[scenarioName][ngods - 2];
+    this.parseScenenario(scenario);
 
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {
@@ -678,19 +716,19 @@ export class Table extends EventDispatcher  {
 
     // this.stage.enableMouseOver(10);
     this.scaleCont.addChild(this.overlayCont); // now at top of the list.
-    this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[0]);
+    this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[this.gamePlay.turnNumber % Player.allPlayers.length]);
     this.gamePlay.gameState.start();   // enable Table.GUI to drive game state.
   }
 
-  makeDragable(tile: Tile) {
+  makeDragable(tile: Container) {
     const dragger = this.dragger;
     dragger.makeDragable(tile, this, this.dragFunc, this.dropFunc);
     dragger.clickToDrag(tile, true); // also enable clickToDrag;
   }
 
-  hexUnderObj(dragObj: DisplayObject) {
+  hexUnderObj(dragObj: DisplayObject, legalOnly = true ) {
     const pt = dragObj.parent.localToLocal(dragObj.x, dragObj.y, this.hexMap.mapCont.markCont);
-    return this.hexMap.hexUnderPoint(pt.x, pt.y);
+    return this.hexMap.hexUnderPoint(pt.x, pt.y, legalOnly);
   }
 
   dragContext: DragContext;

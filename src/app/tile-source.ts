@@ -3,11 +3,13 @@ import { NumCounter } from "./counters";
 import { GP } from "./game-play";
 import type { Hex2 } from "./hex";
 import { H } from "./hex-intfs";
-import type { Meeple } from "./meeple";
+import { Meeple } from "./meeple";
 import type { Player } from "./player";
 import { TP } from "./table-params";
-import type { Tile } from "./tile";
+import { Tile } from "./tile";
 import { ValueEvent } from "@thegraid/easeljs-lib";
+import { removeEltFromArray } from "./functions";
+import { Figure } from "./ankh-figure";
 
 /** a Dispenser of a set of Tiles.
  *
@@ -88,6 +90,9 @@ export class TileSource<T extends Tile> {
     this.allUnits.forEach(unit => {
       unit.moveTo(undefined); // --> this.nextUnit();
       unit.parent?.removeChild(unit);
+      removeEltFromArray(unit, Tile.allTiles);
+      removeEltFromArray(unit, Meeple.allMeeples);
+      removeEltFromArray(unit, Figure.allFigures);
     })
     this.allUnits.length = 0;
     this.available.length = 0;

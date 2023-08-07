@@ -82,10 +82,11 @@ export class GameSetup {
       ary.forEach(elt => rv.includes(elt) || rv.push(elt))
       return rv;
     }
+    const uniqGods = uniq(gods);
     const nToFind = (ngods - gods.length);
     const godNames = (nToFind > 0)
-      ? [...gods].concat(selectN(God.allNames.filter(gn => !gods.includes(gn)), nToFind))
-      : (nToFind < 0) ? selectN(uniq(gods), ngods) : gods;
+      ? [...uniqGods].concat(selectN(God.allNames.filter(gn => !uniqGods.includes(gn)), ngods - uniqGods.length))
+      : (nToFind < 0) ? selectN(uniqGods, ngods) : uniqGods;
     godNames.length = Math.min(godNames.length, 5);
     const guardsC: Constructor<Guardian>[][] = [[Satet, MumCat], [Apep, Mummy], [Scorpion, Androsphinx]];
     const guards: Constructor<Guardian>[] = guardsC.map(gs => selectN(gs, 1)[0]);
