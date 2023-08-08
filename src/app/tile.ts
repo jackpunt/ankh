@@ -1,6 +1,6 @@
 import { C, Constructor, ImageLoader, S, className, stime } from "@thegraid/common-lib";
 import { Bitmap, Container, DisplayObject, MouseEvent, Text } from "@thegraid/easeljs-module";
-import { GP } from "./game-play";
+import type { GamePlay } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
@@ -41,9 +41,11 @@ class TileLoader {
 
 /** Someday refactor: all the cardboard bits (Tiles, Meeples & Coins) */
 class Tile0 extends Container {
+  static gamePlay: GamePlay;
   static loader = new TileLoader();
   // constructor() { super(); }
 
+  public gamePlay = Tile.gamePlay;
   public player: Player | undefined;
   get pColor() { return this.player?.color }
   get recycleVerb(): string { return 'demolished'; }
@@ -87,21 +89,6 @@ class Tile0 extends Container {
 export class Tile extends Tile0 {
   static allTiles: Tile[] = [];
   static textSize = 20;
-  static cacheScale = TP.cacheTiles;
-  static reCacheTiles() {
-    Tile.cacheScale = Math.max(1, GP.gamePlay.table.scaleCont.scaleX);
-    TP.cacheTiles = (TP.cacheTiles == 0) ? Tile.cacheScale : 0;
-    console.log(stime('Tile', `.reCacheTiles: TP.cacheTiles=`), TP.cacheTiles, GP.gamePlay.table.scaleCont.scaleX);
-    Tile.allTiles.forEach(tile => {
-      if (tile.cacheID) {
-        tile.uncache();
-      } else {
-        const rad = tile.radius;
-        tile.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
-      }
-    });
-    GP.gamePlay.hexMap.update();
-  }
 
   static makeSource0<T extends Tile, TS extends TileSource<T>>(
     unitSource: new (type: Constructor<Tile>, p: Player, hex: Hex2) => TS,
@@ -234,15 +221,7 @@ export class Tile extends Tile0 {
 
   /** Tile.dropFunc() --> placeTile (to Map, reserve, ~>auction; not Recycle); semantic move/action. */
   placeTile(toHex: Hex1, payCost = false) {
-    GP.gamePlay.placeEither(this, toHex, payCost);
-  }
-
-  flipOwner(targetHex: Hex2, ctx: DragContext) {
-    const gamePlay = GP.gamePlay, player = ctx?.lastCtrl ? this.player.otherPlayer : gamePlay.curPlayer;
-    if (targetHex?.isOnMap && (targetHex === this.fromHex)) {
-      return true;
-    }
-    return false;
+    this.gamePlay.placeEither(this, toHex, payCost);
   }
 
   resetTile() {
@@ -304,7 +283,7 @@ export class Tile extends Tile0 {
   isLegalTarget(toHex: Hex1, ctx?: DragContext) {
     if (!toHex) return false;
     if (!!toHex.tile) return false; // note: from AuctionHexes to Reserve overrides this.
-    if (toHex.meep && !(toHex.meep.player === GP.gamePlay.curPlayer)) return false; // QQQ: can place on non-player meep?
+    if (toHex.meep && !(toHex.meep.player === this.gamePlay.curPlayer)) return false; // QQQ: can place on non-player meep?
     if ((this.hex as Hex2)?.isOnMap && !ctx?.lastShift) return false;
     // [newly] placed tile must be adjacent to an existing [non-BonusTile] Tile:
     if (TP.placeAdjacent && toHex.isOnMap && !toHex.findLinkHex(hex => (hex.tile?.player !== undefined ))) return false;
@@ -325,17 +304,17 @@ export class Tile extends Tile0 {
   }
 
   noLegal() {
-    // const cause = GP.gamePlay.failToBalance(this) ?? '';
-    // const [infR, coinR] = GP.gamePlay.getInfR(this);
-    // GP.gamePlay.logText(`No placement for ${this.andInfStr} ${cause} infR=${infR} coinR=${coinR}`, 'Tile.noLegal')
+    // const cause = this.gamePlay.failToBalance(this) ?? '';
+    // const [infR, coinR] = this.gamePlay.getInfR(this);
+    // this.gamePlay.logText(`No placement for ${this.andInfStr} ${cause} infR=${infR} coinR=${coinR}`, 'Tile.noLegal')
   }
 
   logRecycle(verb: string) {
-    const cp = GP.gamePlay.curPlayer;
+    const cp = this.gamePlay.curPlayer;
     const loc = this.hex?.isOnMap ? 'onMap' : 'offMap';
     const info = { Aname: this.Aname, fromHex: this.fromHex?.Aname, cp: cp.colorn, tile: {...this} }
     console.log(stime(this, `.recycleTile[${loc}]: ${verb}`), info);
-    GP.gamePlay.logText(`${cp.Aname} ${verb} ${this}`, `GamePlay.recycle`);
+    this.gamePlay.logText(`${cp.Aname} ${verb} ${this}`, `GamePlay.recycle`);
   }
 }
 

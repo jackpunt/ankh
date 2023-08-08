@@ -16,7 +16,7 @@ export class AnkhMarker extends Container {
     super();
     this.name = className(this);
     const shape = new CircleShape(color, rad, );
-    const ankh = new CenterText(`${'\u2625'}`, rad * 2.2, C.black);
+    const ankh = new CenterText(TP.ankhString, rad * 2.2, C.black);
     ankh.y += rad * .1;
     this.addChild(shape);
     this.addChild(ankh);
@@ -48,8 +48,8 @@ export class God {
   readonly ankhPowers: string[] = [];
 
   radius = TP.ankh2Rad;
-  getAnkhToken(rad = TP.ankhRad) {
-    return new AnkhMarker(this.color, rad);
+  getAnkhToken(rad = TP.ankhRad, color = this.color) {
+    return new AnkhMarker(color, rad);
   }
 
   makeSpecial(cont: Container, wh: WH, table: Table): Container {

@@ -3,7 +3,7 @@ import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape,
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
 import { Scenario, ScenarioParser } from "./ankh-scenario";
-import { GP, type GamePlay } from "./game-play";
+import { type GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
@@ -13,6 +13,7 @@ import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButto
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
+import { ClassByName } from "./class-by-name";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -442,7 +443,7 @@ export class Table extends EventDispatcher  {
 
   monumentSources: AnkhSource<Monument>[] = [];
   makeMounumentSources(row = 7, col = TP.nHexes + 1.7) {
-    const monmts = Monument.typeNames.map(name => ScenarioParser.classByName[name]);
+    const monmts = Monument.typeNames.map(name => ClassByName.classByName[name]);
     monmts.forEach((momnt, i) => { // .filter((g, i) => i > 0)
       const ci = col + i * 1.25;
       const hex = this.newHex2(row, ci, `ms-${i}`, AnkhHex);
@@ -498,12 +499,13 @@ export class Table extends EventDispatcher  {
     }
     this.activateActionSelect(false, id); // de-activate this row and the ones above.
     this.setActionMarker(button);
-    GP.gamePlay.phaseDone(); // --> phase(selectedAction)
+    this.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
-  setActionMarker(button: EventButton) {
+  setActionMarker(button: EventButton, color?: string) {
     const rad = (button.children[0] as CircleShape).rad;
-    const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(rad);
+    const god = this.gamePlay.curPlayer.god;
+    const ankhToken = god.getAnkhToken(rad, color ?? god.color);
     button.addChild(ankhToken);
     button.stage.update();
   }
@@ -546,7 +548,7 @@ export class Table extends EventDispatcher  {
   doneButton: UtilButton;
   doneClicked = (evt?) => {
     this.activateActionSelect(false); // deactivate all
-    GP.gamePlay.phaseDone();   // <--- main button does not supply 'panel'
+    this.gamePlay.phaseDone();   // <--- main doneButton does not supply 'panel'
   }
   addDoneButton(actionCont: Container, rh: number) {
     const w = 90, h = 56;
@@ -616,9 +618,10 @@ export class Table extends EventDispatcher  {
     if (this.gamePlay.eventName) this.setEventMarker(index - 1);
   }
 
-  setEventMarker(index: number) {
+  setEventMarker(index: number, color?: string) {
+    const god = this.gamePlay.curPlayer.god;
+    const ankhToken = god.getAnkhToken(TP.ankhRad, color ?? god.color);
     const cell = this.eventCells[index];
-    const ankhToken = this.gamePlay.curPlayer.god.getAnkhToken(TP.ankhRad);
     cell.addChild(ankhToken);
     this.gamePlay.eventName = cell.eventName;
   }

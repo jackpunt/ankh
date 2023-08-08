@@ -1,9 +1,8 @@
 import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
-import { SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
+import type { SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
-import { God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
@@ -308,10 +307,11 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return [regions, metaMap];
   }
 
-  showRegions(hexAry = this.hexAry, colors = permute(God.allGods.map(g => g.color))) {
+  colors = ['red', 'yellow','cyan','magenta','blue','green','lightgreen','purple','lightblue'];
+  showRegions(hexAry = this.hexAry, colors = permute(this.colors.concat())) {
     hexAry.forEach(ahex => {
       if (ahex.regionId !== undefined) {
-        const color = C.nameToRgbaString(colors[ahex.regionId % colors.length], .4)
+        const color = C.nameToRgbaString(colors[ahex.regionId % colors.length], .2)
         ahex.overlay.paint(color);
         ahex.overlay.visible = ahex.terrain !== 'w';
         ahex.cont.updateCache();

@@ -65,6 +65,9 @@ export class TP {
   static riverColor = '#90b2f4';
   static borderColor = '#4D5656'; // darker than riverColor
   static splitColor = '#6D9686'; // lighter than borderColor
+  static ankhChar = '\u2625';
+  static ankhString = `${'\u2625'}`;
+
 
   /** map size for (dpb, dop) */
   static fnHexes(nh = TP.nHexes, nm = TP.mHexes) {

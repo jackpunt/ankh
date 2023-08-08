@@ -1,19 +1,19 @@
 
 // TODO: namespace or object for GameState names
 
-import { Constructor, S, className, stime } from "@thegraid/common-lib";
+import { C, Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
-import { AnkhToken } from "./ankh-token";
-import { Androsphinx, AnkhPiece, Apep, Figure, GodFigure, Guardian, Monument, MumCat, Mummy, Obelisk, Pyramid, Satet, Scorpion, Temple, Warrior } from "./ankh-figure";
-import { AnkhHex, AnkhMap } from "./ankh-map";
-import { GamePlay } from "./game-play";
+import { AnkhPiece, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
+import type { AnkhHex, AnkhMap } from "./ankh-map";
+import { ClassByName } from "./class-by-name";
+import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
-import { Hex2 } from "./hex";
+import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
-import { Player } from "./player";
+import type { Player } from "./player";
 import { ActionContainer } from "./table";
-import { Tile } from "./tile";
-import { TileSource } from "./tile-source";
+import type { TileSource } from "./tile-source";
+import { AnkhToken } from "./ankh-token";
 
 type GodName = string;
 type GuardName = string | Constructor<Guardian>;
@@ -62,17 +62,17 @@ export class AnkhScenario {
       ngods: 2,
       regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3],],
       places: [
-        [0, 3, Temple],
-        [2, 5, Pyramid],
-        [1, 8, Obelisk],
-        [5, 0, Obelisk, 1],
-        [4, 1, Warrior, 1],
-        [5, 1, GodFigure, 1],
-        [8, 1, Pyramid],
-        [6, 5, Temple, 2],
-        [6, 6, Warrior, 2],
-        [7, 6, GodFigure, 2],
-        [5, 8, Pyramid],
+        [0, 3, 'Temple'],
+        [2, 5, 'Pyramid'],
+        [1, 8, 'Obelisk'],
+        [5, 0, 'Obelisk', 1],
+        [4, 1, 'Warrior', 1],
+        [5, 1, 'GodFigure', 1],
+        [8, 1, 'Pyramid'],
+        [6, 5, 'Temple', 2],
+        [6, 6, 'Warrior', 2],
+        [7, 6, 'GodFigure', 2],
+        [5, 8, 'Pyramid'],
       ],
     },
     // 3 player
@@ -80,23 +80,23 @@ export class AnkhScenario {
       ngods: 3,
       regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3],],
       places: [
-        [4, 3, GodFigure, 1],
-        [4, 4, Warrior, 1],
-        [5, 4, Temple, 1],
-        [3, 0, Pyramid],
-        [7, 2, Obelisk],
+        [4, 3, 'GodFigure', 1],
+        [4, 4, 'Warrior', 1],
+        [5, 4, 'Temple', 1],
+        [3, 0, 'Pyramid'],
+        [7, 2, 'Obelisk'],
 
-        [7, 6, GodFigure, 2],
-        [6, 6, Warrior, 2],
-        [6, 5, Obelisk, 2],
-        [5, 9, Temple],
-        [3, 7, Pyramid],
+        [7, 6, 'GodFigure', 2],
+        [6, 6, 'Warrior', 2],
+        [6, 5, 'Obelisk', 2],
+        [5, 9, 'Temple'],
+        [3, 7, 'Pyramid'],
 
-        [2, 5, GodFigure, 3],
-        [3, 4, Warrior, 3],
-        [2, 4, Pyramid, 3],
-        [1, 8, Obelisk],
-        [3, 5, Temple],
+        [2, 5, 'GodFigure', 3],
+        [3, 4, 'Warrior', 3],
+        [2, 4, 'Pyramid', 3],
+        [1, 8, 'Obelisk'],
+        [3, 5, 'Temple'],
       ],
     },
 
@@ -108,28 +108,28 @@ export class AnkhScenario {
         [[3, 0, 1,], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
       ],
       places: [
-        [3, 1, GodFigure, 1],
-        [3, 2, Warrior, 1],
-        [4, 2, Temple, 1],
-        [5, 5, Pyramid],
+        [3, 1, 'GodFigure', 1],
+        [3, 2, 'Warrior', 1],
+        [4, 2, 'Temple', 1],
+        [5, 5, 'Pyramid'],
 
-        [7, 3, GodFigure, 2],
-        [7, 4, Warrior, 2],
-        [8, 4, Temple, 2],
-        [7, 0, Pyramid],
-        [4, 1, Obelisk],
+        [7, 3, 'GodFigure', 2],
+        [7, 4, 'Warrior', 2],
+        [8, 4, 'Temple', 2],
+        [7, 0, 'Pyramid'],
+        [4, 1, 'Obelisk'],
 
-        [2, 5, GodFigure, 3],
-        [3, 4, Warrior, 3],
-        [3, 5, Obelisk, 3],
-        [1, 3, Temple],
-        [2, 8, Pyramid],
+        [2, 5, 'GodFigure', 3],
+        [3, 4, 'Warrior', 3],
+        [3, 5, 'Obelisk', 3],
+        [1, 3, 'Temple'],
+        [2, 8, 'Pyramid'],
 
-        [4, 7, GodFigure, 4],
-        [5, 6, Warrior, 4],
-        [5, 7, Pyramid, 4],
-        [3, 8, Obelisk],
-        [8, 6, Temple],
+        [4, 7, 'GodFigure', 4],
+        [5, 6, 'Warrior', 4],
+        [5, 7, 'Pyramid', 4],
+        [3, 8, 'Obelisk'],
+        [8, 6, 'Temple'],
       ],
     },
     // 5-player
@@ -141,35 +141,35 @@ export class AnkhScenario {
         [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
       ],
       places: [
-        [2, 1, Temple, 1],
-        [3, 1, GodFigure, 1],
-        [3, 2, Warrior, 1],
-        [4, 5, Pyramid],
-        [4, 1, Obelisk],
-        [6, 1, GodFigure, 5],
-        [7, 1, Pyramid, 5],
-        [7, 2, Warrior, 5],
-        [8, 4, Temple],
-        [7, 6, Obelisk],
-        [8, 7, Warrior, 3],
-        [8, 8, GodFigure, 3],
-        [8, 9, Temple, 3],
+        [2, 1, 'Temple', 1],
+        [3, 1, 'GodFigure', 1],
+        [3, 2, 'Warrior', 1],
+        [4, 5, 'Pyramid'],
+        [4, 1, 'Obelisk'],
+        [6, 1, 'GodFigure', 5],
+        [7, 1, 'Pyramid', 5],
+        [7, 2, 'Warrior', 5],
+        [8, 4, 'Temple'],
+        [7, 6, 'Obelisk'],
+        [8, 7, 'Warrior', 3],
+        [8, 8, 'GodFigure', 3],
+        [8, 9, 'Temple', 3],
 
-        [6, 6, Pyramid],
-        [4, 8, GodFigure, 2],
-        [3, 8, Obelisk, 2],
-        [3, 7, Warrior, 2],
-        [1, 6, Temple],
-        [3, 4, GodFigure, 4],
-        [2, 5, Warrior, 4],
-        [3, 5, Pyramid, 4],
-        [0, 2, Temple],
+        [6, 6, 'Pyramid'],
+        [4, 8, 'GodFigure', 2],
+        [3, 8, 'Obelisk', 2],
+        [3, 7, 'Warrior', 2],
+        [1, 6, 'Temple'],
+        [3, 4, 'GodFigure', 4],
+        [2, 5, 'Warrior', 4],
+        [3, 5, 'Pyramid', 4],
+        [0, 2, 'Temple'],
       ],
     },
   ];
   static AltMidKingdom5: Scenario = {
     ngods: 5,
-    turn: 15,
+    turn: 16,
     gods: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
     actions: { Move: 5, Summon: 1, Gain: 4, Ankh: 2 },
     ankhs: [
@@ -240,31 +240,23 @@ export class AnkhScenario {
       stable: [['Satet'], []],
       ankhs: [['Commanding', 'Revered'], ['Inspiring', 'Omnipresent', 'Temple']],
       places: [
-        [3, 4, Warrior, 1],
-        [8, 2, GodFigure, 1],
-        [3, 6, Warrior, 2],
-        [4, 7, GodFigure, 2],
+        [3, 4, 'Warrior', 1],
+        [8, 2, 'GodFigure', 1],
+        [3, 6, 'Warrior', 2],
+        [4, 7, 'GodFigure', 2],
 
-        [0, 3, Temple],
-        [2, 5, Pyramid],
-        [1, 8, Obelisk],
-        [5, 0, Obelisk, 1],
-        [8, 1, Pyramid],
-        [6, 5, Temple, 2],
-        [5, 8, Pyramid],
+        [0, 3, 'Temple'],
+        [2, 5, 'Pyramid'],
+        [1, 8, 'Obelisk'],
+        [5, 0, 'Obelisk', 1],
+        [8, 1, 'Pyramid'],
+        [6, 5, 'Temple', 2],
+        [5, 8, 'Pyramid'],
       ]
   };
 }
 
 export class ScenarioParser {
-  static classByName: { [index: string]: Constructor<GodFigure | Monument | Figure | AnkhToken > } =
-    { 'GodFigure': GodFigure, 'Warrior': Warrior,
-      'Obelisk': Obelisk, 'Pyramid': Pyramid, 'Temple': Temple,
-      'Satet': Satet, 'MumCat': MumCat,
-      'Apep': Apep, 'Mummy': Mummy,
-      'Androsphinx': Androsphinx, 'Scorpion': Scorpion,
-      'AnkhToken': AnkhToken,
-    }
 
   constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
@@ -304,7 +296,7 @@ export class ScenarioParser {
   parsePlaces(place: PlaceElt[], unplaceAnkhs = false) {
     const map = this.map;
     // Figure.allFigures.forEach(fig => (fig.hex?.isOnMap ? fig.sendHome() : undefined));
-    Tile.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
+    this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     // const figs = map.forEachHex(hex => hex.meep);
     const p0 = this.gamePlay.allPlayers[0], p1 = this.gamePlay.allPlayers[1];
     const as0 = p0.panel.ankhSource, as1 = p1.panel.ankhSource;
@@ -324,15 +316,15 @@ export class ScenarioParser {
     //console.groupCollapsed('place');
     place.forEach(elt => {
       const [row, col, cons0, pid] = elt;
-      const cons = (typeof cons0 === 'string') ? ScenarioParser.classByName[cons0] : cons0;
+      const cons = (typeof cons0 === 'string') ? ClassByName.classByName[cons0] : cons0;
       const hex = map[row][col];
-      const player = (pid !== undefined) && Player.allPlayers[pid - 1];
+      const player = (pid !== undefined) && this.gamePlay.allPlayers[pid - 1];
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
       const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god.Aname) as GodFigure;
-      let piece0 = godFig ?? ((source instanceof TileSource) ? source.takeUnit() : undefined);
+      let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit() : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
@@ -364,7 +356,7 @@ export class ScenarioParser {
     }
     if (events !== undefined) {
       for (let ndx = 0; ndx < events; ndx++) {
-        table.setEventMarker(ndx);
+        table.setEventMarker(ndx, C.grey);
       }
       gamePlay.eventName = undefined;
       map.update();
@@ -375,7 +367,7 @@ export class ScenarioParser {
         for (let cn = 0; cn < nSelected; cn++) {
           const rowCont = table.actionPanels[id];
           const button = rowCont.getButton(cn);
-          table.setActionMarker(button);
+          table.setActionMarker(button, C.grey);
         }
       });
     }
@@ -384,7 +376,7 @@ export class ScenarioParser {
     guards?.forEach((name, ndx) => {
       if (typeof name !== 'string') name = name.name;
       const source = table.guardSources[ndx];
-      const type = ScenarioParser.classByName[name] as Constructor<Guardian>;
+      const type = ClassByName.classByName[name] as Constructor<Guardian>;
       if (name !== source.type.name) {
         const n = source.deleteAll();
         const newSource = Guardian.makeSource(source.hex, type, n);
@@ -463,7 +455,7 @@ export class ScenarioParser {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
     const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());
-    const places = Tile.allTiles.filter(t => t.hex?.isOnMap && !(t instanceof AnkhToken)).map(t => {
+    const places = this.gamePlay.allTiles.filter(t => t.hex?.isOnMap && !(t instanceof AnkhToken)).map(t => {
       const row = t.hex.row, col = t.hex.col, cons = className(t), pid = t.player ? t.player.index + 1 : undefined;
       return [row, col, cons, pid] as PlaceElt;
     })

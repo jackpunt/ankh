@@ -4,7 +4,7 @@ import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
 import { Scenario, ScenarioParser } from "./ankh-scenario";
-import { GameSetup } from "./game-setup";
+import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
@@ -22,11 +22,6 @@ class Move{
   Aname: string = "";
   ind: number = 0;
   board: any = {};
-}
-
-export class GP {
-  static gamePlay: GamePlay;
-  static ankhC = '\u2625';
 }
 
 /** Implement game, enforce the rules, manage GameStats & hexMap; no GUI/Table required.
@@ -49,7 +44,7 @@ export class GamePlay0 {
   static gpid = 0
   readonly id = GamePlay0.gpid++
 
-  readonly gameState: GameState = (this instanceof GamePlay) ? new GameState(this) : undefined;
+  readonly gameState: GameState = (this instanceof GamePlay) ? new GameState(this as GamePlay) : undefined;
   get gamePhase() { return this.gameState.state; }
   isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
   phaseDone(...args: any[]) { this.gameState.done(...args); }
@@ -59,6 +54,7 @@ export class GamePlay0 {
   readonly logWriter: LogWriter
 
   get allPlayers() { return Player.allPlayers; }
+  get allTiles() { return Tile.allTiles; }
   selectedActionIndex: number;
   selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
   eventName: string;
@@ -89,7 +85,8 @@ export class GamePlay0 {
 
     // Create and Inject all the Players: (picking a townStart?)
     this.allPlayers.length = 0;
-    godNames.forEach((godName, ndx) => new Player(ndx, godName, this)); // make real Players...
+    const gamePlay = (this instanceof GamePlay) ? this as GamePlay : undefined;
+    godNames.forEach((godName, ndx) => new Player(ndx, godName, gamePlay)); // make real Players...
     this.curPlayerNdx = 0;
     this.curPlayer = this.allPlayers[this.curPlayerNdx];
   }
@@ -261,7 +258,7 @@ export class GamePlay extends GamePlay0 {
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
   constructor(public scenario: Scenario, table: Table, public gameSetup: GameSetup) {
     super(scenario.gods);            // hexMap, history, gStats...
-    GP.gamePlay = this; // table
+    Tile.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;
     if (this.table.stage.canvas) this.bindKeys();
@@ -298,7 +295,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.stopPlayer })// C-c Stop Planner
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
     KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn })
-    KeyBinder.keyBinder.setKey('c', { thisArg: this, func: Tile.reCacheTiles })
+    KeyBinder.keyBinder.setKey('C', { thisArg: this, func: this.reCacheTiles })
 
     KeyBinder.keyBinder.setKey('m', { thisArg: this, func: this.chooseAction, argVal: 'Move' })
     KeyBinder.keyBinder.setKey('s', { thisArg: this, func: this.chooseAction, argVal: 'Summon' })
@@ -383,6 +380,22 @@ export class GamePlay extends GamePlay0 {
     if (this.curPlayer.plannerRunning) return
     this.undoMove();
     this.makeMove(true, undefined, 1)
+  }
+
+  cacheScale = TP.cacheTiles;
+  reCacheTiles() {
+    this.cacheScale = Math.max(1, this.table.scaleCont.scaleX);
+    TP.cacheTiles = (TP.cacheTiles == 0) ? this.cacheScale : 0;
+    console.log(stime('GamePlay', `.reCacheTiles: TP.cacheTiles=`), TP.cacheTiles, this.table.scaleCont.scaleX);
+    Tile.allTiles.forEach(tile => {
+      if (tile.cacheID) {
+        tile.uncache();
+      } else {
+        const rad = tile.radius;
+        tile.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
+      }
+    });
+    this.hexMap.update();
   }
 
   /**

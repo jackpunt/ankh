@@ -1,11 +1,10 @@
 import { C, Constructor } from "@thegraid/common-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import { AnkhMeeple, AnkhSource, Monument } from "./ankh-figure";
-import { GP } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
-import { Player } from "./player";
+import type { Player } from "./player";
 import { CenterText } from "./shapes";
-import { DragContext } from "./table";
+import type { DragContext } from "./table";
 import { TP } from "./table-params";
 
 
@@ -18,14 +17,14 @@ export class AnkhToken extends AnkhMeeple {
   }
   override get radius() { return TP.ankhRad; }
   override isDragable(arg: DragContext) {
-    return this.hex && GP.gamePlay.isPhase('Claim');
+    return this.hex && this.player.gamePlay.isPhase('Claim');
   }
 
   constructor(player: Player, serial: number) {
     super(player, serial, `Ankh`); // `Ankh:${player?.index}\n${serial}`, player);
     this.name = `Ankh:${player?.index}-${serial}`;
     const r = this.radius;
-    const ankhChar = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
+    const ankhChar = new CenterText(TP.ankhString, r * 2.2, C.black);
     ankhChar.y += r * 0.1;
     this.addChild(ankhChar);
     this.nameText.text = '';
@@ -62,11 +61,11 @@ export class AnkhToken extends AnkhMeeple {
 
   override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
     const tile = hex.tile, player = this.player;
-    const allMonuments = GP.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
+    const allMonuments = this.player.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
     const allUnclaimed = allMonuments.filter(mon => mon.player === undefined);;
     const canBeClaimed = (tile instanceof Monument) && ((allUnclaimed.length === 0) ? true : (tile.player === undefined));
     const isClaimable = hex.findLinkHex(adj => adj.meep?.player === player);
-    if (isClaimable && canBeClaimed && (this.hex === this.source.hex) && GP.gamePlay.isPhase('Claim')) return true;
+    if (isClaimable && canBeClaimed && (this.hex === this.source.hex) && this.player.gamePlay.isPhase('Claim')) return true;
     return false;
   }
 }

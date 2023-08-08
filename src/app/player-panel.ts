@@ -2,9 +2,7 @@ import { C, DragInfo, S, stime } from "@thegraid/easeljs-lib";
 import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
 import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex } from "./ankh-map";
-import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
-import { GP } from "./game-play";
 import { Hex2 } from "./hex";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
@@ -12,6 +10,7 @@ import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { TileSource } from "./tile-source";
+import { AnkhToken } from "./ankh-token";
 
 
 /** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */
@@ -92,7 +91,7 @@ export class PlayerPanel extends Container {
   plagueBid = 0;  // TODO wireup a NumCounter (with a close-gesture)
   enablePlagueBid(region: number): void {
     this.plagueBid = 0;
-    GP.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
+    this.player.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
   canBuildInRegion: number = -1; // disabled.
   // really: detectBuildDne.
@@ -106,7 +105,7 @@ export class PlayerPanel extends Container {
       if (panel0 === panel) {
         this.table.off('buildDone', onBuildDone);
         panel0.canBuildInRegion = -1;
-        GP.gamePlay.phaseDone(panel0);
+        this.player.gamePlay.phaseDone(panel0);
       }
     })
   }
@@ -166,7 +165,7 @@ export class PlayerPanel extends Container {
   }
   get objects() {
     const player = this.player, index = player.index, panel = this, god = this.player.god;
-    const table  = this.table, gamePlay = GP.gamePlay;
+    const table  = this.table, gamePlay = this.player.gamePlay;
     return { panel, player, index, god, table, gamePlay }
   }
 
@@ -179,7 +178,7 @@ export class PlayerPanel extends Container {
   }
   bg0 = 'rgba(255,255,255,.3)';
   bg1 = 'rgba(255,255,255,.5)';
-  showPlayer(show = (this.player === GP.gamePlay.curPlayer)) {
+  showPlayer(show = (this.player && this.player === this.player.gamePlay.curPlayer)) {
     this.setOutline(show ? 4 : 2, show ? this.bg1 : this.bg0);
   }
 
@@ -296,8 +295,8 @@ export class PlayerPanel extends Container {
     if (colCont.guardianSlot === 1 - ankhCol) {
       this.takeGuardianIfAble(colCont.rank)
     }
-    GP.gamePlay.selectedAction = 'Ankh';
-    GP.gamePlay.phaseDone();
+    this.player.gamePlay.selectedAction = 'Ankh';
+    this.player.gamePlay.phaseDone();
   };
 
   takeGuardianIfAble(rank: number) {

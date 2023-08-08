@@ -1,15 +1,14 @@
 import { C, S, stime } from "@thegraid/common-lib";
 import { MouseEvent } from "@thegraid/easeljs-module";
 import { Figure, Monument } from "./ankh-figure";
-import { AnkhHex } from "./ankh-map";
-import { SplitSpec } from "./ankh-scenario";
-import { GP, GamePlay } from "./game-play";
+import type { AnkhHex } from "./ankh-map";
+import type { SplitSpec } from "./ankh-scenario";
+import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
-import { Player } from "./player";
-import { PlayerPanel, PowerLine } from "./player-panel";
+import type { Player } from "./player";
+import type { PlayerPanel, PowerLine } from "./player-panel";
 import { CircleShape, UtilButton } from "./shapes";
 import { TP } from "./table-params";
-import { Tile } from "./tile";
 
 interface Phase {
   Aname?: string,
@@ -59,7 +58,7 @@ export class GameState {
   }
 
   findGod(name: string) {
-    return GP.gamePlay.allPlayers.find(p => p.god.Aname == name);
+    return this.gamePlay.allPlayers.find(p => p.god.Aname == name);
   }
 
   start(phase = 'BeginTurn') {
@@ -648,7 +647,7 @@ export class GameState {
   gainFollowersAction() {
     const player = this.gamePlay.curPlayer;
     // Osiris Portal begins offMap.
-    const allMonts = Tile.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
+    const allMonts = this.gamePlay.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
     const monts =  allMonts.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
     const mine = monts.filter(mont => mont.hex.findAdjHex(hex => hex.meep?.player === player));
     const n = mine.length;

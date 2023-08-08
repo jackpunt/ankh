@@ -2,7 +2,6 @@ import { C, Constructor, XY, className, stime } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap } from "./ankh-map";
 import { NumCounter } from "./counters";
-import { GP } from "./game-play";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -24,7 +23,7 @@ export class AnkhSource<T extends Tile> extends TileSource<T> {
           return new NumCounter(name, initValue, 'rgba(240,240,240,.6)', fontSize, fontName, textColor);
         }
         const radius = type.prototype.radius ?? 0, fs = TP.hexRad / 2, x0 = radius / 2, y0 = radius - fs / 4;
-        const cont = hex.map.mapCont.counterCont; // GP.gamePlay.hexMap.mapCont.counterCont;
+        const cont = hex.map.mapCont.counterCont; // this.gamePlay.hexMap.mapCont.counterCont;
         const { x, y } = hex.cont.localToLocal(xy ? xy.x ?? x0 : x0, xy ? xy.y ?? y0 : y0, cont);
         const counter = makeCounter(`${type.name}:${player?.index ?? 'any'}`, 0, `lightblue`, TP.hexRad / 2);
         counter.attachToContainer(cont, { x: counter.x + x, y: counter.y + y });
@@ -60,7 +59,7 @@ export class AnkhPiece extends MapTile {
     return hex;
   }
   isPhase(name: string) {
-    return GP.gamePlay.isPhase(name);
+    return this.gamePlay.isPhase(name);
   }
 
   isLegalWater(hex: AnkhHex) {
@@ -91,12 +90,12 @@ export class Monument extends AnkhPiece {
   }
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
-    if (!GP.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
-    if (!GP.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
-    const panel = GP.gamePlay.gameState.state.panels[0];
+    if (!this.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
+    if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
+    const panel = this.gamePlay.gameState.state.panels[0];
     if (panel.canBuildInRegion < 0) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
-    const regionId = GP.gamePlay.gameState.conflictRegion - 1;
-    const region = GP.gamePlay.hexMap.regions[regionId];
+    const regionId = this.gamePlay.gameState.conflictRegion - 1;
+    const region = this.gamePlay.hexMap.regions[regionId];
     if (!region?.includes(toHex) && !ctx.lastShift) return false;  // now: toHex !== undefined, toHex.isOnMap
     if (toHex.meep) return false;
     if (toHex.terrain == 'w') return false;
@@ -108,7 +107,7 @@ export class Monument extends AnkhPiece {
     super.dropFunc(targetHex, ctx);
     if (targetHex.isOnMap && !targetHex.meep) {
       const tohex = targetHex as AnkhHex, map = tohex.map as AnkhMap<AnkhHex>;
-      const gamePlay = GP.gamePlay, gameState = gamePlay.gameState;
+      const gamePlay = this.gamePlay, gameState = gamePlay.gameState;
       if (!this.isPhase('BuildMonument')) return;
       const panel0 = gameState.state.panels[0]; // 'active' player.
       const regionId = panel0.canBuildInRegion, region = map.regions[regionId - 1];
@@ -116,7 +115,7 @@ export class Monument extends AnkhPiece {
         const ankh = panel0.ankhSource.takeUnit(), monument = this;
         ankh.moveTo(this.hex);
         console.log(stime(this, `.dropFunc: emit buildDone panel0=`), panel0);
-        setTimeout( () => GP.gamePlay.table.dispatchEvent({ type: 'buildDone', panel0, monument }), 10);
+        setTimeout( () => this.gamePlay.table.dispatchEvent({ type: 'buildDone', panel0, monument }), 10);
       }
     }
   }
@@ -179,7 +178,7 @@ export class Portal extends AnkhPiece {
         // TODO: isOnMap && isOccupiedLegal
         return super.isLegalTarget(toHex, ctx);
       } else if (this.isPhase('Battle')) {
-        if (GP.gamePlay.gameState.battleResults) return true;
+        if (this.gamePlay.gameState.battleResults) return true;
       }
     }
     return false;
@@ -236,7 +235,7 @@ export class AnkhMeeple extends Meeple {
   override moveTo(hex: Hex1) {
     const startHex = this.startHex;
     const rv = super.moveTo(hex);
-    if (GP.gamePlay.isPhase('Summon') && startHex) {
+    if (this.gamePlay.isPhase('Summon') && startHex) {
       this.startHex = startHex;
     }
     return rv;
@@ -256,7 +255,7 @@ export class Figure extends AnkhMeeple {
   static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) as Figure[] }
 
   isPhase(name: string) {
-    return GP.gamePlay.isPhase(name);
+    return this.gamePlay.isPhase(name);
   }
 
   isStableHex(hex: Hex1) {
@@ -414,8 +413,8 @@ export class Guardian extends Figure {
     // Coming from global source:
     if (this.hex === this.source.hex) {
       // allow moveTo a stable if ctx.lastShift
-      const index = GP.gamePlay.table.guardSources.findIndex(s => s === this.source) + 1;
-      const toStable =  !!GP.gamePlay.allPlayers.find(p => p.stableHexes[index] === hex);
+      const index = this.gamePlay.table.guardSources.findIndex(s => s === this.source) + 1;
+      const toStable =  !!this.gamePlay.allPlayers.find(p => p.stableHexes[index] === hex);
       if (ctx.lastShift && toStable && !hex.occupied) return true;
     }
     return super.isLegalTarget(hex, ctx);
@@ -423,7 +422,7 @@ export class Guardian extends Figure {
 
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     if (this.isStableHex(targetHex)) {
-      const plyr = GP.gamePlay.allPlayers.find(p => p.stableHexes.includes(targetHex))
+      const plyr = this.gamePlay.allPlayers.find(p => p.stableHexes.includes(targetHex))
       this.setPlayerAndPaint(plyr);
     }
     super.dropFunc(targetHex, ctx);

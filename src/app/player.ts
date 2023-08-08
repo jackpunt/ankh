@@ -1,6 +1,6 @@
 import { Constructor, stime } from "@thegraid/common-lib";
 import { NumCounter } from "./counters";
-import { GP, GamePlay, GamePlay0 } from "./game-play";
+import type { GamePlay, GamePlay0 } from "./game-play";
 import { God } from "./god";
 import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
@@ -17,7 +17,7 @@ export class Player {
   constructor(
     readonly index: number,
     readonly godName: string,
-    readonly gamePlay: GamePlay0,
+    public readonly gamePlay: GamePlay, // for headless, allow GamePlay0
   ) {
     const godc = God.constructors.find(g => g.name === godName);
     this.god =  new godc();
@@ -44,7 +44,7 @@ export class Player {
   get score() { return this._score }
   set score(score: number) {
     this._score = Math.floor(score);
-    GP.gamePlay.table.setPlayerScore(this, score);
+    this.gamePlay?.table.setPlayerScore(this, score);
   }
 
   // Created in masse by Table.layoutCounter

@@ -1,6 +1,6 @@
 import { C, Constructor } from "@thegraid/common-lib";
 import { Shape } from "@thegraid/easeljs-module";
-import { GP, NamedObject } from "./game-play";
+import type { NamedObject } from "./game-play";
 import type { Hex, Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, PaintableShape } from "./shapes";
@@ -103,7 +103,7 @@ export class Meeple extends Tile {
     if (this.backSide) this.backSide.visible = !up;
     if (up && this.hex) this.startHex = this.hex; // set at start of turn.
     this.updateCache();
-    if (this.hex?.isOnMap) GP.gamePlay.hexMap.update();
+    if (this.hex?.isOnMap) this.gamePlay.hexMap.update();
   }
 
   moveTo0(hex: Hex1) {
@@ -167,8 +167,7 @@ export class Meeple extends Tile {
   }
 
   override isLegalRecycle(ctx: DragContext) {
-    if (this.player === GP.gamePlay.curPlayer) return true;
-    // if (this.hex.getInfT(GP.gamePlay.curPlayer.color) > this.hex.getInfT(this.infColor)) return true;
+    if (this.player === this.gamePlay.curPlayer) return true;
     return false;
   }
 

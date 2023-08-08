@@ -1,12 +1,7 @@
-import { C, F, S, XY, stime } from "@thegraid/common-lib";
-import { DisplayObject, Shape, Text, MouseEvent } from "@thegraid/easeljs-module";
-import { GP } from "./game-play";
-import type { Hex2 } from "./hex";
-import { H } from "./hex-intfs";
-import { TP } from "./table-params";
-import { InfShape } from "./shapes";
+import { S, XY } from "@thegraid/common-lib";
 import { ValueCounter, ValueEvent } from "@thegraid/easeljs-lib"; // "./value-counter";
-import type { Player } from "./player";
+import { DisplayObject, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
+import type { GamePlay } from "./game-play";
 
 /** ValueCounter in a Rectangle. */
 export class ValueCounterBox extends ValueCounter {
@@ -113,7 +108,6 @@ export class DecimalCounter extends NumCounterBox {
   constructor(name: string, initValue?: string | number, color?: string, fontSize?: number, fontName?: string) {
     super(name, initValue, color, fontSize, fontName);
   }
-  get perRound() { return (this.value as number) / Math.max(1, Math.floor(GP.gamePlay.turnNumber / 2)); }
 
   override setBoxWithValue(value: number): void {
     super.setBoxWithValue(value.toFixed(this.decimal));
@@ -121,57 +115,59 @@ export class DecimalCounter extends NumCounterBox {
 }
 
 export class PerRoundCounter extends DecimalCounter {
+  gamePlay: GamePlay;
+  get perRound() { return (this.value as number) / Math.max(1, Math.floor(this.gamePlay.turnNumber / 2)); }
   override decimal = 1;
   override setBoxWithValue(value: number): void {
     super.setBoxWithValue(this.perRound);
   }
 }
 
-export class CostIncCounter extends NumCounter {
+// export class CostIncCounter extends NumCounter {
 
-  /**
-   * Show InfR for curPlayer to place Tile;
-   * @param hex place Counter above the given hex.
-   * @param name internal identifyier
-   * @param ndx cost increment based on CostIncMatrix[ndx]; -1 -> show no cost
-   * @param repaint calc cost for: Player OR true/false->curPlayer;
-   * - Note: false -> const cost, no repaint
-   */
-  constructor(
-    public hex: Hex2,
-    name = `costInc`,
-    public ndx = -1,
-    public repaint: boolean | Player = true
-  ) {
-    super(name, 0, 'grey', TP.hexRad / 2)
-    const counterCont = hex.mapCont.counterCont;
-    const xy = hex.cont.localToLocal(0, TP.hexRad * H.sqrt3_2, counterCont);
-    this.attachToContainer(counterCont, xy);
-  }
-  protected override makeBox(color: string, high: number, wide: number): DisplayObject {
-    const box = new InfShape('lightgrey');
-    const size = Math.max(high, wide)
-    box.scaleX = box.scaleY = .5 * size / TP.hexRad;
-    return box
-  }
+//   /**
+//    * Show InfR for curPlayer to place Tile;
+//    * @param hex place Counter above the given hex.
+//    * @param name internal identifyier
+//    * @param ndx cost increment based on CostIncMatrix[ndx]; -1 -> show no cost
+//    * @param repaint calc cost for: Player OR true/false->curPlayer;
+//    * - Note: false -> const cost, no repaint
+//    */
+//   constructor(
+//     public hex: Hex2,
+//     name = `costInc`,
+//     public ndx = -1,
+//     public repaint: boolean | Player = true
+//   ) {
+//     super(name, 0, 'grey', TP.hexRad / 2)
+//     const counterCont = hex.mapCont.counterCont;
+//     const xy = hex.cont.localToLocal(0, TP.hexRad * H.sqrt3_2, counterCont);
+//     this.attachToContainer(counterCont, xy);
+//   }
+//   protected override makeBox(color: string, high: number, wide: number): DisplayObject {
+//     const box = new InfShape('lightgrey');
+//     const size = Math.max(high, wide)
+//     box.scaleX = box.scaleY = .5 * size / TP.hexRad;
+//     return box
+//   }
 
-  /** return width, height; suitable for makeBox() => drawRect()  */
-  protected override boxSize(text: Text): { width: number; height: number } {
-    let width = text.getMeasuredWidth();
-    let height = text.getMeasuredLineHeight();
-    let high = height * 1.1;
-    let wide = Math.max(width * 1.1, high);
-    let rv = { width: wide, height: high };
-    return rv;
-  }
-}
+//   /** return width, height; suitable for makeBox() => drawRect()  */
+//   protected override boxSize(text: Text): { width: number; height: number } {
+//     let width = text.getMeasuredWidth();
+//     let height = text.getMeasuredLineHeight();
+//     let high = height * 1.1;
+//     let wide = Math.max(width * 1.1, high);
+//     let rv = { width: wide, height: high };
+//     return rv;
+//   }
+// }
 
-class CostTotalCounter extends CostIncCounter {
-  protected override makeBox(color: string, high: number, wide: number): DisplayObject {
-    let box = new Shape();
-    let size = Math.max(high, wide)
-    box.graphics.c().f(C.coinGold).dc(0, 0, TP.hexRad);
-    box.scaleX = box.scaleY = .5 * size / TP.hexRad;
-    return box
-  }
-}
+// class CostTotalCounter extends CostIncCounter {
+//   protected override makeBox(color: string, high: number, wide: number): DisplayObject {
+//     let box = new Shape();
+//     let size = Math.max(high, wide)
+//     box.graphics.c().f(C.coinGold).dc(0, 0, TP.hexRad);
+//     box.scaleX = box.scaleY = .5 * size / TP.hexRad;
+//     return box
+//   }
+// }
