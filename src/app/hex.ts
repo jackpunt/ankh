@@ -1,5 +1,5 @@
 import { C, Constructor, F, RC, S } from "@thegraid/easeljs-lib";
-import { Container, Graphics, Point, Shape, Text } from "@thegraid/easeljs-module";
+import { Container, Graphics, Point, Text } from "@thegraid/easeljs-module";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { HexShape, LegalMark } from "./shapes";
@@ -226,7 +226,7 @@ export class Hex2 extends Hex1 {
     const cont: Container = this.map.mapCont.tileCont, x = this.x, y = this.y;
     let k = true;     // debug double tile
     const this_unit = (meep ? this.meep : this.tile)
-    if (unit !== undefined && this_unit !== undefined) {
+    if (unit !== undefined && this_unit !== undefined && !(meep && this_unit.recycleVerb === 'demolished')) {
       if (this === this_unit.source?.hex && this === unit.source?.hex) {
         // Table.dragStart does moveTo(undefined); which triggers source.nextUnit()
         // so if we drop to the startHex, we have a collision.
@@ -601,13 +601,13 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
    * @param legal - returnn ONLY hex with LegalMark visible & mouseenabled.
    * @returns the Hex2 under mouse or undefined, if not a Hex (background)
    */
-  hexUnderPoint(x: number, y: number, legal = true): Hex2 {
+  hexUnderPoint(x: number, y: number, legal = true): T {
     const mark = this.mapCont.markCont.getObjectUnderPoint(x, y, 1);
     // Note: in theory, mark could be on a Hex2 that is NOT in hexCont!
-    if (mark instanceof LegalMark) return mark.hex2;
+    if (mark instanceof LegalMark) return mark.hex2 as any as T;
     if (legal) return undefined;
     const hexc = this.mapCont.hexCont.getObjectUnderPoint(x, y, 1); // 0=all, 1=mouse-enabled (Hex, not Stone)
-    if (hexc instanceof HexCont) return hexc.hex2;
+    if (hexc instanceof HexCont) return hexc.hex2 as any as T;
     return undefined;
   }
   /**

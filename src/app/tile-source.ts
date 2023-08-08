@@ -1,15 +1,14 @@
 import { Constructor } from "@thegraid/common-lib";
+import { ValueEvent } from "@thegraid/easeljs-lib";
+import { Figure } from "./ankh-figure";
 import { NumCounter } from "./counters";
-import { GP } from "./game-play";
+import { removeEltFromArray } from "./functions";
 import type { Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import type { Player } from "./player";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { ValueEvent } from "@thegraid/easeljs-lib";
-import { removeEltFromArray } from "./functions";
-import { Figure } from "./ankh-figure";
 
 /** a Dispenser of a set of Tiles.
  *
@@ -99,6 +98,8 @@ export class TileSource<T extends Tile> {
     this.updateCounter();
     return n;
   }
+
+  get allUnitsCopy() { return this.allUnits.concat(); }
 
   get sourceHexUnit() {
     return (this.hex.tile || this.hex.meep) as T; // moveTo puts it somewhere...

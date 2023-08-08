@@ -7,7 +7,7 @@ import { C1, PaintableShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { TileSource, UnitSource } from "./tile-source";
+import { UnitSource } from "./tile-source";
 
 class MeepleShape extends PaintableShape {
   static fillColor = 'rgba(225,225,225,.7)';
@@ -45,7 +45,6 @@ class MeepleShape extends PaintableShape {
 export class Meeple extends Tile {
   static allMeeples: Meeple[] = [];
 
-  readonly colorValues = C.nameToRgba("blue"); // with alpha component
   get backSide() { return this.baseShape.backSide; }
   override get recycleVerb() { return 'dismissed'; }
 

@@ -1,7 +1,7 @@
 import { C, F, XY, XYWH } from "@thegraid/common-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
-import { H, HexDir } from "./hex-intfs";
+import { H } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
 import type { Tile } from "./tile";
 
@@ -367,5 +367,12 @@ export class UtilButton extends Container implements Paintable {
     // using @thegraid/easeljs-module@^1.1.8: on(once=true) will now 'just work'
     afterUpdate && this.stage.on('drawend', afterUpdate, scope, true)
     this.stage.update()
+  }
+}
+
+export class EdgeShape extends Shape {
+  constructor(public color: string, parent) {
+    super(new Graphics().ss(12, 'round', 'round').s(color))
+    parent.addChild(this);
   }
 }

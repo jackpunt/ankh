@@ -1,8 +1,9 @@
 import { Constructor, json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { EzPromise } from "@thegraid/ezpromise";
-import { Figure, Monument } from "./ankh-figure";
+import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
+import { Scenario, ScenarioParser } from "./ankh-scenario";
 import { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";
@@ -13,7 +14,6 @@ import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
-import { AnkhScenario } from "./ankh-scenario";
 //import { NC } from "./choosers";
 export type NamedObject = { name?: string, Aname?: string };
 
@@ -81,16 +81,17 @@ export class GamePlay0 {
     return logWriter;
   }
 
-  constructor(godNames: string[], public guards: Constructor<Figure>[]) {
+  /** supply GodNames for each Player. */
+  constructor(godNames: string[]) {
     this.logWriter = this.logWriterLine0()
     this.hexMap.Aname = `mainMap`;
     //this.hexMap.makeAllDistricts(); // For 'headless'; re-created by Table, after addToMapCont()
 
     // Create and Inject all the Players: (picking a townStart?)
-    Player.allPlayers.length = 0;
+    this.allPlayers.length = 0;
     godNames.forEach((godName, ndx) => new Player(ndx, godName, this)); // make real Players...
     this.curPlayerNdx = 0;
-    this.curPlayer = Player.allPlayers[this.curPlayerNdx];
+    this.curPlayer = this.allPlayers[this.curPlayerNdx];
   }
 
   turnNumber: number = 0    // = history.lenth + 1 [by this.setNextPlayer]
@@ -165,7 +166,7 @@ export class GamePlay0 {
 
   setNextPlayer(plyr = this.nextPlayer()): void {
     this.preGame = false;
-    this.turnNumber += 1 // this.history.length + 1
+    this.turnNumber = Math.max(1, this.turnNumber + 1); // this.history.length + 1
     this.curPlayer = plyr
     this.curPlayerNdx = plyr.index
     this.curPlayer.newTurn();
@@ -245,8 +246,8 @@ export class GamePlay0 {
 /** GamePlayD has compatible hexMap(mh, nh) but does not share components. used by Planner */
 export class GamePlayD extends GamePlay0 {
   //override hexMap: HexMaps = new HexMap();
-  constructor(gods: string[], guards: Constructor<Figure>[], nh = TP.nHexes, mh = TP.mHexes) {
-    super(gods, guards);
+  constructor(gods: string[], nh = TP.nHexes, mh = TP.mHexes) {
+    super(gods);
     this.hexMap.Aname = `GamePlayD#${this.id}`;
     this.hexMap.makeAllDistricts(nh, mh); // included in GamePlay0
     return;
@@ -256,13 +257,15 @@ export class GamePlayD extends GamePlay0 {
 /** GamePlay with Table & GUI (KeyBinder, ParamGUI & Dragger) */
 export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
+  readonly guards: Constructor<Guardian>[];
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
-  constructor(gods: string[], guards: Constructor<Figure>[], table: Table, public gameSetup: GameSetup) {
-    super(gods, guards);            // hexMap, history, gStats...
+  constructor(public scenario: Scenario, table: Table, public gameSetup: GameSetup) {
+    super(scenario.gods);            // hexMap, history, gStats...
     GP.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;
     if (this.table.stage.canvas) this.bindKeys();
+    this.guards = Guardian.randomGuards;
   }
 
   /** suitable for keybinding */
@@ -313,15 +316,17 @@ export class GamePlay extends GamePlay0 {
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
+
   states = [];
   pushState() {
-    const state = AnkhScenario.saveState(this);
+    const scenarioParser = new ScenarioParser(this.hexMap, this);
+    const state = scenarioParser.saveState(this);
     this.states.push(state);
-    console.log(stime(this, `.pushState`), state);
+    console.log(stime(this, `.pushState --------`), state);
   }
   popState() {
     const state = this.states.pop();
-    console.log(stime(this, `.popState`), state);
+    console.log(stime(this, `.popState --------`), state);
     this.table.parseScenenario(state);
   }
 

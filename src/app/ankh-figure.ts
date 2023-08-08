@@ -12,6 +12,7 @@ import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
+import { selectN } from "./functions";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -91,6 +92,7 @@ export class Monument extends AnkhPiece {
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
     if (!GP.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
+    if (!GP.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
     const panel = GP.gamePlay.gameState.state.panels[0];
     if (panel.canBuildInRegion < 0) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
     const regionId = GP.gamePlay.gameState.conflictRegion - 1;
@@ -381,9 +383,31 @@ export class Warrior extends Figure {
 }
 
 export class Guardian extends Figure {
+  static get constructors() { return guardianConstructors } // Global godConstructors at bottom of file;
+  static byName = new Map<string, Constructor<Guardian>>();
+  static setGuardiansByName() {
+    Guardian.constructors.forEach(cons => Guardian.byName.set(cons.name, cons));
+  }
+
+  static get allGuardians() {
+    return Array.from(Guardian.byName).map(([gname, guard]) => guard);
+  }
+  static get allNames() {
+    return Array.from(Guardian.constructors).map((guard) => guard.name);
+  }
+
+  static get randomGuards() {
+    const guardianN = [['Satet', 'MumCat'], ['Apep', 'Mummy'], ['Scorpion', 'Androsphinx']]
+    const guardianC = guardianN.map(ga => ga.map(gn => Guardian.byName.get(gn)));
+    return guardianC.map(gs => selectN(gs, 1)[0])
+  }
 
   static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = 0) {
     return Guardian.makeSource0(AnkhSource<Guardian>, guard, undefined, hex, n);
+  }
+
+  constructor(player?: Player, serial?: number, Aname?: string) {
+    super(player, serial, Aname)
   }
 
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
@@ -517,3 +541,7 @@ export class Androsphinx extends Guardian3 {
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
   }
 }
+
+// List all the God constructors:
+const guardianConstructors: Constructor<Guardian>[] = [Satet, MumCat, Mummy, Apep, Scorpion, Androsphinx];
+// godSpecs.forEach(god => new god());

@@ -1,9 +1,14 @@
-import { C, className, stime } from "@thegraid/common-lib";
+import { C, S, stime } from "@thegraid/common-lib";
+import { MouseEvent } from "@thegraid/easeljs-module";
 import { Figure, Monument } from "./ankh-figure";
-import { GamePlay, GP } from "./game-play";
+import { AnkhHex } from "./ankh-map";
+import { SplitSpec } from "./ankh-scenario";
+import { GP, GamePlay } from "./game-play";
+import { EwDir, H } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel, PowerLine } from "./player-panel";
-import { UtilButton } from "./shapes";
+import { CircleShape, UtilButton } from "./shapes";
+import { TP } from "./table-params";
 import { Tile } from "./tile";
 
 interface Phase {
@@ -188,9 +193,9 @@ export class GameState {
     Ankh: {
       start: (ok?: boolean) => {
         const panel = this.panel, rank = panel.nextAnkhRank;
-        if (!ok && this.gamePlay.curPlayer.coins <= rank) {
+        if (!ok && this.gamePlay.curPlayer.coins < rank) {
           console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
-          panel.areYouSure('Not enough followers to obtain Anhk power!',
+          panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
             () => {
               console.log(stime(this, `.Ankh state: yes`))
               panel.selectAnkhPower();       // as if a button was clicked: take Ankh, get Guardian.
@@ -240,7 +245,88 @@ export class GameState {
     },
     Split: {
       start: () => {
+        // todo: disable table.dragger!
         console.log(stime(this, `Split:`));
+        const tau = 2 * Math.PI, rad = TP.hexRad, r = rad / 4;
+        const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
+        const bid = hexMap.regions.length;
+        const mark = new CircleShape(C.grey, r * 1.5, '');
+        mapCont.markCont.addChild(mark);
+
+        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(true, ndx + 1); })
+        let target = {} as { mx: number, my: number, hex: AnkhHex, ewDir: EwDir };
+        const path = [] as typeof target[];
+        let pathN: typeof target = undefined; // the final element of path
+        const pathShape = hexMap.edgeShape(TP.splitColor);
+        const lineShape = hexMap.edgeShape(TP.splitColor);
+
+        const pressmove = (e: MouseEvent) => {
+          // pt = globalToLocal(x,y,mapCont)
+          // find hexUnderPoint, compute nearest vertex,
+          // if (!path) pt0 = pt
+          // else edge = pt0 -> pt; pt0 = pt; assert/emit [row, col, edge]
+          //
+          lineShape.graphics.c();
+          const { stageX, stageY } = e;
+          const pt = mapCont.stage.globalToLocal(stageX, stageY);            // mouse (on mapCont)
+          const hex = hexMap.hexUnderPoint(pt.x, pt.y, false);
+          if (hex) {
+            const { x: hx, y: hy } = mapCont.globalToLocal(stageX, stageY, hex.cont); // mouse (on hex)
+            const dirNdx = ((Math.round((Math.asin(hx / hy) / tau) * 12) + 1) / 2); // 0 -- 5; NW,NE,E,SE,SW,W
+            const ewDir = H.ewDirs[dirNdx], angle = H.ewDirRot[ewDir];
+            const [cx, cy] = [Math.sin(angle) * rad, -Math.cos(angle) * rad]; // corner coordinates (on hex)
+            const [dx, dy] = [hx - cx, hy - cy];                              // mouse (on hex)
+            mapCont.localToLocal(cx, cy, mark.parent, mark);                  // corner (on mapCont)
+            const onTarget = (Math.sqrt(dx * dx + dy * dy) < r);
+            mark.visible = onTarget;
+            target = onTarget ? { hex, ewDir, mx: mark.x, my: mark.y} : undefined;
+            if (pathN) {
+              const [lx, ly] = onTarget ? [mark.x, mark.y] : [pt.x, pt.y]; // snap if mark is showing
+              lineShape.graphics.mt(pathN.mx, pathN.my).lt(lx, ly);
+            }
+          }
+          hexMap.update();
+        }
+        // click:
+        const pressup = (e: MouseEvent) => {
+          const { stageX, stageY } = e;
+          const pt = mapCont.stage.globalToLocal(stageX, stageY);
+          if (target) {
+            if (pathN.hex === target.hex && pathN.ewDir === target.ewDir) {} // TODO return to normal, process path.
+            path.push(pathN = target);
+            pathShape.graphics.mt(target.mx, target.my);
+            lineShape.graphics.c();
+          } else {
+            // clear and reset path
+            path.length = 0;
+            pathN = undefined;
+            pathShape.graphics.c();
+            lineShape.graphics.c();
+          }
+        }
+        const finalize = () => {
+          const nsDir = (nsAngle: number) => H.nsDirs.find((value) => H.nsDirRot[value] === nsAngle);
+          const nsAngle = (ewdir0: EwDir, ewdir1: EwDir) => {
+            const a0 = H.ewDirRot[ewdir0], a1 = H.ewDirRot[ewdir1];
+            return (Math.abs(a0 - a1) < 90) ? (a0 + a1) / 2 : 180 + (a0 + a1) / 2;
+          }
+
+          const edges: [hex: AnkhHex, angle: number][] = path.map(
+            ({ hex, ewDir }, n) => (n < path.length) ? [hex, nsAngle(ewDir, path[n + 1].ewDir)] : undefined);
+
+          const { row, col } = target.hex;
+          const splitSpec: SplitSpec = [[row, col, bid, false]];
+          edges.filter(edge => !!edge).forEach(([hex, nsAngle]) => {
+            const dir = nsDir(nsAngle);
+            hex.addEdge(nsAngle, TP.borderColor);
+            hexMap.addBorder(hex, dir);
+            splitSpec.push([row, col, dir])
+          });
+          hexMap.splits.push(splitSpec);
+        }
+        const lisnr = this.gamePlay.hexMap.forEachHex(hex => {
+          hex.overlay.on(S.pressup, pressup as (e: MouseEvent) => void );
+        });
         this.button('Split done');
       },
       done: () => {

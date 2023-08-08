@@ -1,12 +1,13 @@
 import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
-import { Graphics, Shape } from "@thegraid/easeljs-module";
+import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
+import { SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { God } from "./god";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { HexShape } from "./shapes";
+import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
 import type { Tile } from "./tile";
 
@@ -100,11 +101,12 @@ export class AnkhHex extends Hex2 {
     return this.linkDirs.filter((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
   }
 
-  addEdge(dir: HexDir, dirRot: typeof H.ewDirRot, rshape: Shape) {
+  addEdge(angle: number, color: string) {
+    const rshape = new EdgeShape(color, this.map.mapCont.infCont);
     const pt = this.cont.localToLocal(0, 0, rshape.parent);
     const { x, y } = pt, r = this.radius;
     // 0-degrees is 'North'; -sin() because y-axis goes South.
-    const a = dirRot[dir], a0 = a - 30, a1 = a + 30;
+    const a0 = angle - 30, a1 = angle + 30;
     const x0 = x + r * Math.sin(a0 * H.degToRadians);
     const y0 = y - r * Math.cos(a0 * H.degToRadians);
     const x1 = x + r * Math.sin(a1 * H.degToRadians);
@@ -128,16 +130,18 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   static wspec: hexSpec[] = [
     [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [1, 10], [3, 9], [4, 10], [5, 2], [5, 10], [6, 2], [6, 3], [6, 4], [6, 9], [6, 10], [7, 8], [7, 10], [8, 10],
   ];
-  static rspec: hexSpecr[] = [
-    [1, 0, 'NE', 'SE'], [2, 0, 'NE'], [2, 1, 'N', 'NE'], [3, 2, 'N', 'NE'], [3, 3, 'N', 'NE'], [4, 4, 'N', 'NE'],
+  static rspec: SplitSpec[]  = [
+    [[1, 0, 1]],
+    [[1, 0, 2], [1, 0, 'NE', 'SE'], [2, 0, 'NE'], [2, 1, 'N', 'NE'], [3, 2, 'N', 'NE'], [3, 3, 'N', 'NE'], [4, 4, 'N', 'NE'],
     [4, 5, 'N', 'NE', 'SE'],
-    [4, 6, 'NW', 'N'], [3, 7, 'NW', 'N'], [3, 8, 'NW', 'N'], [2, 9, 'NW', 'N'], [2, 10, 'NW'],
-    [5, 5, 'NE', 'SE', 'S'], [6, 5, 'SW'], [7, 5, 'NW', 'SW'], [8, 5, 'NW', 'SW'],
+    [4, 6, 'NW', 'N'], [3, 7, 'NW', 'N'], [3, 8, 'NW', 'N'], [2, 9, 'NW', 'N'], [2, 10, 'NW']],
+    [[5, 5, 3], [5, 5, 'NE', 'SE', 'S'], [6, 5, 'SW'], [7, 5, 'NW', 'SW'], [8, 5, 'NW', 'SW']],
   ];
   static tColor = { d: '#ffe599', f: '#93c47d', w: '#a4c2f4' };
 
-  regions: T[][];
+  regions: T[][] = [];
   adjRegions: Map<number,number>;
+  splits: SplitSpec[] = [];
 
   constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC ? AnkhHex as any as HexConstructor<T> : hexC);
@@ -161,9 +165,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.addTerrain();
-    const [regions, adjRegions]= this.findRegions(this.hexAry);
-    this.regions = regions;
-    this.adjRegions = adjRegions;
+    this.initialRegions();
     return rv;
   }
 
@@ -189,26 +191,54 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   /** add graphics to rshape to show edges
    * @param border if true, include edge as border to region.
    */
-  addEdges([row, col, ...e]: hexSpecr, rshape: Shape, border = true) {
+  addEdges([row, col, ...e]: SplitDir, border = true) {
     const hex = this[row][col];
+    const color = this.splits.length > 3 ? TP.borderColor : TP.riverColor;;
     if (!hex) return;
     const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
-    e.forEach((dir: HexDir) => {
-      hex.addEdge(dir, dirRot, rshape);
+    e.filter(elt => !!elt).forEach(dir => {
+      hex.addEdge(dirRot[dir], color);
       if (border) this.addBorder(hex, dir);
     });
   }
 
-  edgeShape(color = '#4D5656') {
-    const edgeShape = new Shape(new Graphics().ss(12, 'round', 'round').s(color)); // slightly darker
-    this.mapCont.infCont.addChild(edgeShape);
-    return edgeShape;
+  addSplit(splitSpec: SplitSpec, border?: boolean) {
+    this.splits.push(splitSpec);
+    const splitN = splitSpec[0] as SplitBid, map = this;
+    const splitD = splitSpec.slice(1) as SplitDir[];
+    const [row, col, bid] = splitN;
+    const newHex = map[row][col];
+    const origNdx = map.regionOfHex(row, col, newHex);
+
+    splitD.forEach(splitD => this.addEdges(splitD, border))
+
+    // region will split to 2 region IDs: [regions.length, origNdx]
+    // given Hex put in slot 'len', but labeled with id/Ndx = bid-1, other get origNdx
+    const ids = [bid - 1, origNdx,];
+    const [newRs, adjRs] = map.findRegions(map.regions[origNdx], newHex, ids.concat());
+    // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
+    // copy regions to their designated slots:
+    map.regions[ids[0]] = newRs[0]; // rid = 'bid-1'; put in slot 'bid-1'
+    map.regions[ids[1]] = newRs[1]; // rid = origNdx; put in slot origNdx
+    map.regions[ids[0]]?.forEach(hex => hex.district = ids[0] + 1); // always: district = Ndx+1
+    map.regions[ids[1]]?.forEach(hex => hex.district = ids[1] + 1); // always: district = Ndx+1
+  }
+
+  edgeShape(color = TP.borderColor) {
+    return new EdgeShape(color, this.mapCont.infCont); // slightly darker
+  }
+
+  initialRegions() {
+    this.noRegions();
+    this.splits = [];
+    const [regions, adjRegions]= this.findRegions(this.hexAry);
+    this.regions = regions;
+    this.adjRegions = adjRegions;
   }
 
   addTerrain() {
     // add Rivers: (one growing shape.graphics)
-    const rshape = this.edgeShape('#90b2f4'); // slightly darker than water;
-    AnkhMap.rspec.forEach(spec => this.addEdges(spec, rshape));
+    AnkhMap.rspec.forEach(spec => this.addSplit(spec));
     AnkhMap.fspec.forEach(spec => this.setTerrain(spec, 'f'));
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
@@ -224,16 +254,30 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   noRegions(hexAry = this.hexAry) {
     hexAry.forEach(hex => hex.regionId = undefined);
   }
+  /**
+   * split region into [region(hex0), otherRegion]
+   * @param hexAry an array to be split.
+   * @param hex0 seed of new region.
+   * @param ids hex0 gets rid[0], other gets rid[1] (written into hex.district)
+   * @returns [newRegion(hex), ...newRegions(other)]
+   */
   findRegions(hexAry = this.hexAry, hex0?: T, ids?: number[]): [T[][], Map<number, number>,] {
     const regions: T[][] = []; // each element is AnkhHex[];
-    const metaMap = new Map<number, number>();
+    const metaMap = new Map<number, number>();     // to detect adjacent regions.
     let avisit = 0;
     const setRegion = (hex: T, regionId: number, rIndex: number) => {
       hex.regionId = hex.district = regionId;
       hex.Avisit = avisit++;
       regions[rIndex].push(hex)
     }
-    const addNeighbors = (hex: T, region: T[], id, rndx) => {
+    /**
+     * Expand region to include neighbors of given hex.
+     * @param hex seed from which to expand
+     * @param region hex[] to be expanded
+     * @param id set each hex.regionId; differentiates regions; regions[id] = region!
+     * @param rndx 0-based index in this.regions;
+     */
+    const addNeighbors = (hex: T, region: T[], id: number, rndx: number) => {
       hex.forEachLinkHex((nhex: T, dir: HexDir) => {
         if (nhex.terrain === 'w') return;        // not member of any region
         if (nhex.regionId !== undefined) {

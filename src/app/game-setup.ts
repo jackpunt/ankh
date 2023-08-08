@@ -1,15 +1,16 @@
-import { C, Constructor, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
+import { C, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
+import { Guardian } from "./ankh-figure";
+import { AnkhScenario, Scenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
+import { selectN } from "./functions";
 import { GamePlay } from "./game-play";
+import { God } from "./god";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { selectN } from "./functions";
-import { God } from "./god";
-import { Androsphinx, Apep, Guardian, MumCat, Mummy, Satet, Scorpion } from "./ankh-figure";
 
 /** show " R" for " N" */
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
@@ -28,11 +29,11 @@ export class GameSetup {
    * ngAfterViewInit --> start here!
    * @param canvasId supply undefined for 'headless' Stage
    */
-  constructor(canvasId: string, ext?: string[], ngods = 4) {
+  constructor(canvasId: string, public ngods?, public gods?: string[], public scene? : string) {
     stime.fmt = "MM-DD kk:mm:ss.SSS"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
-    Tile.loader.loadImages(() => this.startup(ext, ngods));
+    Tile.loader.loadImages(() => this.startup(ngods, gods, scene));
   }
   _netState = " " // or "yes" or "ref"
   set netState(val: string) {
@@ -59,40 +60,49 @@ export class GameSetup {
     }
     deContainer(this.stage)
     TP.fnHexes(nh, mh);
-    let rv = this.startup()
+    let rv = this.startup(this.ngods, this.gods, this.scene);
     this.netState = " "      // onChange->noop; change to new/join/ref will trigger onChange(val)
     // next tick, new thread...
     setTimeout(() => this.netState = netState, 100) // onChange-> ("new", "join", "ref") initiate a new connection
     return rv
   }
-  ext: string[] = [];
-  ngods: number = 4;
+
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param gods 'ext' from URL
    */
-  startup(gods = this.ext, ngods = this.ngods, scene='MiddleKingdom') {
-    this.ext = gods;
-    this.ngods = ngods;
+  startup(ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom') {
+    this.gods = gods ?? this.gods;
+    this.ngods = ngods ?? this.ngods;
+    this.scene = scene ?? this.scene;
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
+    const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
+
+    const scene1 = AnkhScenario[scene] as (Scenario | Scenario[]);
+    const scenario = (scene1['ngods'] ) ? scene1 as Scenario : (scene1 as Scenario[]).find(scen => scen.ngods === ngods);
+
     const uniq = <T>(ary: T[]) => {
       const rv: T[] = [];
       ary.forEach(elt => rv.includes(elt) || rv.push(elt))
       return rv;
     }
-    const uniqGods = uniq(gods);
-    const nToFind = (ngods - gods.length);
-    const godNames = (nToFind > 0)
-      ? [...uniqGods].concat(selectN(God.allNames.filter(gn => !uniqGods.includes(gn)), ngods - uniqGods.length))
-      : (nToFind < 0) ? selectN(uniqGods, ngods) : uniqGods;
-    godNames.length = Math.min(godNames.length, 5);
-    const guardsC: Constructor<Guardian>[][] = [[Satet, MumCat], [Apep, Mummy], [Scorpion, Androsphinx]];
-    const guards: Constructor<Guardian>[] = guardsC.map(gs => selectN(gs, 1)[0]);
-    const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
-    const gamePlay = new GamePlay(godNames, guards, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
+    const fillGodNames = (ngods: number, gods: string[]) => {
+      const uniqGods = uniq(gods);
+      const nToFind = (ngods - gods.length);
+      const godNames = (nToFind > 0)
+        ? [...uniqGods].concat(selectN(God.allNames.filter(gn => !uniqGods.includes(gn)), ngods - uniqGods.length))
+        : (nToFind < 0) ? selectN(uniqGods, ngods) : uniqGods;
+      godNames.length = Math.min(godNames.length, 5);
+      return godNames;
+    }
+    if (scenario.turn === undefined || scenario.gods === undefined) scenario.gods = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
+    Guardian.setGuardiansByName();
+
+    const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
+
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
@@ -101,7 +111,7 @@ export class GameSetup {
       // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
       console.groupEnd()
     }
-    table.startGame(scene, ngods); // parseScenario; allTiles.makeDragable(); setNextPlayer();
+    table.startGame(scenario); // parseScenario; allTiles.makeDragable(); setNextPlayer();
     return gamePlay
   }
   /** affects the rules of the game & board

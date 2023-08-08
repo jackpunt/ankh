@@ -1,17 +1,17 @@
-import { C, Constructor, DragInfo, S, className, stime } from "@thegraid/easeljs-lib";
+import { C, DragInfo, S, stime } from "@thegraid/easeljs-lib";
 import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
-import { GP } from "./game-play";
-import { AnkhHex } from "./ankh-map";
-import { Player } from "./player";
-import { CenterText, CircleShape, PaintableShape, RectShape, UtilButton } from "./shapes";
-import { TP } from "./table-params";
 import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
-import { TileSource, UnitSource } from "./tile-source";
-import { AnkhToken } from "./god";
-import { DragContext, Table } from "./table";
+import { AnkhHex } from "./ankh-map";
+import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
-import { Meeple } from "./meeple";
+import { GP } from "./game-play";
 import { Hex2 } from "./hex";
+import { Meeple } from "./meeple";
+import { Player } from "./player";
+import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
+import { DragContext, Table } from "./table";
+import { TP } from "./table-params";
+import { TileSource } from "./tile-source";
 
 
 /** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */

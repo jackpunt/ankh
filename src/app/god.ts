@@ -1,73 +1,14 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
-import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhPiece, AnkhSource, Figure, Monument, Portal } from "./ankh-figure";
-import { GP } from "./game-play";
-import { Hex1, Hex2 } from "./hex";
+import { Container, Shape } from "@thegraid/easeljs-module";
+import { AnkhSource, Portal } from "./ankh-figure";
+import { Hex2 } from "./hex";
 import type { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape } from "./shapes";
-import { DragContext, Table } from "./table";
+import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 
-
-export class AnkhToken extends AnkhMeeple {
-  static source: AnkhSource<AnkhToken>[] = [];
-
-  static makeSource(player: Player, hex: Hex2, token: Constructor<AnkhMeeple>, n: number) {
-    return AnkhToken.makeSource0(AnkhSource<AnkhToken>, token, player, hex, n);
-  }
-  override get radius() { return TP.ankhRad; }
-  override isDragable(arg: DragContext) {
-    return this.hex && GP.gamePlay.isPhase('Claim');
-  }
-
-  constructor(player: Player, serial: number) {
-    super(player, serial, `Ankh`);// `Ankh:${player?.index}\n${serial}`, player);
-    this.name = `Ankh:${player?.index}-${serial}`;
-    const r = this.radius;
-    const ankhChar = new CenterText(`${'\u2625'}`, r * 2.2, C.black);
-    ankhChar.y += r * .1;
-    this.addChild(ankhChar);
-    this.nameText.text = '';
-    // this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
-    this.baseShape.cgf = (color) => this.atcgf(color);
-  }
-  override cache(x, y, w, h) {
-    //this.scaleX = this.scaleY = 8;
-    super.cache(x, y, w, h, 5)
-    // this.scaleX = this.scaleY = 1;
-  }
-
-  atcgf(color: string) {
-      const g = new Graphics(), r = this.radius;
-      g.ss(1).s(C.black).dc(0, 0, r - 1);
-      g.f(color).dc(0, 0, r - 1);
-      return g;
-  }
-
-  override moveTo(hex: Hex1): Hex1 {
-    const rv = super.moveTo(hex);
-    if (hex?.isOnMap) {
-      this.y += TP.ankh2Rad - this.radius;
-      if (hex.tile) {
-        hex.tile.setPlayerAndPaint(this.player);
-        this.highlight(false);
-      }
-    }
-    return rv;
-  }
-
-  override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
-    const tile = hex.tile, player = this.player;
-    const allMonuments = GP.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
-    const allUnclaimed = allMonuments.filter(mon => mon.player === undefined);;
-    const canBeClaimed = (tile instanceof Monument) && ((allUnclaimed.length === 0) ? true : (tile.player === undefined));
-    const isClaimable = hex.findLinkHex(adj => adj.meep?.player === player);
-    if (isClaimable && canBeClaimed && (this.hex === this.source.hex) && GP.gamePlay.isPhase('Claim')) return true;
-    return false;
-  }
-}
 
 /** Looks like AnkhToken, but is just a marker for Actions & Events */
 export class AnkhMarker extends Container {
@@ -84,13 +25,13 @@ export class AnkhMarker extends Container {
 export class God {
   static byName = new Map<string, God>();
 
-  static get constructors() { return constructors }
+  static get constructors() { return godConstructors } // Global godConstructors at bottom of file;
 
   static get allGods() {
     return Array.from(God.byName).map(([gname, god]) => god);
   }
   static get allNames() {
-    return Array.from(constructors).map((god) => god.name);
+    return Array.from(godConstructors).map((god) => god.name);
   }
 
   public player: Player;
@@ -227,5 +168,5 @@ class Toth extends God {
 }
 
 // List all the God constructors:
-const constructors: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
+const godConstructors: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
 // godSpecs.forEach(god => new god());

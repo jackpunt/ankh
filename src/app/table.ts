@@ -2,17 +2,17 @@ import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContai
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { AnkhScenario, Scenario, ScenarioParser } from "./ankh-scenario";
+import { Scenario, ScenarioParser } from "./ankh-scenario";
 import { GP, type GamePlay } from "./game-play";
+import { AnkhMarker } from "./god";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
-import { CenterText, CGF, CircleShape, HexShape, Paintable, PaintableShape, RectShape, UtilButton } from "./shapes";
+import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
-import { TileSource, UnitSource } from "./tile-source";
-import { AnkhMarker, AnkhToken } from "./god";
+import { TileSource } from "./tile-source";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -21,7 +21,7 @@ export interface EventButton extends Container { isEvent: boolean; }
 interface EventIcon extends Container { eventName: string; }
 interface ScoreMark extends RectShape { score: number, rank: number }
 
-/** rowCont is an ActionContainer; children as EventButton[]. */
+/** rowCont is an ActionContainer; children are EventButton. */
 export class ActionContainer extends Container {
   constructor(public rad = 30) {
     super();
@@ -32,20 +32,19 @@ export class ActionContainer extends Container {
   }
   highlight: PaintableShape;
   active: DisplayObject; // most recently activated button
+  /** just the Buttons, ignore the highlight Shape. */
+  get buttons() { return this.children.filter(c => (c instanceof Container)) as EventButton[] }
 
   getButton(cn: number) {
-    return (this.children.filter(c => (c instanceof Container)) as EventButton[])[cn];
+    return this.buttons[cn];
   }
 
   /** activate the first button witout a AnkhMarker */
   activate() {
     const hl = this.highlight;
-    const buttons = this.children.filter(c => (c instanceof Container)) as EventButton[]; // minus highlight;
-    let button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker))) as EventButton;
-    if (!button) { // reset after Event!
-      buttons.forEach(b => b.removeChildType(AnkhMarker));
-      button = buttons[0];
-    }
+    const buttons = this.buttons;
+    const button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker))) ??
+      (buttons.forEach(b => b.removeChildType(AnkhMarker)), buttons[0]);// reset after Event!
     hl.x = button.x;
     hl.y = button.y;
     hl.visible = button.mouseEnabled = true;
@@ -536,7 +535,7 @@ export class Table extends EventDispatcher  {
   undoActionSelection(action: string, index: number) {
     const rowCont = this.actionPanels[action] as ActionContainer;
     if (!rowCont) debugger;    // TODO: undo 'Ankh' [isEvent!] -> 'Gain' -> direct to Event!
-    const button = rowCont.children.filter(ch => ch instanceof Container)[index] as EventButton;
+    const button = rowCont.buttons[index];
     button.removeChildType(AnkhMarker);
     if (button.isEvent) {
       this.removeEventMarker(this.nextEventIndex - 1);
@@ -659,8 +658,8 @@ export class Table extends EventDispatcher  {
 
   pushScoreMark(pmark: ScoreMark, score: number, rank?: number) {
     pmark.score = score;
-    pmark.rank = rank ?? this.scoreStacks[score].length;
-    this.scoreStacks[score][pmark.rank] = (pmark); // .push(pmark) if rank not supplied.
+    const pmrank = (rank === undefined) ? this.scoreStacks[score].length : rank;
+    this.scoreStacks[score][pmrank] = pmark;    // .push(pmark) if rank not supplied.
   }
 
   scoreCont: Container; // 31 RectShapes
@@ -678,7 +677,8 @@ export class Table extends EventDispatcher  {
   }
 
   get playerScores() {
-    return this.scoreMarks.map(pm => pm.score + pm.rank/10);
+    // return this.scoreMarks.map(pm => pm.score + pm.rank/10);
+    return this.scoreMarks.map(pm => pm.score + this.scoreStacks[pm.score].indexOf(pm)/10);
   }
   get panelsInRank() {
     const scores = this.playerScores
@@ -704,9 +704,8 @@ export class Table extends EventDispatcher  {
     this.scenarioParser.parseScenario(scenario);
   }
 
-  startGame(scenarioName: string, ngods: number) {
+  startGame(scenario: Scenario) {
     // Place Pieces and Figures on map:
-    const scenario = (ngods === 2) ? AnkhScenario.AltMidKingom2 : AnkhScenario[scenarioName].find(scen => scen.ngods === ngods);
     this.parseScenenario(scenario);
 
     // All Tiles (& Meeple) are Draggable:

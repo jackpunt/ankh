@@ -62,6 +62,9 @@ export class TP {
   static meepleRad = TP.hexRad * .4;
   static meepleY0 = 0;//TP.hexRad * .25;
   static log = 0
+  static riverColor = '#90b2f4';
+  static borderColor = '#4D5656'; // darker than riverColor
+  static splitColor = '#6D9686'; // lighter than borderColor
 
   /** map size for (dpb, dop) */
   static fnHexes(nh = TP.nHexes, nm = TP.mHexes) {
@@ -84,7 +87,7 @@ export class TP {
   static flipDwell:  number = 200 // chooseStartPlayer dwell between each card flip
 
   static bgColor: string = 'tan' //'wheat'// C.BROWN
-  static borderColor: string = 'peru'//TP.bgColor; //'burlywood'
+  static xborderColor: string = 'peru'//TP.bgColor; //'burlywood'
 
   static ghost: string = 'cgserver'   // game-setup.network()
   static gdomain: string = 'thegraid.com'
