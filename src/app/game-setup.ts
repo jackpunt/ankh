@@ -103,14 +103,14 @@ export class GameSetup {
     const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay
 
-    table.layoutTable(gamePlay)              // mutual injection, all the GUI components, fill hexMap
+    table.layoutTable(gamePlay)              // mutual injection, all the GUI components, makeAllDistricts(), addTerrain, initialRegions
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
-    if (this.stage.canvas) {
-      console.groupCollapsed('initParamGUI')
-      // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
-      console.groupEnd()
-    }
+    // if (this.stage.canvas) {
+    //   console.groupCollapsed('initParamGUI')
+    //   // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
+    //   console.groupEnd()
+    // }
     table.startGame(scenario); // parseScenario; allTiles.makeDragable(); setNextPlayer();
     return gamePlay
   }

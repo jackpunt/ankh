@@ -229,7 +229,6 @@ export class Table extends EventDispatcher  {
         console.log(`HexInspector:`, hex.Aname, info)
       })
     qShape.on(S.click, () => this.toggleText(), this); // toggle visible
-    this.toggleText(false);         // set initial visibility
   }
 
   downClick = false;
@@ -326,6 +325,8 @@ export class Table extends EventDispatcher  {
     this.gamePlay.recycleHex = this.makeRecycleHex();
     this.setupUndoButtons(55, 60, 45, bgr) // & enableHexInspector()
 
+    const initialVis = false;
+    this.stage.on('drawend', () => setTimeout(() => this.toggleText(initialVis), 10), this, true );
     this.hexMap.update();
     // position turnLog & turnText
     {

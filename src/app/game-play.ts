@@ -59,7 +59,7 @@ export class GamePlay0 {
   selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
   eventName: string;
 
-  readonly hexMap = new AnkhMap<AnkhHex>()
+  readonly hexMap = new AnkhMap<AnkhHex>(); // create base map; no districts until Table.layoutTable!
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly redoMoves = []
 
@@ -77,13 +77,13 @@ export class GamePlay0 {
     return logWriter;
   }
 
-  /** supply GodNames for each Player. */
+  /** GamePlay0 - supply GodNames for each: new Player(...). */
   constructor(godNames: string[]) {
     this.logWriter = this.logWriterLine0()
     this.hexMap.Aname = `mainMap`;
     //this.hexMap.makeAllDistricts(); // For 'headless'; re-created by Table, after addToMapCont()
 
-    // Create and Inject all the Players: (picking a townStart?)
+    // Create and Inject all the Players:
     this.allPlayers.length = 0;
     const gamePlay = (this instanceof GamePlay) ? this as GamePlay : undefined;
     godNames.forEach((godName, ndx) => new Player(ndx, godName, gamePlay)); // make real Players...
@@ -187,7 +187,7 @@ export class GamePlay0 {
   }
 
   /** update Counters (econ, expense, vp) for ALL players. */
-  updateCounters() {
+  updateCounters() {       // TODO: find users of hexMap.update()
     // Player.allPlayers.forEach(player => player.setCounters(false));
     this.hexMap.update();
   }
@@ -321,6 +321,7 @@ export class GamePlay extends GamePlay0 {
     this.states.push(state);
     console.log(stime(this, `.pushState --------`), state);
   }
+  // TODO: setup undo index to go fwd and back? wire into undoPanel?
   popState() {
     const state = this.states.pop();
     console.log(stime(this, `.popState --------`), state);

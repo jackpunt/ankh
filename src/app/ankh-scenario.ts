@@ -19,7 +19,7 @@ type GodName = string;
 type GuardName = string | Constructor<Guardian>;
 type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
 type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorius' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
-type RegionElt = [row: number, col: number, bid: number];
+export type RegionElt = [row: number, col: number, bid: number];
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
 type ClaimElt = [row: number, col: number, pid: number];
 type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
@@ -167,6 +167,7 @@ export class AnkhScenario {
       ],
     },
   ];
+
   static AltMidKingdom5: Scenario = {
     ngods: 5,
     turn: 16,
@@ -207,6 +208,10 @@ export class AnkhScenario {
       [5, 7, 'GodFigure', 2],
       [1, 2, 'GodFigure', 4],
     ],
+    splits: [
+      [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']], // [[6, 7, 3], ...]
+      [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+    ],
     regions: [
       [1, 0, 1],
       [2, 9, 2],
@@ -215,10 +220,6 @@ export class AnkhScenario {
       [4, 1, 5],
     ],
     scores: [0.0, 0.1, 0.2, 0.3, 0.4],
-    splits: [
-      [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']],
-      [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
-    ],
     stable: [
       ['Satet', 'Apep'],
       [],
@@ -262,55 +263,47 @@ export class ScenarioParser {
 
   }
 
-  parseRegions(region: RegionElt[]) {
+  parseRegions(regionElt: RegionElt[]) {
     const map = this.map;
-    map.initialRegions();
-
-    region.forEach(elt => {
-      // assign battleOrder for region[seed]
+    // regions have been split; river splits and given splits
+    // now: make sure all the regionIds are correct:
+    regionElt.forEach(([row, col, rid]) => {
+      // assign battleOrder for region[seed]; in order, from saveScenario
       // we will simply permute the regions array.
-      const [row, col, bid] = elt, hex = map[row][col], rid = bid - 1;
-      const rindex = map.regionOfHex(row, col, hex);
-      const xregion = map.regions[rid];
-      map.regions[rid] = map.regions[rindex];
-      map.regions[rid].forEach(hex => hex.district = bid);
+      const hex = map[row][col];
+      const rindex = map.regionIndex(row, col, hex);
+      const xregion = map.regions[rid - 1];
+      map.regions[rid - 1] = map.regions[rindex];
+      map.regions[rid - 1].forEach(hex => hex.district = rid);
       map.regions[rindex] = xregion;
       map.regions[rindex]?.forEach(hex => hex.district = rindex + 1);
 
-      map.regions[rid]['Aname'] = `${hex}`
+      map.regions[rid - 1]['Aname'] = `${hex}`
     });
   }
 
   // console.log(stime(this, `.regions: input`), region0.region);
   // console.log(stime(this, `.regions: result`), map.regionList());
-  parseSplits(splits: SplitSpec[]) {
+  parseSplits(splits: SplitSpec[], turnSet = false) {
     const map = this.map;
-    splits.forEach(splitSpec => {
-      map.addSplit(splitSpec, true);
-      map.update();
+    if (turnSet) map.initialRegions();
+    splits.forEach((splitSpec) => {
+      map.addSplit(splitSpec, true, true); // ignore bid; parseRegions will sort it out.
     })
+    map.update();
     // console.log(stime(this, `.split adjRegions:`), map.regionList());
   }
 
   /** Place (or replace) all the Figures on the map. */
   parsePlaces(place: PlaceElt[], unplaceAnkhs = false) {
     const map = this.map;
-    // Figure.allFigures.forEach(fig => (fig.hex?.isOnMap ? fig.sendHome() : undefined));
     this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
-    // const figs = map.forEachHex(hex => hex.meep);
-    const p0 = this.gamePlay.allPlayers[0], p1 = this.gamePlay.allPlayers[1];
-    const as0 = p0.panel.ankhSource, as1 = p1.panel.ankhSource;
     if (unplaceAnkhs) {
-      console.log(stime(this, `.parsePlaces:`), as0.numAvailable, as1.numAvailable);
       this.gamePlay.allPlayers.forEach(player => {
         const source = player.panel.ankhSource;
         const units = source.allUnitsCopy.filter(unit => unit.hex !== source.hex);
-        units.forEach(unit => {
-          // unit.hex = undefined;
-          source.availUnit(unit);
-        })
+        units.forEach(unit => source.availUnit(unit));
       })
-      console.log(stime(this, `.parsePlaces:`), as0.numAvailable, as1.numAvailable);
     }
 
     //console.groupCollapsed('place');
@@ -345,6 +338,8 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
   parseScenario(setup: SetupElt) {
     if (!setup) return;
+    console.log(stime(this, `.parseScenario:`), setup);
+    this.saveState(this.gamePlay); // log current state for debug...
     const { regions, splits, coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
@@ -371,8 +366,8 @@ export class ScenarioParser {
         }
       });
     }
+    if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
-    if (splits) this.parseSplits(splits);
     guards?.forEach((name, ndx) => {
       if (typeof name !== 'string') name = name.name;
       const source = table.guardSources[ndx];
@@ -438,11 +433,13 @@ export class ScenarioParser {
     const table = gamePlay.table;
     const ngods = gamePlay.allPlayers.length;
     const godNames = gamePlay.allPlayers.map(player => player.god.name);
-    const turn = Math.max(0, gamePlay.turnNumber - 1);
+    const turn = Math.max(0, gamePlay.turnNumber);
     const coins = gamePlay.allPlayers.map(p => p.coins);
     const scores = table.playerScores;
-    const regions = gamePlay.hexMap.regions.map((region, n) => [region[0].row, region[0].col, n + 1]);
-    const splits = gamePlay.hexMap.splits;
+    console.log(stime(this, `.saveState: ----------- `), { turn, ngods, godNames })
+
+    const regions = gamePlay.hexMap.regions.map((region, n) => region && [region[0].row, region[0].col, n + 1]);
+    const splits = gamePlay.hexMap.splits.slice(3);
     const events = table.nextEventIndex;
     const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;
     const actions = {};

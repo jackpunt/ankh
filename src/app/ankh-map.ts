@@ -1,7 +1,7 @@
 import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
-import type { SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
+import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { H, HexDir } from "./hex-intfs";
@@ -130,7 +130,6 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [1, 10], [3, 9], [4, 10], [5, 2], [5, 10], [6, 2], [6, 3], [6, 4], [6, 9], [6, 10], [7, 8], [7, 10], [8, 10],
   ];
   static rspec: SplitSpec[]  = [
-    [[1, 0, 1]],
     [[1, 0, 2], [1, 0, 'NE', 'SE'], [2, 0, 'NE'], [2, 1, 'N', 'NE'], [3, 2, 'N', 'NE'], [3, 3, 'N', 'NE'], [4, 4, 'N', 'NE'],
     [4, 5, 'N', 'NE', 'SE'],
     [4, 6, 'NW', 'N'], [3, 7, 'NW', 'N'], [3, 8, 'NW', 'N'], [2, 9, 'NW', 'N'], [2, 10, 'NW']],
@@ -192,7 +191,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
    */
   addEdges([row, col, ...e]: SplitDir, border = true) {
     const hex = this[row][col];
-    const color = this.splits.length > 3 ? TP.borderColor : TP.riverColor;;
+    const color = this.splits.length >= 3 ? TP.borderColor : TP.riverColor;;
     if (!hex) return;
     const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
     e.filter(elt => !!elt).forEach(dir => {
@@ -201,26 +200,49 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     });
   }
 
-  addSplit(splitSpec: SplitSpec, border?: boolean) {
+  addSplit(splitSpec: SplitSpec, border?: boolean, ignoreBid = false) {
     this.splits.push(splitSpec);
     const splitN = splitSpec[0] as SplitBid, map = this;
     const splitD = splitSpec.slice(1) as SplitDir[];
-    const [row, col, bid] = splitN;
-    const newHex = map[row][col];
-    const origNdx = map.regionOfHex(row, col, newHex);
 
-    splitD.forEach(splitD => this.addEdges(splitD, border))
+    splitD.forEach(splitD => this.addEdges(splitD, border));
+    const [row, col, bid] = splitN;
+    const bidHex = map[row][col];
+    const origRid = map.regionIndex(row, col, bidHex) + 1;
+
+    // regionId = district = external Region Ident: 1--N
+    // regionNdx = internal index; regions[regionNdx] => AnkhHex[]
+    // Outside of 'addSplit': regionNdx == regionId - 1;
+    const newRid = ignoreBid ? map.regions.length + 1 : bid; // new regionNdx
 
     // region will split to 2 region IDs: [regions.length, origNdx]
-    // given Hex put in slot 'len', but labeled with id/Ndx = bid-1, other get origNdx
-    const ids = [bid - 1, origNdx,];
-    const [newRs, adjRs] = map.findRegions(map.regions[origNdx], newHex, ids.concat());
+    // given Hex put in slot 'len', but labeled with: bid-1,
+    // other stays in slot origNdx, labeled with: (origRid or newRid)
+    // [r0,r1,r2]; (bid==3) ? [r0,r1,o2[oldRid],n3[bid]] : [r0,r1,o2[nRid],n3[bid]];
+    // then we swap: [r0,r1,o2[len],n3[2]] ==> [r0,r1,n3[2],o2[len]]
+
+    // const seed0 = splitN as RegionElt;   // [row, col, bid]
+    const [row0, col0, dir0] = splitD[0];
+    const seedHex0 = this[row0][col0];
+    const seedHex1 = seedHex0.links[dir0];
+    const seed0 = [seedHex0.row, seedHex0.col, origRid] as RegionElt;
+    const seed1 = [seedHex1.row, seedHex1.col, newRid] as RegionElt;
+    const seeds = [seed0, seed1]; // [row1, col1, orid]
+    const newRs = map.findRegions(map.regions[origRid - 1], seeds);
+    // Assert: newRs.length = 2; labeled (possibly incorrectly) with [origRid, newRid];
+
+    const bidHexInR1 = newRs[1].includes(bidHex);
+    if (bidHexInR1) {
+      map.regions[origRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
+      map.regions[newRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
+    } else {
+      map.regions[newRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
+      map.regions[origRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
+      // regionIds are incorrect, fix them:
+      newRs[0].forEach(hex => hex.district = hex.regionId = newRid);
+      newRs[1].forEach(hex => hex.district = hex.regionId = origRid);
+    }
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
-    // copy regions to their designated slots:
-    map.regions[ids[0]] = newRs[0]; // rid = 'bid-1'; put in slot 'bid-1'
-    map.regions[ids[1]] = newRs[1]; // rid = origNdx; put in slot origNdx
-    map.regions[ids[0]]?.forEach(hex => hex.district = ids[0] + 1); // always: district = Ndx+1
-    map.regions[ids[1]]?.forEach(hex => hex.district = ids[1] + 1); // always: district = Ndx+1
   }
 
   edgeShape(color = TP.borderColor) {
@@ -228,19 +250,17 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   initialRegions() {
-    this.noRegions();
-    this.splits = [];
-    const [regions, adjRegions]= this.findRegions(this.hexAry);
-    this.regions = regions;
-    this.adjRegions = adjRegions;
+    // borders from river splits are installed
+    const splits = [[4, 5, 1], [4, 6, 2], [3, 5, 3]] as RegionElt[];
+    this.regions = this.findRegions(this.hexAry, splits);
   }
 
   addTerrain() {
     // add Rivers: (one growing shape.graphics)
-    AnkhMap.rspec.forEach(spec => this.addSplit(spec));
     AnkhMap.fspec.forEach(spec => this.setTerrain(spec, 'f'));
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
+    AnkhMap.rspec.forEach(spec => this.addSplit(spec));        // after marking water!
     AnkhMap.wspec.forEach(spec => ([r, c]: hexSpec) => {
       const hex = this[r][c];
       Object.keys(hex.links).forEach((dir: HexDir) => {
@@ -256,65 +276,59 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   /**
    * split region into [region(hex0), otherRegion]
    * @param hexAry an array to be split.
-   * @param hex0 seed of new region.
-   * @param ids hex0 gets rid[0], other gets rid[1] (written into hex.district)
-   * @returns [newRegion(hex), ...newRegions(other)]
+   * @param seeds assign a region to hexes adjacent to each seed;
+   * @param rids regionId to assign to each seed-region;
+   * @returns [newRegion(seed0), ...newRegions(seedN)]
    */
-  findRegions(hexAry = this.hexAry, hex0?: T, ids?: number[]): [T[][], Map<number, number>,] {
+  findRegions(hexAry = this.hexAry, regionElts: RegionElt[]): T[][] {
     const regions: T[][] = []; // each element is AnkhHex[];
-    const metaMap = new Map<number, number>();     // to detect adjacent regions.
     let avisit = 0;
-    const setRegion = (hex: T, regionId: number, rIndex: number) => {
+    const setRegion = (hex: T, region: T[], regionId: number) => {
       hex.regionId = hex.district = regionId;
       hex.Avisit = avisit++;
-      regions[rIndex].push(hex)
+      region.push(hex)
     }
     /**
      * Expand region to include neighbors of given hex.
      * @param hex seed from which to expand
      * @param region hex[] to be expanded
-     * @param id set each hex.regionId; differentiates regions; regions[id] = region!
+     * @param regionId set each hex.regionId; differentiates regions; regions[id] = region!
      * @param rndx 0-based index in this.regions;
      */
-    const addNeighbors = (hex: T, region: T[], id: number, rndx: number) => {
+    const addNeighbors = (hex: T, region: T[], regionId: number) => {
       hex.forEachLinkHex((nhex: T, dir: HexDir) => {
         if (nhex.terrain === 'w') return;        // not member of any region
-        if (nhex.regionId !== undefined) {
-          if (nhex.regionId !== id) {
-            metaMap.set(id, nhex.regionId);     // regions are adjacent
-            metaMap.set(nhex.regionId, id);     // regions are adjacent
-          }
-          return;
-        }
+        if (nhex.regionId !== undefined) return;
         if (hex.borders[dir]) return;          // not semantically adjacent
-        setRegion(nhex, id, rndx);
-        addNeighbors(nhex, region, id, rndx);
+        setRegion(nhex, region, regionId);
+        addNeighbors(nhex, region, regionId);
       });
     }
-    const id0 = hexAry[0].regionId;
-    this.noRegions(hexAry);
-    [hex0].concat(hexAry).forEach(hex => {
-      if (!hex) return;   // no seed supplied
+    hexAry.forEach(hex => hex.regionId = undefined);    // mark all as not in any region:
+    const seeds = regionElts.map(([row, col, rids]) => this[row][col]) ;
+    const rids =regionElts.map(([row, col, rids]) => rids) ;
+    seeds.forEach((hex, rndx) => {
+      if (!hex) return;   // bad seed
       // put hex and its adjacent neighbors in the same region;
       if (hex.regionId !== undefined) return; // already done
       if (hex.terrain === 'w') return;        // not member of any region
-      const region = [], rndx = regions.length, id = ids?.pop() ?? rndx;
-      // console.log(stime(this, `.findRegions: seed ${hex} hex.id: ${id0} id: ${id} ids: ${ids} rndx: ${rndx}`), regions.concat());
-      regions.push(region);
-      addNeighbors(hex, region, id, rndx);
+      const region = [], rid = rids[rndx];
+      regions[rndx] = region;
+      setRegion(hex, region, rid);
+      addNeighbors(hex, region, rid);
     });
-    console.log(stime(this, `.findRegions:`), regions.concat());
-    return [regions, metaMap];
+    console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));
+    return regions;
   }
 
-  colors = ['red', 'yellow','cyan','magenta','blue','green','lightgreen','purple','lightblue'];
+  colors = ['red', 'yellow', 'cyan', 'magenta', 'blue', 'green', 'lightgreen', 'purple', 'lightblue'];
   showRegions(hexAry = this.hexAry, colors = permute(this.colors.concat())) {
     hexAry.forEach(ahex => {
       if (ahex.regionId !== undefined) {
         const color = C.nameToRgbaString(colors[ahex.regionId % colors.length], .2)
         ahex.overlay.paint(color);
         ahex.overlay.visible = ahex.terrain !== 'w';
-        ahex.cont.updateCache();
+        if (ahex.cont.cacheID) ahex.cont.updateCache();
       }
     })
     this.update();
@@ -329,7 +343,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     });
     this.update();
   }
-  regionOfHex(row: number, col: number, hex = this[row][col]) {
+  regionIndex(row: number, col: number, hex = this[row][col]) {
     return this.regions.findIndex(r => r?.includes(hex));
   }
   /** debug aid: return array of {r.Aname, r.index, r.length} */
