@@ -1,8 +1,8 @@
 import { C, S, stime } from "@thegraid/common-lib";
 import { MouseEvent } from "@thegraid/easeljs-module";
-import { Figure, Monument } from "./ankh-figure";
+import { Figure, GodFigure, Monument } from "./ankh-figure";
 import type { AnkhHex } from "./ankh-map";
-import type { SplitSpec } from "./ankh-scenario";
+import type { ActionIdent, SplitSpec } from "./ankh-scenario";
 import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
 import type { Player } from "./player";
@@ -34,7 +34,7 @@ export class GameState {
   get selectedAction() { return this.gamePlay.selectedAction; }
   set selectedAction(val) { this.gamePlay.selectedAction = val; }
   get selectedActionIndex() { return this.gamePlay.selectedActionIndex; }
-  readonly selectedActions: string[] = [];
+  readonly selectedActions: ActionIdent[] = [];
   areActiveActions: boolean;
 
   get playerFigures() { const plyr = this.gamePlay.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
@@ -197,7 +197,7 @@ export class GameState {
           panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
             () => {
               console.log(stime(this, `.Ankh state: yes`))
-              panel.selectAnkhPower();       // as if a button was clicked: take Ankh, get Guardian.
+              panel.selectAnkhPower();       // as if a button was clicked: take the AnkhToken, get Guardian.
             },
             () => {
               console.log(stime(this, `.Ankh state: cancel`), this.selectedActions)
@@ -602,7 +602,7 @@ export class GameState {
         const floodProtected = (fig: Figure, player: Player, ) => player.panel.hasCardInBattle('Flood') && fig.hex.terrain === 'd';
         const regionId = this.conflictRegion;
         const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
-        const deadFigs = figuresInRegion.map(fig => !belongsTo(fig, winp) && !floodProtected(fig, fig.player) ? fig : undefined).filter(fig => !!fig);
+        const deadFigs = figuresInRegion.map(fig => !(fig instanceof GodFigure) && !belongsTo(fig, winp) && !floodProtected(fig, fig.player) ? fig : undefined).filter(fig => !!fig);
         console.log(stime(this, `.BattleResolution: Figures KIA:`), deadFigs);
         deadFigs.forEach(fig => fig.sendHome());
 
@@ -633,6 +633,7 @@ export class GameState {
     EndTurn: {
       start: () => {
         this.selectedAction = undefined;
+        this.selectedActions.length = 0;
         this.gamePlay.endTurn();
         this.phase('BeginTurn');
       },

@@ -163,6 +163,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.addTerrain();
+    this.addRiverSplits();
     this.initialRegions();
     return rv;
   }
@@ -249,6 +250,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return new EdgeShape(color, this.mapCont.infCont); // slightly darker
   }
 
+
   initialRegions() {
     // borders from river splits are installed
     const splits = [[4, 5, 1], [4, 6, 2], [3, 5, 3]] as RegionElt[];
@@ -260,7 +262,6 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     AnkhMap.fspec.forEach(spec => this.setTerrain(spec, 'f'));
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
-    AnkhMap.rspec.forEach(spec => this.addSplit(spec));        // after marking water!
     AnkhMap.wspec.forEach(spec => ([r, c]: hexSpec) => {
       const hex = this[r][c];
       Object.keys(hex.links).forEach((dir: HexDir) => {
@@ -268,6 +269,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
         if (ohex.terrain !== 'w') this.addBorder(hex, dir, false); // one-way border: Apep can exit
       });
     });
+  }
+
+  addRiverSplits() {
+    AnkhMap.rspec.forEach(spec => this.addSplit(spec));        // after marking water!
   }
 
   noRegions(hexAry = this.hexAry) {

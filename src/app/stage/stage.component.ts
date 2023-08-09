@@ -65,15 +65,15 @@ export class StageComponent implements OnInit {
     new GameSetup(this.mapCanvasId, ngods, gods, scene) // load images; new GamePlay
   }
   // see: stream-writer.setButton
-  // static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
-  //   options: OpenFilePickerOptions & { multiple?: false; } & SaveFilePickerOptions & DirectoryPickerOptions,
-  //   cb: (fileHandleAry: any) => void) {
-  //   const picker = window[method]       // showSaveFilePicker showDirectoryPicker
-  //   const fsOpenButton = document.getElementById("fsOpenFileButton")
-  //   fsOpenButton.onclick = async () => {
-  //     picker(options).then((value: any) => cb(value), (rej: any) => {
-  //       console.warn(`showOpenFilePicker failed: `, rej)
-  //     });
-  //   }
-  // }
+  static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
+    options: OpenFilePickerOptions & { multiple?: false; } & SaveFilePickerOptions & DirectoryPickerOptions,
+    cb: (fileHandleAry: any) => void) {
+    const picker = window[method]       // showSaveFilePicker showDirectoryPicker
+    const fsOpenButton = document.getElementById("fsOpenFileButton")
+    fsOpenButton.onclick = async () => {
+      picker(options).then((value: any) => cb(value), (rej: any) => {
+        console.warn(`showOpenFilePicker failed: `, rej)
+      });
+    }
+  }
 }

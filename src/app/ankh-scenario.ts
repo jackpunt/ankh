@@ -24,6 +24,11 @@ type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure
 type ClaimElt = [row: number, col: number, pid: number];
 type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
 type AnkhElt = PowerIdent[];
+export type ActionIdent = 'Move' | 'Summon' | 'Gain' | 'Ankh';
+/** 'Move': [1,2] showing playerId */
+type PlayerId = number;
+type ActionElt = { [index in ActionIdent]?: PlayerId[]; } & { selected?: ActionIdent[]; };
+type EventElt = PlayerId[];
 
 /** [row, col, bid] -> new rid, with battle order = bid ;
  * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
@@ -44,10 +49,10 @@ type SetupElt = {
   gods?: GodName[],      // ngods & gods as per URL parsing
   coins?: number[],      // 1
   scores?: number[],     // 0
-  events?: number,
+  events?: EventElt,
   guards?: GuardIdent,   // Guardian types in use. default to random
   stable?: GuardIdent[], // Guardians in player's stable.
-  actions?: { Move?: number, Summon?: number, Gain?: number, Ankh?: number },
+  actions?: ActionElt,
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   turn?: number;   // default to 0; (or 1...)
 }
@@ -170,9 +175,9 @@ export class AnkhScenario {
 
   static AltMidKingdom5: Scenario = {
     ngods: 5,
-    turn: 16,
+    turn: 15,
     gods: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
-    actions: { Move: 5, Summon: 1, Gain: 4, Ankh: 2 },
+    actions: { Move: [0,1,2,3,4], Summon: [2], Gain: [0,1,3,4], Ankh: [3,4] },
     ankhs: [
       ['Inspiring', 'Omnipresent', 'Pyramid'],
       ['Inspiring', 'Omnipresent'],
@@ -181,7 +186,7 @@ export class AnkhScenario {
       ['Revered', 'Omnipresent', 'Pyramid'],
     ],
     coins: [2, 2, 0, 0, 0],
-    events: 3,
+    events: [0, 2, 3],
     guards: ['Satet', 'Apep', 'Androsphinx'],
     places: [
       [2, 5, 'Satet', 2],
@@ -234,8 +239,8 @@ export class AnkhScenario {
       turn: 3,
       regions: [[2, 0, 1], [2, 10, 2], [0, 2, 3]],
       guards: ['Satet', 'Apep', 'Scorpion'],
-      events: 3,
-      actions: { Move: 2, Ankh: 2 },
+      events: [0, 1],
+      actions: { Move: [0,1], Ankh: [0,1] },
       coins: [4, 5],
       scores: [2, 3],
       stable: [['Satet'], []],
@@ -286,7 +291,12 @@ export class ScenarioParser {
   // console.log(stime(this, `.regions: result`), map.regionList());
   parseSplits(splits: SplitSpec[], turnSet = false) {
     const map = this.map;
-    if (turnSet) map.initialRegions();
+    if (map.splits.length > 3) {
+      map.splits = [];
+      map.noRegions();
+      map.addRiverSplits();
+      map.initialRegions();
+    }
     splits.forEach((splitSpec) => {
       map.addSplit(splitSpec, true, true); // ignore bid; parseRegions will sort it out.
     })
@@ -297,7 +307,6 @@ export class ScenarioParser {
   /** Place (or replace) all the Figures on the map. */
   parsePlaces(place: PlaceElt[], unplaceAnkhs = false) {
     const map = this.map;
-    this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     if (unplaceAnkhs) {
       this.gamePlay.allPlayers.forEach(player => {
         const source = player.panel.ankhSource;
@@ -305,7 +314,6 @@ export class ScenarioParser {
         units.forEach(unit => source.availUnit(unit));
       })
     }
-
     //console.groupCollapsed('place');
     place.forEach(elt => {
       const [row, col, cons0, pid] = elt;
@@ -317,7 +325,7 @@ export class ScenarioParser {
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
       const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god.Aname) as GodFigure;
-      let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit() : undefined);
+      let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
@@ -338,33 +346,44 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
   parseScenario(setup: SetupElt) {
     if (!setup) return;
-    console.log(stime(this, `.parseScenario:`), setup);
-    this.saveState(this.gamePlay); // log current state for debug...
+    console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
+    console.log(stime(this, `.parseScenario: newState =`), setup);
+
     const { regions, splits, coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
-    const turnSet = (turn !== undefined);
-    if (turn !== undefined) {
+    const turnSet = (turn !== undefined); // indicates a Saved Scenario.
+    if (turnSet) {
       table.turnLog.log(`turn = ${turn}`, `parseSetup`);
-      table.gamePlay.turnNumber = turn - 1;
+      table.gamePlay.turnNumber = turn;
+      table.guardSources.forEach(source => {
+        source.allUnitsCopy.forEach(unit => (unit.moveTo(undefined), source.availUnit(unit)))
+        source.nextUnit();
+      });
+      this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     }
     if (events !== undefined) {
-      for (let ndx = 0; ndx < events; ndx++) {
-        table.setEventMarker(ndx, C.grey);
-      }
+      events.forEach((pid, ndx) => {
+        table.setEventMarker(ndx, this.gamePlay.allPlayers[pid]);
+      })
       gamePlay.eventName = undefined;
       map.update();
     }
+    // TODO: Red AnkhSelector not painting.
+    // move Ankh-Score column to left when dir -1
+    // TODO: also remove markers from all the other button!
+    // ALSO: Apep Summon to any water
     if (actions !== undefined) {
       table.actionRows.forEach(({ id }) => {
-        const nSelected = actions[id] ?? 0;
-        for (let cn = 0; cn < nSelected; cn++) {
+        const pids = actions[id] ?? [];
+        pids.forEach((pid, cn) => {
           const rowCont = table.actionPanels[id];
           const button = rowCont.getButton(cn);
-          table.setActionMarker(button, C.grey);
-        }
+          table.setActionMarker(button, this.gamePlay.allPlayers[pid]);
+        });
       });
+      const selected = actions.selected;
     }
     if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
@@ -384,16 +403,15 @@ export class ScenarioParser {
       const player = allPlayers[pid], panel = player.panel;
       console.log(stime(this, `.stable:[${pid}]`), gNames)
       gNames.forEach((gName, ndx) => {
-        table.guardSources.find(source => {
-          if (source.type.name === gName) {
-            const unit = source.takeUnit();
-            unit.moveTo(panel.stableHexes[ndx + 1]);
-            unit.setPlayerAndPaint(player);
-            return true;
-          }
-          return false;
-        })
-      })
+        const source = table.guardSources.find(source => (source.type.name === gName))
+        console.log(stime(this, `.stable:[${pid}] ${gName} source.allUnits=`), source?.allUnitsCopy)
+        if (source) {
+          const unit = source.takeUnit();
+          unit.setPlayerAndPaint(player);
+          unit.moveTo(panel.stableHexes[ndx + 1]);
+          source.nextUnit();
+        }
+      });
     });
     // reset all AnkhTokens, ready for claim some Monument:
     this.parsePlaces(places, turnSet);  // turnSet indicates a saved Scenario, vs original.
@@ -429,25 +447,28 @@ export class ScenarioParser {
     this.gamePlay.hexMap.update();
   }
 
-  saveState(gamePlay: GamePlay) {
+  saveState(gamePlay: GamePlay, silent = false) {
     const table = gamePlay.table;
     const ngods = gamePlay.allPlayers.length;
     const godNames = gamePlay.allPlayers.map(player => player.god.name);
     const turn = Math.max(0, gamePlay.turnNumber);
     const coins = gamePlay.allPlayers.map(p => p.coins);
     const scores = table.playerScores;
-    console.log(stime(this, `.saveState: ----------- `), { turn, ngods, godNames })
+    if (!silent) console.log(stime(this, `.saveState: ----------- `), { turn, ngods, godNames })
 
     const regions = gamePlay.hexMap.regions.map((region, n) => region && [region[0].row, region[0].col, n + 1]);
-    const splits = gamePlay.hexMap.splits.slice(3);
-    const events = table.nextEventIndex;
+    const splits = gamePlay.hexMap.splits.slice(2);
+    const events = table.eventCells.slice(0, table.nextEventIndex).map(elt => elt.pid);
     const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;
-    const actions = {};
+    const actions: ActionElt = {};
     table.actionRows.forEach(({id}) => {
       const rowCont = table.actionPanels[id] as ActionContainer;
       const buttons = rowCont.buttons;
-      actions[id] = buttons.findIndex(elt => !elt.children.find(ch => ch instanceof AnkhMarker));
+      const nActions = buttons.findIndex(elt => !elt.children.find(ch => ch instanceof AnkhMarker));
+      actions[id] = buttons.slice(0, nActions).map(elt => elt.pid);
     })
+    actions.selected = this.gamePlay.gameState.selectedActions;
+
     const stable = table.panelForPlayer.map(panel => {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
@@ -458,6 +479,16 @@ export class ScenarioParser {
     })
 
     return { ngods, godNames, turn, regions, splits, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;
+  }
+
+  logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {
+    let lines = 'setup = {';
+    Object.keys(state).forEach((key, ndx) => {
+      const line = JSON.stringify(state[key])
+      lines = `${lines}\n  ${key}: ${line},`;
+    })
+    lines = `${lines}\n};`
+    logWriter.writeLine(lines);
   }
 
   /** debug utility */

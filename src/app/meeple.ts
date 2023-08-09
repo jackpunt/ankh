@@ -171,8 +171,12 @@ export class Meeple extends Tile {
     return false;
   }
 
-  override sendHome(): void { // Criminal
+  override resetTile(): void {
     this.faceUp();
+    this.startHex = undefined;
+  }
+
+  override sendHome(): void { // Criminal
     super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
     const source = this.source;
     if (source) {

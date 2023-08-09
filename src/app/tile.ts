@@ -162,6 +162,7 @@ export class Tile extends Tile0 {
   setPlayerAndPaint(player: Player) {
     this.player = player;
     this.paint(undefined, player?.color);
+    return this;
   }
 
   override toString(): string {

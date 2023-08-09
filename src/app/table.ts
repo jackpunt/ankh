@@ -2,7 +2,7 @@ import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContai
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { Scenario, ScenarioParser } from "./ankh-scenario";
+import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { type GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
 import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
@@ -18,8 +18,9 @@ import { ClassByName } from "./class-by-name";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
 
-export interface EventButton extends Container { isEvent: boolean; }
-interface EventIcon extends Container { eventName: string; }
+export type EventName = 'Claim' | 'Split' | 'Conflict' | 'merge' | 'redzone';
+export interface EventButton extends Container { isEvent: boolean, pid: number; }
+interface EventIcon extends Container { eventName: EventName, pid: number; }
 interface ScoreMark extends RectShape { score: number, rank: number }
 
 /** rowCont is an ActionContainer; children are EventButton. */
@@ -86,7 +87,7 @@ class TextLog extends Container {
   constructor(public Aname: string, nlines = 6, public size: number = 30, public lead = 3) {
     super()
     this.lines = new Array<Text>(nlines);
-    for (let ndx = 0; ndx < nlines; ndx++) this.lines[ndx] = this.newText(`#0:`)
+    for (let ndx = 0; ndx < nlines; ndx++) this.lines[ndx] = this.newText(`//0:`)
     this.addChild(...this.lines);
   }
 
@@ -169,7 +170,10 @@ export class Table extends EventDispatcher  {
     this.turnLog.log(line, 'table.logTurn'); // in top two lines
   }
   logText(line: string, from = '') {
-    this.textLog.log(`#${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
+    const text = `//${this.gamePlay.turnNumber}: ${line}`;
+    this.textLog.log(text, from); // scrolling lines below
+    this.gamePlay.logWriter.writeLine(text);
+
   }
   setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 4, col = -9) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
@@ -492,7 +496,7 @@ export class Table extends EventDispatcher  {
   }
 
   /** mark Action as selected, inform GamePlay & phaseDone() */
-  selectAction (id: string, button: EventButton, cn: number) {
+  selectAction (id: ActionIdent, button: EventButton, cn: number) {
     this.gamePlay.selectedAction = id;
     this.gamePlay.selectedActionIndex = cn;
     if (button.isEvent) {
@@ -503,10 +507,11 @@ export class Table extends EventDispatcher  {
     this.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
-  setActionMarker(button: EventButton, color?: string) {
+  setActionMarker(button: EventButton, player = this.gamePlay.curPlayer) {
     const rad = (button.children[0] as CircleShape).rad;
-    const god = this.gamePlay.curPlayer.god;
-    const ankhToken = god.getAnkhToken(rad, color ?? god.color);
+    const god = player.god;
+    const ankhToken = god.getAnkhToken(rad);
+    button.pid = player.index;
     button.addChild(ankhToken);
     button.stage.update();
   }
@@ -577,7 +582,7 @@ export class Table extends EventDispatcher  {
     const eventCont = new Container();
     this.hexMap.mapCont.resaCont.addChild(eventCont);
     this.setToRowCol(eventCont, row, col);
-    const events = [
+    const events: EventName[] = [
       'Claim', 'Claim', 'Claim', 'Conflict',
       'Split', 'Claim', 'Claim', 'Conflict',
       'Split', 'Claim', 'Claim', 'Conflict', 'merge',
@@ -619,10 +624,11 @@ export class Table extends EventDispatcher  {
     if (this.gamePlay.eventName) this.setEventMarker(index - 1);
   }
 
-  setEventMarker(index: number, color?: string) {
-    const god = this.gamePlay.curPlayer.god;
-    const ankhToken = god.getAnkhToken(TP.ankhRad, color ?? god.color);
+  setEventMarker(index: number, player = this.gamePlay.curPlayer) {
+    const god = player.god, color = god.color;
+    const ankhToken = god.getAnkhToken(TP.ankhRad, color);
     const cell = this.eventCells[index];
+    cell.pid = player.index;
     cell.addChild(ankhToken);
     this.gamePlay.eventName = cell.eventName;
   }
@@ -709,8 +715,9 @@ export class Table extends EventDispatcher  {
   }
 
   startGame(scenario: Scenario) {
+    this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer
     // Place Pieces and Figures on map:
-    this.parseScenenario(scenario);
+    this.parseScenenario(scenario); // may change turnNumber
 
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {
@@ -719,7 +726,7 @@ export class Table extends EventDispatcher  {
 
     // this.stage.enableMouseOver(10);
     this.scaleCont.addChild(this.overlayCont); // now at top of the list.
-    this.gamePlay.setNextPlayer(this.gamePlay.allPlayers[this.gamePlay.turnNumber % Player.allPlayers.length]);
+    this.gamePlay.setNextPlayer(this.gamePlay.turnNumber > 0 ? this.gamePlay.turnNumber : 0);
     this.gamePlay.gameState.start();   // enable Table.GUI to drive game state.
   }
 
@@ -863,9 +870,9 @@ export class Table extends EventDispatcher  {
     const lm = history[0]
     const prev = lm ? `${lm.Aname}${lm.ind}#${tn-1}` : ""
     const robo = plyr.useRobo ? AT.ansiText(['red','bold'],"robo") : "----";
-    const info = { turn: `#${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
+    const info = { turn: `//${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
     console.log(stime(this, `.logCurPlayer --${robo}--`), info);
-    this.logTurn(`#${tn}: ${plyr.Aname}`);
+    this.logTurn(`//${tn}: ${plyr.Aname}`);
   }
   showRedoUndoCount() {
     this.undoText.text = `${this.gamePlay.undoRecs.length}`

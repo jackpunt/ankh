@@ -3,7 +3,7 @@ import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
-import { Scenario, ScenarioParser } from "./ankh-scenario";
+import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";
@@ -11,7 +11,7 @@ import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
 import { LogWriter } from "./stream-writer";
-import { Table } from "./table";
+import { EventName, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
 //import { NC } from "./choosers";
@@ -56,8 +56,8 @@ export class GamePlay0 {
   get allPlayers() { return Player.allPlayers; }
   get allTiles() { return Tile.allTiles; }
   selectedActionIndex: number;
-  selectedAction: string; // set when click on action panel or whatever. read by ActionPhase;
-  eventName: string;
+  selectedAction: ActionIdent; // set when click on action panel or whatever. read by ActionPhase;
+  eventName: EventName;
 
   readonly hexMap = new AnkhMap<AnkhHex>(); // create base map; no districts until Table.layoutTable!
   readonly history: Move[] = []          // sequence of Move that bring board to its state
@@ -70,10 +70,10 @@ export class GamePlay0 {
       mHexes: TP.mHexes, tHexes: TP.tHexes
     }
     let line0 = json(line, false)
-    let logFile = `log_${time}`
+    let logFile = `log_${time}.js`
     console.log(stime(this, `.constructor: -------------- ${line0} --------------`))
     let logWriter = new LogWriter(logFile)
-    logWriter.writeLine(line0)
+    logWriter.writeLine(`start = ${line0};`)
     return logWriter;
   }
 
@@ -161,11 +161,13 @@ export class GamePlay0 {
     // console.log(stime(this, `.endGame: Winner = ${winner.Aname}`), scores);
   }
 
-  setNextPlayer(plyr = this.nextPlayer()): void {
+  setNextPlayer(turnNumber?: number): void {
+    if (turnNumber === undefined) turnNumber = this.turnNumber + 1;
+    this.turnNumber = turnNumber;
+    const index = (turnNumber % this.allPlayers.length);
     this.preGame = false;
-    this.turnNumber = Math.max(1, this.turnNumber + 1); // this.history.length + 1
-    this.curPlayer = plyr
-    this.curPlayerNdx = plyr.index
+    this.curPlayerNdx = index;
+    this.curPlayer = this.allPlayers[index];
     this.curPlayer.newTurn();
   }
 
@@ -318,14 +320,17 @@ export class GamePlay extends GamePlay0 {
   pushState() {
     const scenarioParser = new ScenarioParser(this.hexMap, this);
     const state = scenarioParser.saveState(this);
+    console.log(stime(this, `.pushState -------- turn=${state.turn}`));
     this.states.push(state);
     console.log(stime(this, `.pushState --------`), state);
+    scenarioParser.logState(state);
   }
   // TODO: setup undo index to go fwd and back? wire into undoPanel?
   popState() {
     const state = this.states.pop();
     console.log(stime(this, `.popState --------`), state);
     this.table.parseScenenario(state);
+    this.setNextPlayer(this.turnNumber);
   }
 
   cardShowing: boolean = false;
@@ -335,7 +340,7 @@ export class GamePlay extends GamePlay0 {
     this.hexMap.update();
   }
 
-  chooseAction(action: string) {
+  chooseAction(action: ActionIdent) {
     // find action in actionSelectPanel, dispatch event to click highlighted button.
     const [button, n] = this.table.activeButtons[action];
     setTimeout(() => this.table.selectAction(action, button, n), 10);
@@ -469,9 +474,9 @@ export class GamePlay extends GamePlay0 {
     super.endTurn();
   }
 
-  override setNextPlayer(plyr?: Player) {
+  override setNextPlayer(turnNumber?: number) {
     this.curPlayer.panel.showPlayer(false);
-    super.setNextPlayer(plyr); // update player.coins
+    super.setNextPlayer(turnNumber); // update player.coins
     this.curPlayer.panel.showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...
@@ -484,6 +489,7 @@ export class GamePlay extends GamePlay0 {
 
   /** After setNextPlayer() */
   startTurn() {
+    this.pushState();
   }
 
   paintForPlayer() {

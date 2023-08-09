@@ -268,20 +268,22 @@ export class PlayerPanel extends Container {
       ankh.x = 0; ankh.y = 0;
       if (powerLine) {
         powerLine.addChild(ankh);
-        powerLine.stage.update();
       } else {
         ankh.sendHome();
       }
+      powerLine?.stage.update();
     }
     return ankh;
   }
 
-  /** the click handler for AnkhPower buttons; info supplied by on.Click() */
+  /** the click handler for AnkhPower buttons; info supplied by on.Click()
+   *  confirm supplies (button === undefined) when insufficent funds to purchase AnkhPower
+   */
   selectAnkhPower(evt?: Object, button?: CircleShape) {
     const rank = this.nextAnkhRank, ankhCol = this.ankhArrays.length % 2;
     const ankh = this.addAnkhToPowerLine(button?.parent as PowerLine);
     const colCont = this.powerCols[rank];
-    this.activateAnkhPowerSelector(colCont, false);
+    this.activateAnkhPowerSelector(colCont, false); // deactivate
 
     // get God power, if can sacrific followers:
     if (this.player.coins >= colCont.rank) {
@@ -295,8 +297,8 @@ export class PlayerPanel extends Container {
     if (colCont.guardianSlot === 1 - ankhCol) {
       this.takeGuardianIfAble(colCont.rank)
     }
-    this.player.gamePlay.selectedAction = 'Ankh';
-    this.player.gamePlay.phaseDone();
+    this.stage.on('drawend', () => this.player.gamePlay.phaseDone(), this, true);
+    this.stage.update();
   };
 
   takeGuardianIfAble(rank: number) {
@@ -305,9 +307,7 @@ export class PlayerPanel extends Container {
       return (meep instanceof Guardian) && (meep.player === this.player) && (meep.radius === radius);
     }).length;
     if (nRank >= 2) return;
-    const guardian = this.stableSources[rank].takeUnit();
-    guardian?.setPlayerAndPaint(this.player);
-    guardian?.moveTo(this.stableHexes[rank]);
+    this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player)?.moveTo(this.stableHexes[rank]);
   }
 
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){
@@ -325,7 +325,7 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  get nextAnkhRank() { return 3 - Math.floor(this.ankhArrays.length / 2) }
+  get nextAnkhRank() { return 3 - Math.ceil(this.ankhArrays.length / 2) }
   readonly powerCols: AnkhPowerCont[] = [];
   readonly ankhArrays: AnkhToken[] = [];
   makeAnkhPowerGUI() {

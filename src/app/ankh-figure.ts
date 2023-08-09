@@ -119,6 +119,11 @@ export class Monument extends AnkhPiece {
       }
     }
   }
+
+  override sendHome(): void {
+    this.setPlayerAndPaint(undefined);
+    super.sendHome();
+  }
 }
 
 export class Pyramid extends Monument {
@@ -191,10 +196,11 @@ export class Portal extends AnkhPiece {
 export class AnkhMeeple extends Meeple {
 
   constructor(player: Player, serial: number, Aname?: string) {
-    super(Aname ?? `${Aname}\n${serial}`, player);
+    super(`${Aname}\n${serial}`, player);
     this.underlay = new CircleShape();
     this.addChildAt(this.underlay, 0);
     this.underlay.visible = false;
+    this.nameText.text = Aname;
   }
   underlay: CircleShape;
 
@@ -347,11 +353,6 @@ export class GodFigure extends Figure {
   constructor(player: Player, serial?: number, Aname?: string) {
     super(player, serial, Aname);
   }
-  override sendHome(): void {
-    // this.moveTo(undefined);   // "there's no place like home" (home is like no-place...)
-    // "whereever you hang your hat, that's Home..."
-    return;
-  }
 
   override get radius() { return TP.ankh2Rad; }
 
@@ -429,7 +430,7 @@ export class Guardian extends Figure {
   }
 
   override sendHome(): void {
-    this.setPlayerAndPaint(undefined);
+    this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
     super.sendHome();
   }
 }
@@ -536,8 +537,9 @@ export class Scorpion extends Guardian3 {
 
 export class Androsphinx extends Guardian3 {
   constructor(player: Player, serial: number) {
-    super(player, serial, `Andro\nsphinx\n${serial}`, );
+    super(player, serial, `Andro\nsphinx`, );
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
+
   }
 }
 
