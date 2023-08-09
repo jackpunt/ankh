@@ -41,12 +41,16 @@ export class ActionContainer extends Container {
     return this.buttons[cn];
   }
 
-  /** activate the first button witout a AnkhMarker */
+  get nextButton() { return this.buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker))) }
+  resetToFirstButton() {
+    this.buttons.forEach(b => b.removeChildType(AnkhMarker));
+    return this.buttons[0];
+  }
+  /** activate the first button without an AnkhMarker OR reset to first button (after Event) */
   activate() {
     const hl = this.highlight;
-    const buttons = this.buttons;
-    const button = buttons.find(button => !button.children.find(c => (c instanceof AnkhMarker))) ??
-      (buttons.forEach(b => b.removeChildType(AnkhMarker)), buttons[0]);// reset after Event!
+    const button = this.nextButton ?? this.resetToFirstButton(); // reset after Event!
+    hl.paint(C.WHITE);
     hl.x = button.x;
     hl.y = button.y;
     hl.visible = button.mouseEnabled = true;
@@ -461,7 +465,7 @@ export class Table extends EventDispatcher  {
   }
 
   actionPanels: ActionContainer[] = [];
-  actionRows: { id: 'Move' | 'Summon' | 'Gain' | 'Ankh', dn?: number }[] = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
+  actionRows: { id: ActionIdent, dn?: number }[] = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
   makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.2) {
     const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
     const wide = 400;
@@ -503,14 +507,20 @@ export class Table extends EventDispatcher  {
       this.setEventMarker(this.nextEventIndex);
     }
     this.activateActionSelect(false, id); // de-activate this row and the ones above.
-    this.setActionMarker(button);
+    this.setActionMarker(button, undefined, C.grey);
+
     this.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
-  setActionMarker(button: EventButton, player = this.gamePlay.curPlayer) {
+  setActionMarker(button: EventButton, player = this.gamePlay.curPlayer, color?: string) {
     const rad = (button.children[0] as CircleShape).rad;
     const god = player.god;
-    const ankhToken = god.getAnkhToken(rad);
+    const ankhToken = god.getAnkhMarker(rad);
+    if (color) {
+      const hl = (button.parent as ActionContainer).highlight;
+      hl.paint(color);
+      hl.visible = true;
+    }
     button.pid = player.index;
     button.addChild(ankhToken);
     button.stage.update();
@@ -521,17 +531,18 @@ export class Table extends EventDispatcher  {
    * On each row: activate or deactivate the first button without an AnkhMarker on each line.
    * If a row is 'full' (previous Event) it is reset to the beginning.
    *
-   * @return false if no buttons were activated (after == 'Ankh')
+   * @param afterRow name of previous actionSelected; that row and above are deactivated.
+   * @return false if no buttons were activated (afterRow == 'Ankh')
    */
-  activateActionSelect(activate: boolean, after?: string, cat = false) {
-    let isAfter = (after === undefined);
+  activateActionSelect(activate: boolean, afterRow?: string, cat = false) {
+    let isAfter = (afterRow === undefined);
     let active = 0;
     this.activeButtons = {};
     this.actionRows.map(({id, dn}, cn) => {
       const rowCont = this.actionPanels[id] as ActionContainer;
-      if (!activate) { rowCont.deactivate() } // mouseEnable
+      if (!activate) { rowCont.deactivate() }  // highlight & mouse = false
       else if (isAfter) { this.activeButtons[id]= [rowCont.activate(), cn]; active++; }
-      isAfter = isAfter || id === after;
+      isAfter = isAfter || id === afterRow;
     })
     if (cat) {
       // [de]activate 'Cat' & 'Pass' buttons..?
@@ -626,7 +637,7 @@ export class Table extends EventDispatcher  {
 
   setEventMarker(index: number, player = this.gamePlay.curPlayer) {
     const god = player.god, color = god.color;
-    const ankhToken = god.getAnkhToken(TP.ankhRad, color);
+    const ankhToken = god.getAnkhMarker(TP.ankhRad, color);
     const cell = this.eventCells[index];
     cell.pid = player.index;
     cell.addChild(ankhToken);

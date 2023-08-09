@@ -73,7 +73,7 @@ export class GamePlay0 {
     let logFile = `log_${time}.js`
     console.log(stime(this, `.constructor: -------------- ${line0} --------------`))
     let logWriter = new LogWriter(logFile)
-    logWriter.writeLine(`start = ${line0};`)
+    logWriter.writeLine(`[\n{start: ${line0}},`)
     return logWriter;
   }
 
@@ -307,8 +307,9 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
     KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
-    KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.pushState, argVal: true })
-    KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.popState, argVal: true })
+    KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
+    KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
+    KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
 
     // diagnostics:
@@ -316,19 +317,25 @@ export class GamePlay extends GamePlay0 {
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
 
-  states = [];
-  pushState() {
+  backStates = [];
+  saveState() {
+    if (this.nstate !== 0) {
+      this.backStates = this.backStates.slice(this.nstate); // remove ejected states
+      this.nstate = 0;
+    }
+
     const scenarioParser = new ScenarioParser(this.hexMap, this);
     const state = scenarioParser.saveState(this);
-    console.log(stime(this, `.pushState -------- turn=${state.turn}`));
-    this.states.push(state);
-    console.log(stime(this, `.pushState --------`), state);
+    this.backStates.unshift(state);
+    console.log(stime(this, `.saveState -------- turn=${state.turn}`), state);
     scenarioParser.logState(state);
   }
   // TODO: setup undo index to go fwd and back? wire into undoPanel?
-  popState() {
-    const state = this.states.pop();
-    console.log(stime(this, `.popState --------`), state);
+  nstate = 0;
+  pickState(back = true) {
+    this.nstate = back ? Math.min(this.backStates.length, this.nstate + 1) : Math.max(0, this.nstate - 1);
+    const state = this.backStates[this.nstate];
+    console.log(stime(this, `.pickState -------- #${this.nstate} turn=${state.turn}:`), state);
     this.table.parseScenenario(state);
     this.setNextPlayer(this.turnNumber);
   }
@@ -489,7 +496,7 @@ export class GamePlay extends GamePlay0 {
 
   /** After setNextPlayer() */
   startTurn() {
-    this.pushState();
+    this.saveState();
   }
 
   paintForPlayer() {

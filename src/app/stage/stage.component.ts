@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Params } from '@angular/router';
 import { stime } from '@thegraid/easeljs-lib';
 //import { } from 'wicg-file-system-access';
 import { GameSetup } from '../game-setup';
@@ -16,9 +16,9 @@ export class StageComponent implements OnInit {
   getId(): string {
     return "T" + (StageComponent.idnum = StageComponent.idnum + 1);
   };
-  /** names of extensions to be removed: ext=Transit,Roads */
-  @Input('ext')
-  ext: string;
+  /** the query string: ?a=...&b=...&c=... =>{a: ..., b: ..., c:...} */
+  @Input('params')
+  qParams: Params;
 
   @Input('width')
   width = 1600.0;   // [pixels] size of "Viewport" of the canvas / Stage
@@ -31,13 +31,12 @@ export class StageComponent implements OnInit {
   constructor(private activatedRoute: ActivatedRoute) {}
   ngOnInit() {
     console.log(stime(this, ".noOnInit---"))
-    let x = this.activatedRoute.params.subscribe(params => {
+    this.activatedRoute.params.subscribe(params => {
       console.log(stime(this, ".ngOnInit: params="), params)
     })
-    let y = this.activatedRoute.queryParams.subscribe(params => {
-      console.log(stime(this, ".ngOnInit: queryParams="), params)
-      this.ext = params['ext'];
-      console.log(stime(this, ".ngOnInit: ext="), this.ext);
+    this.activatedRoute.queryParams.subscribe(params => {
+      console.log(stime(this, ".ngOnInit: queryParams="), params);
+      this.qParams = params;
     });
   }
 
@@ -46,7 +45,7 @@ export class StageComponent implements OnInit {
   }
   ngAfterViewInit2() {
     let href: string = document.location.href;
-    console.log(stime(this, ".ngAfterViewInit---"), href, "ext=", this.ext)
+    console.log(stime(this, ".ngAfterViewInit---"), href, "qParams=", this.qParams)
     if (href.endsWith("startup")) {
 
     }
@@ -56,13 +55,8 @@ export class StageComponent implements OnInit {
     const urlParams = new URLSearchParams(window.location.search);
     TP.ghost = urlParams.get('host') || TP.ghost
     TP.gport = Number.parseInt(urlParams.get('port') || TP.gport.toString(10), 10)
-    TP.networkUrl = buildURL(undefined)
-    const ngodstr = urlParams.get('n');
-    const ngods = ngodstr ? Number.parseInt(ngodstr) : undefined;
-    const scene = urlParams.get('scene') ?? undefined;
-    const godsstr = urlParams.get('gods');
-    const gods = !!godsstr ? godsstr.split(',') : []
-    new GameSetup(this.mapCanvasId, ngods, gods, scene) // load images; new GamePlay
+    TP.networkUrl = buildURL(undefined);
+    new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
   }
   // see: stream-writer.setButton
   static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',

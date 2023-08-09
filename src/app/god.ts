@@ -48,7 +48,7 @@ export class God {
   readonly ankhPowers: string[] = [];
 
   radius = TP.ankh2Rad;
-  getAnkhToken(rad = TP.ankhRad, color = this.color) {
+  getAnkhMarker(rad = TP.ankhRad, color = this.color) {
     return new AnkhMarker(color, rad);
   }
 

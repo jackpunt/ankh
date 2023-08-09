@@ -4,7 +4,7 @@
 import { C, Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhPiece, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
-import type { AnkhHex, AnkhMap } from "./ankh-map";
+import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ClassByName } from "./class-by-name";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
@@ -16,10 +16,10 @@ import type { TileSource } from "./tile-source";
 import { AnkhToken } from "./ankh-token";
 
 type GodName = string;
-type GuardName = string | Constructor<Guardian>;
-type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
+export type GuardName = string | Constructor<Guardian>;
+export type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
 type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorius' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
-export type RegionElt = [row: number, col: number, bid: number];
+export type RegionElt = [row: number, col: number, bid: RegionId];
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
 type ClaimElt = [row: number, col: number, pid: number];
 type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
@@ -33,7 +33,7 @@ type EventElt = PlayerId[];
 /** [row, col, bid] -> new rid, with battle order = bid ;
  * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
  */
-export type SplitBid = [row: number, col: number, bid: number, split?: boolean ];
+export type SplitBid = [row: number, col: number, bid: RegionId, split?: boolean ];
 export type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir];
 export type SplitElt = (SplitBid | SplitDir)
 export type SplitSpec = SplitElt[];
@@ -172,6 +172,37 @@ export class AnkhScenario {
       ],
     },
   ];
+  static AltMidK2: Scenario = {
+    ngods: 2,
+    godNames: ["Amun", "Osiris"],
+    turn: 9,
+    regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3]],
+    splits: [],
+    guards: ["MumCat", "Apep", "Scorpion"],
+    events: [0, 1, 0],
+    actions: { "Move": [0, 1], "Summon": [0, 0, 0], "Gain": [1], "Ankh": [1, 0], "selected": [] },
+    coins: [3, 1],
+    scores: [0, 0.1],
+    stable: [[], []],
+    ankhs: [["Revered", "Omnipresent", "Pyramid", "Temple"], ["Revered", "Omnipresent", "Pyramid", "Temple"]],
+    places: [[1, 8, "Obelisk", null], [5, 0, "Obelisk", 1], [2, 5, "Pyramid", 1], [8, 1, "Pyramid", 1], [5, 8, "Pyramid", 2], [0, 3, "Temple", null], [6, 5, "Temple", 2], [3, 4, "Warrior", 1], [4, 1, "Warrior", 1], [7, 1, "Warrior", 1], [1, 7, "Warrior", 1], [2, 4, "Warrior", 1], [3, 6, "Warrior", 2], [2, 6, "MumCat", 1], [0, 4, "Apep", 1], [8, 2, "GodFigure", 1], [4, 7, "GodFigure", 2]],
+  };
+
+  static preSplit: Scenario = {
+    ngods: 2,
+    godNames: ["Horus","Set"],
+    turn: 10,
+    regions: [[4,5,1],[4,6,2],[3,5,3]],
+    splits: [],
+    guards: ["MumCat","Apep","Scorpion"],
+    events: [0,1,0,1],
+    actions: {"Move":[0,1],"Summon":[0,0,0],"Gain":[1,1],"Ankh":[1,0],"selected":[]},
+    coins: [4,1],
+    scores: [4,2],
+    stable: [[],[]],
+    ankhs: [["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
+    places: [[2,6,"MumCat",1],[0,4,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",null],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
+  };
 
   static AltMidKingdom5: Scenario = {
     ngods: 5,
@@ -319,7 +350,7 @@ export class ScenarioParser {
       const [row, col, cons0, pid] = elt;
       const cons = (typeof cons0 === 'string') ? ClassByName.classByName[cons0] : cons0;
       const hex = map[row][col];
-      const player = (pid !== undefined) && this.gamePlay.allPlayers[pid - 1];
+      const player = (pid !== undefined) ? this.gamePlay.allPlayers[pid - 1] : undefined;
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
@@ -370,20 +401,16 @@ export class ScenarioParser {
       gamePlay.eventName = undefined;
       map.update();
     }
-    // TODO: Red AnkhSelector not painting.
-    // move Ankh-Score column to left when dir -1
-    // TODO: also remove markers from all the other button!
-    // ALSO: Apep Summon to any water
     if (actions !== undefined) {
+      const players = this.gamePlay.allPlayers;
       table.actionRows.forEach(({ id }) => {
+        const rowCont = table.actionPanels[id] as ActionContainer;
+        rowCont.resetToFirstButton();
         const pids = actions[id] ?? [];
-        pids.forEach((pid, cn) => {
-          const rowCont = table.actionPanels[id];
-          const button = rowCont.getButton(cn);
-          table.setActionMarker(button, this.gamePlay.allPlayers[pid]);
-        });
+        pids.forEach((pid, cn) => table.setActionMarker(rowCont.getButton(cn), players[pid]));
       });
       const selected = actions.selected;
+      table.activateActionSelect(true, selected[0])
     }
     if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
@@ -423,7 +450,7 @@ export class ScenarioParser {
       // remove existing AnkhPowers & AnkhTokens
       god.ankhPowers.length = 0;
       god.ankhPowers.push(...powers);
-      panel.ankhArrays.length = 0;
+      panel.ankhPowerTokens.length = 0;
       // add ankhs for each colCont:
       panel.powerCols.forEach((colCont, cn) => {
         colCont.removeChildType(AnkhToken).forEach(ankhToken => ankhToken.sendHome());
@@ -433,7 +460,7 @@ export class ScenarioParser {
           const marker = colCont.children[cn];
           ankh.x = marker.x; ankh.y = marker.y;
         })
-        panel.ankhArrays.push(...ankhs); // add 2 ankhs to supply
+        panel.ankhPowerTokens.push(...ankhs); // add 2 ankhs to supply
         colCont.addChild(...ankhs);
         colCont.ankhs = ankhs;
       })
@@ -482,12 +509,12 @@ export class ScenarioParser {
   }
 
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {
-    let lines = 'setup = {';
+    let lines = '{ setup: {';
     Object.keys(state).forEach((key, ndx) => {
       const line = JSON.stringify(state[key])
       lines = `${lines}\n  ${key}: ${line},`;
     })
-    lines = `${lines}\n};`
+    lines = `${lines}\n}},`
     logWriter.writeLine(lines);
   }
 

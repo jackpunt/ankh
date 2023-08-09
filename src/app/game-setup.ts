@@ -1,7 +1,8 @@
+import { Params } from "@angular/router";
 import { C, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
-import { AnkhScenario, Scenario } from "./ankh-scenario";
+import { AnkhScenario, GuardIdent, Scenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
 import { selectN } from "./functions";
 import { GamePlay } from "./game-play";
@@ -29,11 +30,11 @@ export class GameSetup {
    * ngAfterViewInit --> start here!
    * @param canvasId supply undefined for 'headless' Stage
    */
-  constructor(canvasId: string, public ngods?, public gods?: string[], public scene? : string) {
+  constructor(canvasId: string, public qParams: Params) {
     stime.fmt = "MM-DD kk:mm:ss.SSS"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
-    Tile.loader.loadImages(() => this.startup(ngods, gods, scene));
+    Tile.loader.loadImages(() => this.startup(qParams));
   }
   _netState = " " // or "yes" or "ref"
   set netState(val: string) {
@@ -60,28 +61,39 @@ export class GameSetup {
     }
     deContainer(this.stage)
     TP.fnHexes(nh, mh);
-    let rv = this.startup(this.ngods, this.gods, this.scene);
+    let rv = this.startup(this.qParams);
     this.netState = " "      // onChange->noop; change to new/join/ref will trigger onChange(val)
     // next tick, new thread...
     setTimeout(() => this.netState = netState, 100) // onChange-> ("new", "join", "ref") initiate a new connection
     return rv
   }
 
+  scene: string;
+  ngods: number = undefined;
+  gods: string[] = [];
+  guards: GuardIdent = [undefined, undefined, undefined];
+
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
-   * @param gods 'ext' from URL
+   * @param qParams from URL
    */
-  startup(ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom') {
-    this.gods = gods ?? this.gods;
-    this.ngods = ngods ?? this.ngods;
-    this.scene = scene ?? this.scene;
+  startup(qParams: Params = []) {
+    //ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom'
+    this.gods = qParams['gods']?.split(',') ?? this.gods;
+    this.ngods = Number.parseInt(qParams?.['n'] ?? '4') ?? this.ngods;
+    this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
+    this.guards = qParams['guards']?.split(',') ?? this.guards;
+
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
 
-    const scene1 = AnkhScenario[scene] as (Scenario | Scenario[]);
-    const scenario = (scene1['ngods'] ) ? scene1 as Scenario : (scene1 as Scenario[]).find(scen => scen.ngods === ngods);
+    const scene1 = AnkhScenario[this.scene] as (Scenario);
+    const scene2 = AnkhScenario[this.scene] as (Scenario[]);
+    const scenario = scene1?.['ngods'] ? scene1 : scene2.find(scen => (scen.ngods === this.ngods));
+
+    console.log(stime(this, `.startup: scenario=`), scene1, this.scene, this.ngods , scenario);
 
     const uniq = <T>(ary: T[]) => {
       const rv: T[] = [];
@@ -97,8 +109,17 @@ export class GameSetup {
       godNames.length = Math.min(godNames.length, 5);
       return godNames;
     }
-    if (scenario.turn === undefined || scenario.gods === undefined) scenario.gods = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
+    const fillGuardNames = (pguards: GuardIdent, sguards: GuardIdent) => {
+      [0, 1, 2].forEach((rank: 0 | 1 | 2) => {
+        pguards[rank] = (!!pguards?.[rank] ? pguards[rank] : undefined) ?? sguards?.[rank] ?? Guardian.randomGuard(rank);
+      })
+      return pguards;
+    }
     Guardian.setGuardiansByName();
+    const guardNames = fillGuardNames(this.guards ?? [undefined, undefined, undefined], [undefined, undefined, undefined]);
+    console.log(stime(this, `.startup: guardNames =`), this.guards, guardNames);
+    if (scenario.turn === undefined || scenario.gods === undefined) scenario.gods = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
+    if (scenario.turn === undefined || scenario.guards === undefined) scenario.guards = fillGuardNames(this.guards, scenario.guards);
 
     const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay

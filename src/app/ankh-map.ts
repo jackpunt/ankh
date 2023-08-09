@@ -10,6 +10,8 @@ import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
 import type { Tile } from "./tile";
 
+export type RegionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 ;
+export type RegionNdx = number;
 export class SquareMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC);
@@ -74,7 +76,7 @@ export class AnkhHex extends Hex2 {
   readonly borders: { [key in HexDir]?: boolean | undefined } = {};
   Avisit: number = undefined;
   terrain: Terrain;
-  regionId: number;
+  regionId: RegionId;
   overlay: HexShape;
   get piece() { return this.tile ?? this.meep }
 
@@ -240,8 +242,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       map.regions[newRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
       map.regions[origRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
       // regionIds are incorrect, fix them:
-      newRs[0].forEach(hex => hex.district = hex.regionId = newRid);
-      newRs[1].forEach(hex => hex.district = hex.regionId = origRid);
+      newRs[0].forEach(hex => hex.district = hex.regionId = newRid as RegionId);
+      newRs[1].forEach(hex => hex.district = hex.regionId = origRid as RegionId);
     }
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
   }
@@ -288,10 +290,11 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   findRegions(hexAry = this.hexAry, regionElts: RegionElt[]): T[][] {
     const regions: T[][] = []; // each element is AnkhHex[];
     let avisit = 0;
-    const setRegion = (hex: T, region: T[], regionId: number) => {
+    const setRegion = (hex: T, region: T[], regionId: RegionId) => {
       hex.regionId = hex.district = regionId;
       hex.Avisit = avisit++;
-      region.push(hex)
+      region.push(hex);
+      return hex.terrain === 'w';
     }
     /**
      * Expand region to include neighbors of given hex.
@@ -300,12 +303,12 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
      * @param regionId set each hex.regionId; differentiates regions; regions[id] = region!
      * @param rndx 0-based index in this.regions;
      */
-    const addNeighbors = (hex: T, region: T[], regionId: number) => {
+    const addNeighbors = (hex: T, region: T[], regionId: RegionId) => {
       hex.forEachLinkHex((nhex: T, dir: HexDir) => {
-        if (nhex.terrain === 'w') return;        // not member of any region
         if (nhex.regionId !== undefined) return;
         if (hex.borders[dir]) return;          // not semantically adjacent
-        setRegion(nhex, region, regionId);
+        // adjacent water is in each region, but does not propagate.
+        if (setRegion(nhex, region, regionId)) return;
         addNeighbors(nhex, region, regionId);
       });
     }
@@ -313,13 +316,12 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     const seeds = regionElts.map(([row, col, rids]) => this[row][col]) ;
     const rids =regionElts.map(([row, col, rids]) => rids) ;
     seeds.forEach((hex, rndx) => {
-      if (!hex) return;   // bad seed
       // put hex and its adjacent neighbors in the same region;
-      if (hex.regionId !== undefined) return; // already done
-      if (hex.terrain === 'w') return;        // not member of any region
       const region = [], rid = rids[rndx];
       regions[rndx] = region;
-      setRegion(hex, region, rid);
+      if (!hex) return;   // bad seed
+      if (hex.regionId !== undefined) return; // already done; seeds not distinct!
+      if (setRegion(hex, region, rid)) return; // water seed! single hex in region...
       addNeighbors(hex, region, rid);
     });
     console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));

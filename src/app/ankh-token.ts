@@ -61,11 +61,13 @@ export class AnkhToken extends AnkhMeeple {
 
   override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
     const tile = hex.tile, player = this.player;
-    const allMonuments = this.player.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
-    const allUnclaimed = allMonuments.filter(mon => mon.player === undefined);;
-    const canBeClaimed = (tile instanceof Monument) && ((allUnclaimed.length === 0) ? true : (tile.player === undefined));
+    if (!player.gamePlay.isPhase('Claim') && (this.hex === this.source.hex)) return false;
+    if (!(tile instanceof Monument)) return false;
     const isClaimable = hex.findLinkHex(adj => adj.meep?.player === player);
-    if (isClaimable && canBeClaimed && (this.hex === this.source.hex) && this.player.gamePlay.isPhase('Claim')) return true;
-    return false;
+    if (!isClaimable) return false;
+    const allMonuments = this.player.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
+    const numUnclaimed = allMonuments.filter(mon => !mon.player).length;
+    const canBeClaimed = (numUnclaimed === 0) ? (tile.player !== this.player) : (!tile.player);
+    return canBeClaimed;
   }
 }

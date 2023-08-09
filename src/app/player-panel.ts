@@ -1,7 +1,7 @@
 import { C, DragInfo, S, stime } from "@thegraid/easeljs-lib";
 import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
 import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
-import { AnkhHex } from "./ankh-map";
+import { AnkhHex, RegionId } from "./ankh-map";
 import { NumCounter, NumCounterBox } from "./counters";
 import { Hex2 } from "./hex";
 import { Meeple } from "./meeple";
@@ -40,19 +40,22 @@ type CardSpec = [name: string, doc: string, power: number];
 export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
-  isPlayerInRegion(regionId: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionId];
-    return region.find(hex => hex.meep?.player === this.player) ?? false;
+  isPlayerInRegion(regionNdx: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionNdx];
+    return region.find(hex => hex.meep?.player === this.player) ?? false; // TODO: account for SetGod adjancency
   }
-  templeHexesInRegion(regionId: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionId];
+  templeHexesInRegion(regionNdx: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionNdx];
     return region.filter(hex => hex.meep?.player === this.player && hex.tile instanceof Temple);
   }
-  nFiguresInRegion(regionId: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionId];
+  nFiguresInRegion(regionNdx: number) {
+    const region = this.table.gamePlay.hexMap.regions[regionNdx];
     return region.filter(hex => hex.meep?.player === this.player && hex.meep instanceof Figure).length;
   }
-  figuresInRegion(regionId: number, player = this.player) {
+  nRegionsWithFigures() {
+    return this.table.gamePlay.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;
+  }
+  figuresInRegion(regionId: RegionId, player = this.player) {
     const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
     const belongsTo = (fig: Figure, player: Player) => { return fig.player === player } // consider Set power.
     return figuresInRegion.filter(fig => belongsTo(fig, player))
@@ -70,16 +73,16 @@ export class PlayerPanel extends Container {
   strength = 0;
   reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
   /** BattleResolution phase */
-  strengthInRegion(regionId: number) {
+  strengthInRegion(regionNdx: number) {
     this.reasons = {name: this.name, total: 0};
     this.strength = 0;
     const addStrength = (val, why) => { this.strength += val; this.reasons[why] = val; this.reasons.total = this.strength; }
-    const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionId); addStrength(nFigures, 'Figures');
+    const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionNdx); addStrength(nFigures, 'Figures');
     const cardsInPlay = this.cardsInBattle;
     const cardSpecsInPlay = cardsInPlay.map(pl => PlayerPanel.cardSpecs.find(([name, doc, power]) => name === pl.name));
     cardSpecsInPlay.forEach(([name, doc, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
-      const temples = this.templeHexesInRegion(regionId);
+      const temples = this.templeHexesInRegion(regionNdx);
       const activeTemples = temples.filter(tmpl => tmpl.filterAdjHex(hex => hex.meep?.player == this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
@@ -89,22 +92,22 @@ export class PlayerPanel extends Container {
   }
 
   plagueBid = 0;  // TODO wireup a NumCounter (with a close-gesture)
-  enablePlagueBid(region: number): void {
+  enablePlagueBid(region: RegionId): void {
     this.plagueBid = 0;
     this.player.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
-  canBuildInRegion: number = -1; // disabled.
+  canBuildInRegion: RegionId = undefined; // disabled.
   // really: detectBuildDne.
-  enableBuild(regionId: number): void {
+  enableBuild(regionId: RegionId): void {
     this.canBuildInRegion = regionId;
     const panel = this;
     const onBuildDone = this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
       const { panel0, monument } = evt;
       // Monument, hex.isOnMap, mont.player === this.player,
-      console.log(stime(this, `.enableBuild[${this.player.color}]: buildDone eq? ${panel0 === this} `), panel0.player.color, monument)
+      // console.log(stime(this, `.enableBuild[${this.player.color}]: buildDone eq? ${panel0 === this} `), panel0.player.color, monument)
       if (panel0 === panel) {
         this.table.off('buildDone', onBuildDone);
-        panel0.canBuildInRegion = -1;
+        panel0.canBuildInRegion = undefined;
         this.player.gamePlay.phaseDone(panel0);
       }
     })
@@ -262,7 +265,7 @@ export class PlayerPanel extends Container {
   }
 
   addAnkhToPowerLine(powerLine: PowerLine) {
-    const ankh = this.ankhArrays.shift();
+    const ankh = this.ankhPowerTokens.shift();
     if (ankh) {
       // mark power as taken:
       ankh.x = 0; ankh.y = 0;
@@ -280,9 +283,9 @@ export class PlayerPanel extends Container {
    *  confirm supplies (button === undefined) when insufficent funds to purchase AnkhPower
    */
   selectAnkhPower(evt?: Object, button?: CircleShape) {
-    const rank = this.nextAnkhRank, ankhCol = this.ankhArrays.length % 2;
+    const rank = this.nextAnkhRank, ankhCol = this.ankhPowerTokens.length % 2;
     const ankh = this.addAnkhToPowerLine(button?.parent as PowerLine);
-    const colCont = this.powerCols[rank];
+    const colCont = this.powerCols[rank - 1];        // aka: button.parent.parent
     this.activateAnkhPowerSelector(colCont, false); // deactivate
 
     // get God power, if can sacrific followers:
@@ -325,9 +328,9 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  get nextAnkhRank() { return 3 - Math.ceil(this.ankhArrays.length / 2) }
+  get nextAnkhRank() { return [1, 1, 2, 2, 3, 3][Math.max(0, 6 - this.ankhPowerTokens.length)] }  // 6,5: 1, 4,3: 2, 0,1: 3
   readonly powerCols: AnkhPowerCont[] = [];
-  readonly ankhArrays: AnkhToken[] = [];
+  readonly ankhPowerTokens: AnkhToken[] = [];
   makeAnkhPowerGUI() {
     const { panel, player } = this.objects;
     // select AnkhPower: onClick->selectAnkhPower(info)
@@ -342,7 +345,7 @@ export class PlayerPanel extends Container {
       panel.powerCols.push(colCont);
 
       const ankhs = [this.ankhSource.takeUnit(), this.ankhSource.takeUnit(),];
-      this.ankhArrays.push(...ankhs);
+      this.ankhPowerTokens.push(...ankhs);
       ankhs.forEach((ankh, i) => {
         const mColor = (colCont.guardianSlot === i) ? 'purple' : C.black;
         const marker = new CircleShape(mColor, brad);
@@ -358,8 +361,9 @@ export class PlayerPanel extends Container {
   }
 
   makePowerLines(colCont: AnkhPowerCont, powerList, onClick) {
-    const {brad, gap, rowh, dir,} = this.metrics;
-    const { player } = this.objects;
+    const panel = this;
+    const {brad, gap, rowh, dir,} = panel.metrics;
+    const { player } = panel.objects;
       // place powerLines --> selectAnkhPower:
       colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
       powerList.forEach(([powerName, docString], nth) => {
@@ -372,7 +376,7 @@ export class PlayerPanel extends Container {
 
         const button = new CircleShape(C.white, brad, );
         button.name = powerName;
-        button.on(S.click, onClick, this, false, button);
+        button.on(S.click, onClick, panel, false, button);
         button.mouseEnabled = false;
         powerLine.addChild(button);
         powerLine.button = button;
@@ -394,13 +398,13 @@ export class PlayerPanel extends Container {
         const doctext = new UtilButton('rgb(240,240,240)', docString, 2 * brad);
         doctext.name = `doctext`;
         doctext.visible = false;
-        this.table.overlayCont.addChild(doctext);
-        powerLine.localToLocal(doctext.x, doctext.y, this.table.overlayCont.parent, doctext);
+        panel.table.overlayCont.addChild(doctext);
+        powerLine.localToLocal(doctext.x, doctext.y, panel.table.overlayCont.parent, doctext);
         const showDocText = powerLine.showDocText = (vis = !doctext.visible) => {
           const pt = text.parent.localToLocal(text.x, text.y, doctext.parent, doctext);
           doctext.x -= dir * (60 + doctext.label.getMeasuredWidth() / 2);
           if (!vis) {
-            this.table.overlayCont.children.forEach(doctext => doctext.visible = false)
+            panel.table.overlayCont.children.forEach(doctext => doctext.visible = false)
           } else {
             doctext.visible = true;
           }

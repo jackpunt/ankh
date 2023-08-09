@@ -1,13 +1,14 @@
 import { C, S, stime } from "@thegraid/common-lib";
 import { MouseEvent } from "@thegraid/easeljs-module";
 import { Figure, GodFigure, Monument } from "./ankh-figure";
-import type { AnkhHex } from "./ankh-map";
+import type { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent, SplitSpec } from "./ankh-scenario";
 import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
 import type { Player } from "./player";
 import type { PlayerPanel, PowerLine } from "./player-panel";
 import { CircleShape, UtilButton } from "./shapes";
+import { EventName } from "./table";
 import { TP } from "./table-params";
 
 interface Phase {
@@ -31,6 +32,7 @@ export class GameState {
   get panel() { return this.gamePlay.curPlayer.panel; }
 
   get eventName() { return this.gamePlay.eventName; }
+  set eventName(eventName: EventName) { this.gamePlay.eventName = eventName; }
   get selectedAction() { return this.gamePlay.selectedAction; }
   set selectedAction(val) { this.gamePlay.selectedAction = val; }
   get selectedActionIndex() { return this.gamePlay.selectedActionIndex; }
@@ -41,7 +43,7 @@ export class GameState {
 
   doneButton: UtilButton;
   highlights: Figure[];
-  conflictRegion = 0;
+  conflictRegion: RegionId = 1;
   get panelsInConflict() {
     return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion(this.conflictRegion - 1));
   }
@@ -192,7 +194,7 @@ export class GameState {
     Ankh: {
       start: (ok?: boolean) => {
         const panel = this.panel, rank = panel.nextAnkhRank;
-        if (!ok && this.gamePlay.curPlayer.coins < rank) {
+        if (!ok && (this.gamePlay.curPlayer.coins < rank)) {
           console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
           panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
             () => {
@@ -237,22 +239,26 @@ export class GameState {
     },
     EventDone: {
       start: () => {
-        this.gamePlay.eventName = undefined;
+        console.log(stime(this, `.EventDone: ${this.eventName}`))
+        this.eventName = undefined;
         this.phase('EndTurn');
       },
       // phase(EndTurn)
     },
+    // TODO: highlight Monument.source.he when 'Build Monument'
+    //
+    // TODO: clear highlight when done
     Split: {
       start: () => {
         // todo: disable table.dragger!
         console.log(stime(this, `Split:`));
         const tau = 2 * Math.PI, rad = TP.hexRad, r = rad / 4;
         const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
-        const bid = hexMap.regions.length;
+        const bid = hexMap.regions.length as RegionId;
         const mark = new CircleShape(C.grey, r * 1.5, '');
         mapCont.markCont.addChild(mark);
 
-        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(true, ndx + 1); })
+        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(true, (ndx + 1) as RegionId); })
         let target = {} as { mx: number, my: number, hex: AnkhHex, ewDir: EwDir };
         const path = [] as typeof target[];
         let pathN: typeof target = undefined; // the final element of path
@@ -329,6 +335,8 @@ export class GameState {
         this.button('Split done');
       },
       done: () => {
+        const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
+        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(false, (ndx + 1) as RegionId); })
         this.phase('Swap');
       },
       // mouse enable edges (of land tiles)
@@ -370,9 +378,8 @@ export class GameState {
     },
     Conflict: {
       start: () => {
-        this.conflictRegion = 0;
         this.panel.canUseTiebreaker = true;
-        this.phase('ConflictNextRegion');
+        this.phase('ConflictNextRegion', 1);
       },
       // process Omnipresent
       // process TeleportToTemple (for each player!)
@@ -384,9 +391,9 @@ export class GameState {
       // Done(phase(ConflictNextRegion))
     },
     ConflictNextRegion: {
-      start: () => {
-        const conflictRegion = ++this.conflictRegion;  // 1..n
-        const isRegion = (conflictRegion <= this.gamePlay.hexMap.regions.length);
+      start: (regionId = this.conflictRegion + 1) => {
+        this.conflictRegion = regionId; // 1..n;
+        const isRegion = (regionId <= this.gamePlay.hexMap.regions.length);
         this.highlightRegions(isRegion);
         this.phase(isRegion ? 'ConflictInRegion' : 'ConflictDone');
       },
@@ -397,7 +404,7 @@ export class GameState {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
         const omni = panels.filter(panel => panel.hasAnkhPower('Omnipresent'));
-        omni.forEach(panel => panel.player.coins += panel.nFiguresInRegion(this.conflictRegion - 1));
+        omni.forEach(panel => panel.player.coins += panel.nRegionsWithFigures());
 
         if (panels.length > 1) this.phase('Obelisks'); // do battle, check for Obelisk
         else if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
@@ -499,7 +506,7 @@ export class GameState {
       // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
       done: (panel: PlayerPanel = this.state.panels[0]) => {
         // no cost if Done *without* building (cbir>0)
-        if (panel.canBuildInRegion < 0 && !panel.hasAnkhPower('Inspiring')) {
+        if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
           panel.player.coins -= 3;
         }
 
@@ -589,13 +596,15 @@ export class GameState {
           if (powers.includes('Bountiful') && player.score <= 20) dev += 3;
           if (powers.includes('Worshipful') && player.coins > 2) (player.coins -= 2, dev += 1); // assume yes, they want the point.
           if (powers.includes('Commanding')) player.coins += 3;
-          player.score += dev;
+          this.addDevotion(player, dev, `BattleResolution[${this.conflictRegion}]`);
           console.log(stime(this, `.BattleResolution: ${winner.name} wins, get ${dev} Devotion`));
           panels.splice(0, 1); // remove winner, panels now has all the losers.
         }
         const winp = winner.player;
         panels.forEach(panel => {
-          if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) panel.player.score += 2;
+          if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
+            this.addDevotion(panel.player, 2, `Magnanimous[${this.conflictRegion}]`);
+          }
         });
         // TODO Set adjacency.
         const belongsTo = (fig: Figure, player: Player) => { return fig.player === player }
@@ -606,10 +615,13 @@ export class GameState {
         console.log(stime(this, `.BattleResolution: Figures KIA:`), deadFigs);
         deadFigs.forEach(fig => fig.sendHome());
 
+        // ASSERT: panels0 is [still] sorted by player rank.
         const worships0 = panels0.filter(panel => panel.hasAnkhPower('Workshipful'));
         const workship1 = worships0.filter(panel => panel.player.coins >= 2)
-        // TODO sort by score:rank.
-        workship1.forEach(panel => (panel.player.coins -= 2, panel.player.score += 1));
+        workship1.forEach(panel => {
+          this.addFollowers(panel.player, -2, `Worshipful[${this.conflictRegion}]`);
+          this.addFollowers(panel.player,  1, `Worshipful[${this.conflictRegion}]`);
+        });
         panels0.forEach(panel => panel.battleCardsToTable());
         this.phase('ConflictNextRegion')
       },
@@ -623,8 +635,9 @@ export class GameState {
     },
     ConflictDone: {
       start: () => {
+        this.conflictRegion = undefined;
         this.highlightRegions(false);
-        this.phase('EndTurn');
+        this.phase('EventDone');
       },
       // coins from Scales to Toth, add Devotion(Scales)
       // mark on Event panel
@@ -656,14 +669,23 @@ export class GameState {
     if (player.god.ankhPowers.includes('Revered')) player.coins += 1;
   }
 
+  addFollowers(player: Player, n: number, reason?: string) {
+    player.coins += n;
+  }
+
+  addDevotion(player: Player, n: number, reason?: string) {
+    player.score += n;
+    this.gamePlay.logText(`${player.Aname} gains ${n} devotion: ${reason}`);
+  }
+
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
   /** score each monument type in conflictRegion */
   scoreMonuments(dom = false) {
-    const regionId = this.conflictRegion - 1;
+    const regionNdx = this.conflictRegion - 1;
     const allPlayers = this.gamePlay.allPlayers;
     const players = this.panelsInConflict.map(panel => panel.player);
     console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]`), players);
-    const hexes = this.gamePlay.hexMap.regions[regionId].filter(hex => (hex.tile instanceof Monument) && hex.tile.player);
+    const hexes = this.gamePlay.hexMap.regions[regionNdx].filter(hex => (hex.tile instanceof Monument) && hex.tile.player);
     const tiles = hexes.map(hex => hex.tile);
     const types = GameState.typeNames;
     const countsOfTypeByPlayer = types.map(type => allPlayers.map(player => ({type, player, n: 0})));// [[{p, n:0},,0,0...], [0,0,0,0...], [0,0,0...]]
@@ -675,28 +697,8 @@ export class GameState {
     const winers = deltas.map(({ p, n, d, t }) => ({ p: ((n > 0 && d > 0) ? p : undefined), n, d, t }));
     winers.forEach(({ p, n, d, t }) => {
       console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]: ${t} -> Player=${p?.Aname}, d=${d}, n=${n}`))
-      if (players.includes(p)) p.score + 1;
+      if (players.includes(p)) this.addDevotion(p, 1, `Score Monuments[${this.conflictRegion}]`);
     })
     return;
-  }
-  scoreMonuments2() {
-    const regionId = this.conflictRegion - 1;
-    const allPlayers = this.gamePlay.allPlayers;
-    const players = this.panelsInConflict.map(panel => panel.player);
-    console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]`), players);
-    const hexes = this.gamePlay.hexMap.regions[regionId].filter(hex => (hex.tile instanceof Monument) && hex.tile.player);
-    const tiles = hexes.map(hex => hex.tile);
-    const types = GameState.typeNames;
-    types.forEach(type => {
-      // [ {p: p0, n: 0}, {p: p1, n: 0}, {p: p2, n: 0} ]
-      const nTilesByPlayer = allPlayers.map(p => ({ p, n: 0 }))
-      tiles.forEach(tile => nTilesByPlayer[tile.player.index].n += 1)
-      const pnary = nTilesByPlayer.sort((a, b) => b.n - a.n);
-      const pndary = ({ p: pnary[0].p, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) })
-      const {p, n, d} = pndary;
-      const winer = ({ p: ((n > 0 && d > 0) ? p : undefined), n, d });
-      console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]: ${type} -> Player=${p?.Aname}, d=${d}, n=${n}`))
-      if (players.includes(p)) p.score + 1;
-    })
   }
 }

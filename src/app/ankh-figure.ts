@@ -1,7 +1,9 @@
 import { C, Constructor, XY, className, stime } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap } from "./ankh-map";
+import { GuardName } from "./ankh-scenario";
 import { NumCounter } from "./counters";
+import { selectN } from "./functions";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -11,7 +13,6 @@ import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import { selectN } from "./functions";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -93,9 +94,9 @@ export class Monument extends AnkhPiece {
     if (!this.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
     if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
     const panel = this.gamePlay.gameState.state.panels[0];
-    if (panel.canBuildInRegion < 0) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
-    const regionId = this.gamePlay.gameState.conflictRegion - 1;
-    const region = this.gamePlay.hexMap.regions[regionId];
+    if (!panel.canBuildInRegion) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
+    const regionNdx = this.gamePlay.gameState.conflictRegion - 1;
+    const region = this.gamePlay.hexMap.regions[regionNdx];
     if (!region?.includes(toHex) && !ctx.lastShift) return false;  // now: toHex !== undefined, toHex.isOnMap
     if (toHex.meep) return false;
     if (toHex.terrain == 'w') return false;
@@ -114,7 +115,7 @@ export class Monument extends AnkhPiece {
       if (region?.includes(tohex)) {
         const ankh = panel0.ankhSource.takeUnit(), monument = this;
         ankh.moveTo(this.hex);
-        console.log(stime(this, `.dropFunc: emit buildDone panel0=`), panel0);
+        // console.log(stime(this, `.dropFunc: emit buildDone panel0=`), panel0);
         setTimeout( () => this.gamePlay.table.dispatchEvent({ type: 'buildDone', panel0, monument }), 10);
       }
     }
@@ -384,7 +385,7 @@ export class Warrior extends Figure {
 
 export class Guardian extends Figure {
   static get constructors() { return guardianConstructors } // Global godConstructors at bottom of file;
-  static byName = new Map<string, Constructor<Guardian>>();
+  static byName = new Map<GuardName, Constructor<Guardian>>();
   static setGuardiansByName() {
     Guardian.constructors.forEach(cons => Guardian.byName.set(cons.name, cons));
   }
@@ -396,10 +397,13 @@ export class Guardian extends Figure {
     return Array.from(Guardian.constructors).map((guard) => guard.name);
   }
 
+  static namesByRank: GuardName[][] = [['Satet', 'MumCat'], ['Apep', 'Mummy'], ['Scorpion', 'Androsphinx']];
   static get randomGuards() {
-    const guardianN = [['Satet', 'MumCat'], ['Apep', 'Mummy'], ['Scorpion', 'Androsphinx']]
-    const guardianC = guardianN.map(ga => ga.map(gn => Guardian.byName.get(gn)));
+    const guardianC = Guardian.namesByRank.map(ga => ga.map(gn => Guardian.byName.get(gn)));
     return guardianC.map(gs => selectN(gs, 1)[0])
+  }
+  static randomGuard(rank: 0 | 1 | 2) {
+    return selectN(Guardian.namesByRank[rank], 1)[0]
   }
 
   static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = 0) {
@@ -468,6 +472,7 @@ export class Apep extends Guardian2 {
     return this.isStableHex(this.hex) ? true : super.isLegalWater(hex);
   }
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
+    if (this.isStableHex(this.hex) && hex.terrain === 'w') return true;
     return super.isLegalTarget(hex, ctx);
   }
 }
