@@ -159,7 +159,7 @@ export class PlayerPanel extends Container {
   get metrics() {
     const dydr = this.table.hexMap.xywh.dydr, dir = this.dir;
     const wide = 590, high = dydr * 3.2, brad = TP.ankhRad, gap = 6, rowh = 2 * brad + gap;
-    const colWide = 176, ankhColx = wide - (2 * brad), ankhRowy = 3.85 * rowh;
+    const colWide = 176, ankhColx = [brad + 2 * gap, 0, wide - (brad + 3 * gap)][1 - dir], ankhRowy = 3.85 * rowh;
     const swidth = 210; // reserved for God's special Container
     return {dir, dydr, wide, high, brad, gap, rowh, colWide, ankhColx, ankhRowy, swidth}
   }
@@ -329,16 +329,15 @@ export class PlayerPanel extends Container {
   readonly powerCols: AnkhPowerCont[] = [];
   readonly ankhArrays: AnkhToken[] = [];
   makeAnkhPowerGUI() {
-    const { rowh } = this.metrics;
     const { panel, player } = this.objects;
     // select AnkhPower: onClick->selectAnkhPower(info)
     // Ankh Power line: circle + text; Ankhs
-    const { brad, gap, ankhRowy, colWide } = this.metrics;
+    const { brad, gap, ankhRowy, colWide, dir} = this.metrics;
     PlayerPanel.ankhPowers.forEach((powerList, colNdx) => {
       const colCont = new Container() as AnkhPowerCont, rank = colNdx +1;
       colCont.rank = rank;
       colCont.guardianSlot = (colNdx < 2) ? 1 : 0;
-      colCont.x = colNdx * colWide;
+      colCont.x = colNdx * colWide + [2 * brad + 3 * gap, 0, 0][1 - dir];
       panel.addChild(colCont);
       panel.powerCols.push(colCont);
 
