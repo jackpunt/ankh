@@ -259,7 +259,7 @@ export class GamePlay extends GamePlay0 {
   readonly guards: Constructor<Guardian>[];
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
   constructor(public scenario: Scenario, table: Table, public gameSetup: GameSetup) {
-    super(scenario.gods);            // hexMap, history, gStats...
+    super(scenario.godNames);            // hexMap, history, gStats...
     Tile.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;

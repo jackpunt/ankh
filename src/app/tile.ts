@@ -266,8 +266,7 @@ export class Tile extends Tile0 {
   }
 
   /** override as necessary. */
-  dragStart(ctx: DragContext) {
-  }
+  dragStart(ctx: DragContext) {  }
 
   /** state of shiftKey has changed during drag */
   dragShift(shiftKey: boolean, ctx: DragContext) { }
@@ -340,7 +339,5 @@ export class Token extends Tile {
 
 /** Tiles that can be played to the Map: AuctionTile, Civic, Monument, BonusTile */
 export class MapTile extends Tile {
-  override dragStart(ctx: DragContext): void {
-    super.dragStart(ctx);
-  }
+
 }

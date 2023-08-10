@@ -557,7 +557,7 @@ export class Table extends EventDispatcher  {
     const button = rowCont.buttons[index];
     button.removeChildType(AnkhMarker);
     if (button.isEvent) {
-      this.removeEventMarker(this.nextEventIndex - 1);
+      this.removeEventMarker(this.nextEventIndex - 1); // maybe reset gamePlay.eventName??
     }
     rowCont.activate();;
   }
@@ -632,15 +632,13 @@ export class Table extends EventDispatcher  {
 
   removeEventMarker(index: number) {
     this.eventCells[index].removeChildType(AnkhMarker);
-    if (this.gamePlay.eventName) this.setEventMarker(index - 1);
+    // if (this.gamePlay.eventName) this.setEventMarker(index - 1); // <--- QQQ: Why this?
   }
 
   setEventMarker(index: number, player = this.gamePlay.curPlayer) {
-    const god = player.god, color = god.color;
-    const ankhToken = god.getAnkhMarker(TP.ankhRad, color);
     const cell = this.eventCells[index];
     cell.pid = player.index;
-    cell.addChild(ankhToken);
+    cell.addChild(player.god.getAnkhMarker(TP.ankhRad));
     this.gamePlay.eventName = cell.eventName;
   }
 
@@ -881,7 +879,7 @@ export class Table extends EventDispatcher  {
     const lm = history[0]
     const prev = lm ? `${lm.Aname}${lm.ind}#${tn-1}` : ""
     const robo = plyr.useRobo ? AT.ansiText(['red','bold'],"robo") : "----";
-    const info = { turn: `//${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
+    const info = { turn: `#${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
     console.log(stime(this, `.logCurPlayer --${robo}--`), info);
     this.logTurn(`//${tn}: ${plyr.Aname}`);
   }

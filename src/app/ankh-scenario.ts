@@ -41,12 +41,11 @@ export type SplitSpec = SplitElt[];
 type SetupElt = {
   Aname?: string,        // {orig-scene}#{turn}
   ngods: number,         // == nPlayers (used to select, verify scenario)
-  godNames?: string[]    // Gods in the game ?? use names from URL command.
   places: PlaceElt[],    // must have some GodFigure on the board!
   splits?: SplitSpec[],  // added camel train borders
   regions: RegionElt[],  // delta, east, west, ...; after splits.
   // the rest assume defaults or random values:
-  gods?: GodName[],      // ngods & gods as per URL parsing
+  godNames?: string[]    // Gods in the game ?? use names from URL command.
   coins?: number[],      // 1
   scores?: number[],     // 0
   events?: EventElt,
@@ -172,7 +171,7 @@ export class AnkhScenario {
       ],
     },
   ];
-  static AltMidK2: Scenario = {
+  static preBattle: Scenario = {
     ngods: 2,
     godNames: ["Amun", "Osiris"],
     turn: 9,
@@ -190,7 +189,7 @@ export class AnkhScenario {
 
   static preSplit: Scenario = {
     ngods: 2,
-    godNames: ["Horus","Set"],
+    godNames: ["Amun", "Osiris"],
     turn: 10,
     regions: [[4,5,1],[4,6,2],[3,5,3]],
     splits: [],
@@ -207,7 +206,7 @@ export class AnkhScenario {
   static AltMidKingdom5: Scenario = {
     ngods: 5,
     turn: 15,
-    gods: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
+    godNames: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
     actions: { Move: [0,1,2,3,4], Summon: [2], Gain: [0,1,3,4], Ankh: [3,4] },
     ankhs: [
       ['Inspiring', 'Omnipresent', 'Pyramid'],
@@ -380,7 +379,7 @@ export class ScenarioParser {
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, events, actions, stable, ankhs, places } = setup;
+    const { regions, splits, coins, scores, turn, guards, godNames, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -395,6 +394,7 @@ export class ScenarioParser {
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     }
     if (events !== undefined) {
+      table.eventCells.forEach((evc, ndx) => table.removeEventMarker(ndx))
       events.forEach((pid, ndx) => {
         table.setEventMarker(ndx, this.gamePlay.allPlayers[pid]);
       })

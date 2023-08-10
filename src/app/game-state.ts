@@ -1,7 +1,7 @@
 import { C, S, stime } from "@thegraid/common-lib";
 import { MouseEvent } from "@thegraid/easeljs-module";
 import { Figure, GodFigure, Monument } from "./ankh-figure";
-import type { AnkhHex, RegionId } from "./ankh-map";
+import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent, SplitSpec } from "./ankh-scenario";
 import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
@@ -246,20 +246,19 @@ export class GameState {
       // phase(EndTurn)
     },
     // TODO: highlight Monument.source.he when 'Build Monument'
-    //
+    // TODO: debug gods in reload (preSplit for ex)
     // TODO: clear highlight when done
     Split: {
       start: () => {
         // todo: disable table.dragger!
-        console.log(stime(this, `Split:`));
+        console.log(stime(this, `.Split:`));
         const tau = 2 * Math.PI, rad = TP.hexRad, r = rad / 4;
         const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
         const bid = hexMap.regions.length as RegionId;
         const mark = new CircleShape(C.grey, r * 1.5, '');
         mapCont.markCont.addChild(mark);
 
-        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(true, (ndx + 1) as RegionId); })
-        let target = {} as { mx: number, my: number, hex: AnkhHex, ewDir: EwDir };
+        let target = undefined as { mx: number, my: number, hex: AnkhHex, ewDir: EwDir };
         const path = [] as typeof target[];
         let pathN: typeof target = undefined; // the final element of path
         const pathShape = hexMap.edgeShape(TP.splitColor);
@@ -273,11 +272,11 @@ export class GameState {
           //
           lineShape.graphics.c();
           const { stageX, stageY } = e;
-          const pt = mapCont.stage.globalToLocal(stageX, stageY);            // mouse (on mapCont)
-          const hex = hexMap.hexUnderPoint(pt.x, pt.y, false);
-          if (hex) {
+          const pt = mapCont.hexCont.globalToLocal(stageX, stageY);            // mouse (on mapCont)
+          const hex = hexMap.mapCont.hexCont.getObjectUnderPoint(pt.x, pt.y, 1); // mouse-enabled object in mapCont/hexCont?
+          if (hex instanceof AnkhHex) {
             const { x: hx, y: hy } = mapCont.globalToLocal(stageX, stageY, hex.cont); // mouse (on hex)
-            const dirNdx = ((Math.round((Math.asin(hx / hy) / tau) * 12) + 1) / 2); // 0 -- 5; NW,NE,E,SE,SW,W
+            const dirNdx = ((Math.round((Math.atan(hx / hy) / tau) * 12) + 1) / 2); // 0 -- 5; NW,NE,E,SE,SW,W
             const ewDir = H.ewDirs[dirNdx], angle = H.ewDirRot[ewDir];
             const [cx, cy] = [Math.sin(angle) * rad, -Math.cos(angle) * rad]; // corner coordinates (on hex)
             const [dx, dy] = [hx - cx, hy - cy];                              // mouse (on hex)
@@ -295,9 +294,9 @@ export class GameState {
         // click:
         const pressup = (e: MouseEvent) => {
           const { stageX, stageY } = e;
-          const pt = mapCont.stage.globalToLocal(stageX, stageY);
+          const pt = mapCont.globalToLocal(stageX, stageY);
           if (target) {
-            if (pathN.hex === target.hex && pathN.ewDir === target.ewDir) {} // TODO return to normal, process path.
+            if (pathN.hex === target.hex && pathN.ewDir === target.ewDir) {finalize()} // TODO return to normal, process path.
             path.push(pathN = target);
             pathShape.graphics.mt(target.mx, target.my);
             lineShape.graphics.c();
@@ -329,14 +328,18 @@ export class GameState {
           });
           hexMap.splits.push(splitSpec);
         }
-        const lisnr = this.gamePlay.hexMap.forEachHex(hex => {
-          hex.overlay.on(S.pressup, pressup as (e: MouseEvent) => void );
-        });
+        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx, 'rgba(240,240,240,.4'))
+        // overlay is HexShape child of hex.cont; on mapCont.hexCont;
+
+        const cont = this.gamePlay.hexMap.mapCont;
+        cont.mouseEnabled = true;
+        cont.addEventListener('pressmove', pressmove, true);
+        cont.addEventListener('click', pressup, true);
         this.button('Split done');
       },
       done: () => {
         const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
-        hexMap.regions.forEach((region, ndx) => { this.highlightRegions(false, (ndx + 1) as RegionId); })
+        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx));
         this.phase('Swap');
       },
       // mouse enable edges (of land tiles)
@@ -501,23 +504,26 @@ export class GameState {
         panels.forEach(panel => {
           panel.enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
         });
+        this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.button('Build Done', panels[0].player.color);
       },
       // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
       done: (panel: PlayerPanel = this.state.panels[0]) => {
         // no cost if Done *without* building (cbir>0)
         if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
-          panel.player.coins -= 3;
+          this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
         }
 
         const panels = this.state.panels;
         const ndx = panels.indexOf(panel);
         panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
         if (panels.length === 0) {
+          this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
           this.button('Build Done', C.grey, true, () => this.phase('Plague'));
           return;
         }
         console.log(stime(this, `Build.done: return NOT done...`))
+        this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.button('Build Done', panels[0].player.color);
         // TODO: at ConflictDone, mark yellow cards green, and check reclaimCards (Cycle of Ma`at)
       }
@@ -595,7 +601,7 @@ export class GameState {
           if (powers.includes('Glorious') && d >= 3) dev += 3;
           if (powers.includes('Bountiful') && player.score <= 20) dev += 3;
           if (powers.includes('Worshipful') && player.coins > 2) (player.coins -= 2, dev += 1); // assume yes, they want the point.
-          if (powers.includes('Commanding')) player.coins += 3;
+          if (powers.includes('Commanding')) this.addFollowers(player, 3, `Commanding[${this.conflictRegion}]`);
           this.addDevotion(player, dev, `BattleResolution[${this.conflictRegion}]`);
           console.log(stime(this, `.BattleResolution: ${winner.name} wins, get ${dev} Devotion`));
           panels.splice(0, 1); // remove winner, panels now has all the losers.
@@ -620,7 +626,7 @@ export class GameState {
         const workship1 = worships0.filter(panel => panel.player.coins >= 2)
         workship1.forEach(panel => {
           this.addFollowers(panel.player, -2, `Worshipful[${this.conflictRegion}]`);
-          this.addFollowers(panel.player,  1, `Worshipful[${this.conflictRegion}]`);
+          this.addDevotion(panel.player, 1, `Worshipful[${this.conflictRegion}]`);
         });
         panels0.forEach(panel => panel.battleCardsToTable());
         this.phase('ConflictNextRegion')
@@ -665,17 +671,19 @@ export class GameState {
     const monts =  allMonts.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
     const mine = monts.filter(mont => mont.hex.findAdjHex(hex => hex.meep?.player === player));
     const n = mine.length;
-    player.coins += n;
-    if (player.god.ankhPowers.includes('Revered')) player.coins += 1;
+    this.addFollowers(player, n, `Gain Followers action`)
+    if (player.god.ankhPowers.includes('Revered')) this.addFollowers(player, 1, `Revered`);
   }
 
   addFollowers(player: Player, n: number, reason?: string) {
     player.coins += n;
+    const verb = (n >= 0) ? 'gains' : 'sacrifices';
+    this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} Followers: ${reason}`);
   }
 
   addDevotion(player: Player, n: number, reason?: string) {
     player.score += n;
-    this.gamePlay.logText(`${player.Aname} gains ${n} devotion: ${reason}`);
+    this.gamePlay.logText(`${player.god.name} gains ${n} Devotion: ${reason}`);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];

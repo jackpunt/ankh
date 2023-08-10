@@ -103,6 +103,7 @@ export class PlayerPanel extends Container {
     const panel = this;
     const onBuildDone = this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
       const { panel0, monument } = evt;
+      panel0.table.monumentSources.forEach(ms => ms.sourceHexUnit.setPlayerAndPaint(undefined));
       // Monument, hex.isOnMap, mont.player === this.player,
       // console.log(stime(this, `.enableBuild[${this.player.color}]: buildDone eq? ${panel0 === this} `), panel0.player.color, monument)
       if (panel0 === panel) {
@@ -290,9 +291,9 @@ export class PlayerPanel extends Container {
 
     // get God power, if can sacrific followers:
     if (this.player.coins >= colCont.rank) {
-      this.player.coins -= colCont.rank;
+      this.player.gamePlay.gameState.addFollowers(this.player, -colCont.rank, `Ankh Power: ${button?.name ?? '---'}`);
       if (button?.name) this.god.ankhPowers.push(button.name); // 'Commanding', 'Resplendent', etc.
-      console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, button?.name, button?.id);
+      //console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, button?.name, button?.id);
     } else {
       ankh.sendHome();
     }

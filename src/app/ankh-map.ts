@@ -341,8 +341,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     this.update();
   }
 
-  showRegion(regionId = 0, color?: string) {
-    const region = this.regions[regionId]
+  showRegion(regionNdx = 0, color?: string) {
+    const region = this.regions[regionNdx]
     region?.forEach(ahex => {
       ahex.overlay.paint(color ?? 'rgba(240,240,240,.2');
       ahex.overlay.visible = !!color;

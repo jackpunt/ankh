@@ -118,11 +118,11 @@ export class GameSetup {
     Guardian.setGuardiansByName();
     const guardNames = fillGuardNames(this.guards ?? [undefined, undefined, undefined], [undefined, undefined, undefined]);
     console.log(stime(this, `.startup: guardNames =`), this.guards, guardNames);
-    if (scenario.turn === undefined || scenario.gods === undefined) scenario.gods = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
+    if (scenario.turn === undefined || scenario.godNames === undefined) scenario.godNames = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
     if (scenario.turn === undefined || scenario.guards === undefined) scenario.guards = fillGuardNames(this.guards, scenario.guards);
 
     const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
-    this.gamePlay = gamePlay
+    this.gamePlay = gamePlay;
 
     table.layoutTable(gamePlay)              // mutual injection, all the GUI components, makeAllDistricts(), addTerrain, initialRegions
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup

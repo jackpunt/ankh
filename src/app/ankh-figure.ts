@@ -247,6 +247,7 @@ export class AnkhMeeple extends Meeple {
     }
     return rv;
   }
+
   override dragStart(ctx: DragContext): void {
     // console.log(stime(this, `.dragStart:`), ctx.tile, ctx.targetHex);
     super.dragStart(ctx);
