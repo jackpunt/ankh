@@ -2,10 +2,10 @@ import { RC } from "@thegraid/common-lib"
 
 /** Hexagonal canonical directions */
 export enum Dir { C, NE, E, SE, SW, W, NW }
-export type HexDir = 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW' | 'N'
+export type HexDir = 'NE' | 'EN' | 'E' | 'ES' | 'SE' | 'S' | 'SW' | 'WS' | 'W' | 'WN' | 'NW' | 'N';
 export type XYWH = { x: number, y: number, w: number, h: number } // like a Rectangle
-export type EwDir = Exclude<HexDir, 'N' | 'S'>
-export type NsDir = Exclude<HexDir, 'E' | 'W'>
+export type EwDir = Exclude<HexDir, 'N' | 'S' | 'EN' | 'WN' | 'ES' | 'WS'>;
+export type NsDir = Exclude<HexDir, 'E' | 'W' | 'NE' | 'NW' | 'SE' | 'SW'>;
 
 type DCR    = { [key in "dc" | "dr"]: number }  // Delta for Col & Row
 export type TopoEW = { [key in EwDir]: DCR }
@@ -35,6 +35,10 @@ export namespace H {
   export const SE: HexDir = "SE"
   export const SW: HexDir = "SW"
   export const NW: HexDir = "NW"
+  export const EN: HexDir = "EN"
+  export const ES: HexDir = "ES"
+  export const WS: HexDir = "WS"
+  export const WN: HexDir = "WN"
   export function hexBounds(r = this.radius, tilt = 0) {
     // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
     const w = r * Math.cos(H.degToRadians * tilt);
@@ -51,12 +55,12 @@ export namespace H {
     SW: { dc: 0, dr: 1 }, W: { dc: -1, dr: 0 }, NW: { dc: 0, dr: -1 }
   }
   export const nsEvenCol: TopoNS = {
-    NE: { dc: +1, dr: -1 }, N: { dc: 0, dr: -1 }, SE: { dc: +1, dr: 0 },
-    SW: { dc: -1, dr: 0 }, S: { dc: 0, dr: +1 }, NW: { dc: -1, dr: -1 }
+    EN: { dc: +1, dr: -1 }, N: { dc: 0, dr: -1 }, ES: { dc: +1, dr: 0 },
+    WS: { dc: -1, dr: 0 }, S: { dc: 0, dr: +1 }, WN: { dc: -1, dr: -1 }
   }
   export const nsOddCol: TopoNS = {
-    NE: { dc: 1, dr: 0 }, N: { dc: 0, dr: -1 }, SE: { dc: 1, dr: 1 },
-    SW: { dc: -1, dr: 1 }, S: { dc: 0, dr: 1 }, NW: { dc: -1, dr: 0 }
+    EN: { dc: 1, dr: 0 }, N: { dc: 0, dr: -1 }, ES: { dc: 1, dr: 1 },
+    WS: { dc: -1, dr: 1 }, S: { dc: 0, dr: 1 }, WN: { dc: -1, dr: 0 }
   }
   export function nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? H.nsEvenCol : H.nsOddCol };
   export function ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? H.ewEvenRow : H.ewOddRow };
@@ -66,14 +70,16 @@ export namespace H {
   /** includes E,W, suitable for EwTopo */
   export const ewDirs: EwDir[] = [NE, E, SE, SW, W, NW]; // directions for EwTOPO
   /** includes N,W, suitable for NsTopo */
-  export const nsDirs: NsDir[] = [NE, SE, S, SW, NW, N]; // directions for NsTOPO
+  export const nsDirs: NsDir[] = [EN, ES, S, WS, WN, N]; // directions for NsTOPO
+
+  export const dirRot: { [key in HexDir]: number } = { N: 0, EN: 30, NE: 60, E: 90, ES: 120, SE: 150, S: 180, SW: 210, WS: 240, W: 270, WN: 300, NW: 330 }
   // angles for ewTopo!
-  export const ewDirRot: {[key in HexDir] : number} = { N: 0, NE: 30, E: 90, SE: 150, S: 180, SW: 210, W: 270, NW: 330 }
+  export const ewDirRot: {[key in EwDir] : number} = { NE: 30, E: 90, SE: 150, SW: 210, W: 270, NW: 330 }
   // angles for nwTopo!
-  export const nsDirRot: {[key in HexDir] : number} = { N: 0, NE: 60, E: 90, SE: 120, S: 180, SW: 240, W: 270, NW: 300 }
-  export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
+  export const nsDirRot: {[key in NsDir] : number} = { N: 0, EN: 60, ES: 120, S: 180, WS: 240, WN: 300 }
+  export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE, ES: WN, EN: WS, WS: EN, WN: ES }
   export const dirRevEW: {[key in EwDir] : EwDir} = { E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
-  export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, NE: SW, SE: NW, SW: NE, NW: SE }
+  export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, EN: WS, ES: WN, WS: EN, WN: ES }
 
   export const capColor1:   string = "rgba(150,  0,   0, .8)"  // unplayable: captured last turn
   export const capColor2:   string = "rgba(128,  80, 80, .8)"  // protoMove would capture

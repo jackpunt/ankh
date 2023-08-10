@@ -8,9 +8,11 @@ import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
 import type { Player } from "./player";
 import type { PlayerPanel, PowerLine } from "./player-panel";
-import { CircleShape, EdgeShape, HexShape, UtilButton } from "./shapes";
-import { EventName } from "./table";
+import { CircleShape, EdgeShape, HexShape, PaintableShape, UtilButton } from "./shapes";
+import { DragContext, EventName } from "./table";
 import { TP } from "./table-params";
+import { Tile } from "./tile";
+import { Hex1, Hex2 } from "./hex";
 
 interface Phase {
   Aname?: string,
@@ -20,12 +22,6 @@ interface Phase {
   region?: number,
   panels?: PlayerPanel[],
   players?: Player[],
-}
-/** a tiny HexShape */
-export class SplitterSphape extends HexShape {
-  constructor(rad: number) {
-    super(rad);
-  }
 }
 
 export class GameState {
@@ -639,12 +635,12 @@ export class GameState {
     return;
   }
 
-  splitShape: SplitterSphape;
+  splitShape: SplitterShape;
   splitMark: CircleShape;
   makeSplitShape(markRad: number) {
     const hexMap = this.gamePlay.hexMap;
     const mapCont = hexMap.mapCont;
-    this.splitShape = new SplitterSphape(10);
+    this.splitShape = new SplitterShape();
     this.splitShape.paint(TP.splitColor);
     this.splitShape.visible = true;
     mapCont.tileCont.addChild(this.splitShape);
@@ -672,19 +668,17 @@ export class GameState {
     pathShape.reset(); lineShape.reset();
     pathShape.visible = lineShape.visible = true;
 
-    const dragFunc = (dispObj: DisplayObject, ctx: DragInfo) => {
+    const isLegalTarget = (hex: AnkhHex, ctx: DragContext) => {
+
+    }
+
+    const dragFunc = (splitShape: DisplayObject, ctx: DragInfo) => {
       if (ctx.first) {
+        // mark legal corners...?
+
       }
-      // pt = globalToLocal(x,y,mapCont)
-      // find hexUnderPoint, compute nearest vertex,
-      // if (!path) pt0 = pt
-      // else edge = pt0 -> pt; pt0 = pt; assert/emit [row, col, edge]
-      //
-      const pt = dispObj.parent.localToLocal(dispObj.x, dispObj.y, hexCont); // mouse (on mapCont)
-      // mouse-enabled object in hexCont (or last target.hex, if off-map...)
-      // const hex_cont = hexCont.getObjectUnderPoint(pt.x, pt.y, 1) as HexCont ?? target?.hex.cont;
-      // const hex = hex_cont?.hex2;
-      const hex = this.table.hexUnderObj(dispObj, false);
+      const hex = this.table.hexUnderObj(splitShape, false);
+      const pt = splitShape.parent.localToLocal(splitShape.x, splitShape.y, hexCont); // mouse (on mapCont)
       let lx = pt.x, ly = pt.y;
       if (hex instanceof AnkhHex) {
         const { x: hx, y: hy, hexDir } = hex.cornerDir(pt), ewDir = hexDir as EwDir;
@@ -759,5 +753,23 @@ export class GameState {
     dragger.makeDragable(this.splitShape, this, dragFunc, dropFunc);
     dragger.clickToDrag(this.splitShape);
     dragSplitter();
+  }
+}
+/** a tiny HexShape */
+export class SplitterShape extends Tile {
+  override get radius(): number { return TP.hexRad/6; }
+  constructor() {
+    super('split', undefined);
+  }
+  override makeShape(): PaintableShape {
+    const base = new HexShape(this.radius);
+    base.paint(TP.splitColor);
+    return base;
+  }
+
+  /** return true if within radius/3 of corner. */
+  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
+
+    return false;
   }
 }

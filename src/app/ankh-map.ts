@@ -106,7 +106,7 @@ export class AnkhHex extends Hex2 {
     const { x: x, y: y } = parent.localToLocal(pt.x, pt.y, this.cont); // on hex
     const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
     const ndx = Math.round(3 * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
-    const hexDir = ['W', 'SW', 'SW', 'S', 'SE', 'SE', 'E', 'NE', 'NE', 'N', 'NW', 'NW', 'W'][ndx] as HexDir;
+    const hexDir = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'][ndx] as HexDir;
     return { x, y, hexDir };
   }
 
@@ -145,10 +145,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [1, 10], [3, 9], [4, 10], [5, 2], [5, 10], [6, 2], [6, 3], [6, 4], [6, 9], [6, 10], [7, 8], [7, 10], [8, 10],
   ];
   static rspec: SplitSpec[]  = [
-    [[1, 0, 2], [1, 0, 'NE', 'SE'], [2, 0, 'NE'], [2, 1, 'N', 'NE'], [3, 2, 'N', 'NE'], [3, 3, 'N', 'NE'], [4, 4, 'N', 'NE'],
-    [4, 5, 'N', 'NE', 'SE'],
-    [4, 6, 'NW', 'N'], [3, 7, 'NW', 'N'], [3, 8, 'NW', 'N'], [2, 9, 'NW', 'N'], [2, 10, 'NW']],
-    [[5, 5, 3], [5, 5, 'NE', 'SE', 'S'], [6, 5, 'SW'], [7, 5, 'NW', 'SW'], [8, 5, 'NW', 'SW']],
+    [[1, 0, 2], [1, 0, 'EN', 'ES'], [2, 0, 'EN'], [2, 1, 'N', 'EN'], [3, 2, 'N', 'EN'], [3, 3, 'N', 'EN'], [4, 4, 'N', 'EN'],
+    [4, 5, 'N', 'EN', 'ES'],
+    [4, 6, 'WN', 'N'], [3, 7, 'WN', 'N'], [3, 8, 'WN', 'N'], [2, 9, 'WN', 'N'], [2, 10, 'WN']],
+    [[5, 5, 3], [5, 5, 'EN', 'ES', 'S'], [6, 5, 'WS'], [7, 5, 'WN', 'WS'], [8, 5, 'WN', 'WS']],
   ];
   static tColor = { d: '#ffe599', f: '#93c47d', w: '#a4c2f4' };
 

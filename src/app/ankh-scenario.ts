@@ -31,7 +31,7 @@ type ActionElt = { [index in ActionIdent]?: PlayerId[]; } & { selected?: ActionI
 type EventElt = PlayerId[];
 
 /** [row, col, bid] -> new rid, with battle order = bid ;
- * - For Ex: [3, 0, 1], [4, 0, 'N', 'NE'], [4, 1, 'N']
+ * - For Ex: [3, 0, 1], [4, 0, 'N', 'EN'], [4, 1, 'N']
  */
 export type SplitBid = [row: number, col: number, bid: RegionId, split?: boolean ];
 export type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir];
@@ -109,7 +109,7 @@ export class AnkhScenario {
       ngods: 4,
       regions: [[4, 5, 2], [3, 5, 3], [4, 6, 4],],
       splits: [
-        [[3, 0, 1,], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+        [[3, 0, 1,], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
       ],
       places: [
         [3, 1, 'GodFigure', 1],
@@ -141,8 +141,8 @@ export class AnkhScenario {
       ngods: 5,
       regions: [[4, 5, 1], [4, 6, 2], [3, 5, 4]],
       splits: [
-        [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']],
-        [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+        [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'EN']],
+        [[4, 0, 5], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
       ],
       places: [
         [2, 1, 'Temple', 1],
@@ -244,8 +244,8 @@ export class AnkhScenario {
       [1, 2, 'GodFigure', 4],
     ],
     splits: [
-      [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'NE']], // [[6, 7, 3], ...]
-      [[4, 0, 5], [4, 0, 'N', 'NE'], [4, 1, 'N', 'NE']],
+      [[6, 7, 3], [7, 5, 'N'], [7, 6, 'NW', 'N'], [6, 7, 'NW', 'N', 'EN']], // [[6, 7, 3], ...]
+      [[4, 0, 5], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
     ],
     regions: [
       [1, 0, 1],
