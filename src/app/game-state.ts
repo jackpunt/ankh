@@ -1,5 +1,6 @@
-import { C, S, stime } from "@thegraid/common-lib";
-import { MouseEvent } from "@thegraid/easeljs-module";
+import { C, stime } from "@thegraid/common-lib";
+import { DragInfo } from "@thegraid/easeljs-lib";
+import { DisplayObject } from "@thegraid/easeljs-module";
 import { Figure, GodFigure, Monument } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent, SplitSpec } from "./ankh-scenario";
@@ -7,7 +8,7 @@ import type { GamePlay } from "./game-play";
 import { EwDir, H } from "./hex-intfs";
 import type { Player } from "./player";
 import type { PlayerPanel, PowerLine } from "./player-panel";
-import { CircleShape, UtilButton } from "./shapes";
+import { CircleShape, EdgeShape, HexShape, UtilButton } from "./shapes";
 import { EventName } from "./table";
 import { TP } from "./table-params";
 
@@ -19,6 +20,12 @@ interface Phase {
   region?: number,
   panels?: PlayerPanel[],
   players?: Player[],
+}
+/** a tiny HexShape */
+export class SplitterSphape extends HexShape {
+  constructor(rad: number) {
+    super(rad);
+  }
 }
 
 export class GameState {
@@ -194,7 +201,7 @@ export class GameState {
     Ankh: {
       start: (ok?: boolean) => {
         const panel = this.panel, rank = panel.nextAnkhRank;
-        if (!ok && (this.gamePlay.curPlayer.coins < rank)) {
+        if (!ok && (panel.player.coins < rank)) {
           console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
           panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
             () => {
@@ -245,96 +252,18 @@ export class GameState {
       },
       // phase(EndTurn)
     },
-    // TODO: highlight Monument.source.he when 'Build Monument'
-    // TODO: debug gods in reload (preSplit for ex)
-    // TODO: clear highlight when done
+    // Plan: attach a dragable (but mostly invisible?) token to mouse (per click to drag)
+    // use normal dragFunc to track it an paint lineTo.
+    // on click: mark target or add point to path.
+    // click on last path point to finalize. (addEdges)
     Split: {
       start: () => {
         // todo: disable table.dragger!
         console.log(stime(this, `.Split:`));
-        const tau = 2 * Math.PI, rad = TP.hexRad, r = rad / 4;
-        const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
-        const bid = hexMap.regions.length as RegionId;
-        const mark = new CircleShape(C.grey, r * 1.5, '');
-        mapCont.markCont.addChild(mark);
-
-        let target = undefined as { mx: number, my: number, hex: AnkhHex, ewDir: EwDir };
-        const path = [] as typeof target[];
-        let pathN: typeof target = undefined; // the final element of path
-        const pathShape = hexMap.edgeShape(TP.splitColor);
-        const lineShape = hexMap.edgeShape(TP.splitColor);
-
-        const pressmove = (e: MouseEvent) => {
-          // pt = globalToLocal(x,y,mapCont)
-          // find hexUnderPoint, compute nearest vertex,
-          // if (!path) pt0 = pt
-          // else edge = pt0 -> pt; pt0 = pt; assert/emit [row, col, edge]
-          //
-          lineShape.graphics.c();
-          const { stageX, stageY } = e;
-          const pt = mapCont.hexCont.globalToLocal(stageX, stageY);            // mouse (on mapCont)
-          const hex = hexMap.mapCont.hexCont.getObjectUnderPoint(pt.x, pt.y, 1); // mouse-enabled object in mapCont/hexCont?
-          if (hex instanceof AnkhHex) {
-            const { x: hx, y: hy } = mapCont.globalToLocal(stageX, stageY, hex.cont); // mouse (on hex)
-            const dirNdx = ((Math.round((Math.atan(hx / hy) / tau) * 12) + 1) / 2); // 0 -- 5; NW,NE,E,SE,SW,W
-            const ewDir = H.ewDirs[dirNdx], angle = H.ewDirRot[ewDir];
-            const [cx, cy] = [Math.sin(angle) * rad, -Math.cos(angle) * rad]; // corner coordinates (on hex)
-            const [dx, dy] = [hx - cx, hy - cy];                              // mouse (on hex)
-            mapCont.localToLocal(cx, cy, mark.parent, mark);                  // corner (on mapCont)
-            const onTarget = (Math.sqrt(dx * dx + dy * dy) < r);
-            mark.visible = onTarget;
-            target = onTarget ? { hex, ewDir, mx: mark.x, my: mark.y} : undefined;
-            if (pathN) {
-              const [lx, ly] = onTarget ? [mark.x, mark.y] : [pt.x, pt.y]; // snap if mark is showing
-              lineShape.graphics.mt(pathN.mx, pathN.my).lt(lx, ly);
-            }
-          }
-          hexMap.update();
-        }
-        // click:
-        const pressup = (e: MouseEvent) => {
-          const { stageX, stageY } = e;
-          const pt = mapCont.globalToLocal(stageX, stageY);
-          if (target) {
-            if (pathN.hex === target.hex && pathN.ewDir === target.ewDir) {finalize()} // TODO return to normal, process path.
-            path.push(pathN = target);
-            pathShape.graphics.mt(target.mx, target.my);
-            lineShape.graphics.c();
-          } else {
-            // clear and reset path
-            path.length = 0;
-            pathN = undefined;
-            pathShape.graphics.c();
-            lineShape.graphics.c();
-          }
-        }
-        const finalize = () => {
-          const nsDir = (nsAngle: number) => H.nsDirs.find((value) => H.nsDirRot[value] === nsAngle);
-          const nsAngle = (ewdir0: EwDir, ewdir1: EwDir) => {
-            const a0 = H.ewDirRot[ewdir0], a1 = H.ewDirRot[ewdir1];
-            return (Math.abs(a0 - a1) < 90) ? (a0 + a1) / 2 : 180 + (a0 + a1) / 2;
-          }
-
-          const edges: [hex: AnkhHex, angle: number][] = path.map(
-            ({ hex, ewDir }, n) => (n < path.length) ? [hex, nsAngle(ewDir, path[n + 1].ewDir)] : undefined);
-
-          const { row, col } = target.hex;
-          const splitSpec: SplitSpec = [[row, col, bid, false]];
-          edges.filter(edge => !!edge).forEach(([hex, nsAngle]) => {
-            const dir = nsDir(nsAngle);
-            hex.addEdge(nsAngle, TP.borderColor);
-            hexMap.addBorder(hex, dir);
-            splitSpec.push([row, col, dir])
-          });
-          hexMap.splits.push(splitSpec);
-        }
+        const hexMap = this.gamePlay.hexMap;
         hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx, 'rgba(240,240,240,.4'))
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
-
-        const cont = this.gamePlay.hexMap.mapCont;
-        cont.mouseEnabled = true;
-        cont.addEventListener('pressmove', pressmove, true);
-        cont.addEventListener('click', pressup, true);
+        this.runSplitShape();
         this.button('Split done');
       },
       done: () => {
@@ -708,5 +637,127 @@ export class GameState {
       if (players.includes(p)) this.addDevotion(p, 1, `Score Monuments[${this.conflictRegion}]`);
     })
     return;
+  }
+
+  splitShape: SplitterSphape;
+  splitMark: CircleShape;
+  makeSplitShape(markRad: number) {
+    const hexMap = this.gamePlay.hexMap;
+    const mapCont = hexMap.mapCont;
+    this.splitShape = new SplitterSphape(10);
+    this.splitShape.paint(TP.splitColor);
+    this.splitShape.visible = true;
+    mapCont.tileCont.addChild(this.splitShape);
+    this.splitMark = new CircleShape(C.grey, markRad * 1.5, '');
+    mapCont.markCont.addChild(this.splitMark);
+    this.lineShape = hexMap.edgeShape(TP.splitColor);
+    this.pathShape = hexMap.edgeShape(TP.splitColor);
+  }
+  lineShape: EdgeShape;
+  pathShape: EdgeShape;
+
+  runSplitShape() {
+    const hexMap = this.gamePlay.hexMap, hexCont = hexMap.mapCont.hexCont;
+    const rad = TP.hexRad, r = rad / 4, r2 = r * r;
+    if (!this.splitShape) this.makeSplitShape(r);
+    const mark = this.splitMark;
+    const dragger = this.table.dragger;
+    const pn = (n: number) => n.toFixed(2);
+
+    let target: { mx: number, my: number, hex: AnkhHex, ewDir: EwDir } = undefined;
+    const path = [] as (typeof target)[];
+    let pathN: typeof target = undefined; // the final element of path
+    const pathShape = this.pathShape; // real segment, on Path
+    const lineShape = this.lineShape; // temp segment, pathN to mouse.
+    pathShape.reset(); lineShape.reset();
+    pathShape.visible = lineShape.visible = true;
+
+    const dragFunc = (dispObj: DisplayObject, ctx: DragInfo) => {
+      if (ctx.first) {
+      }
+      // pt = globalToLocal(x,y,mapCont)
+      // find hexUnderPoint, compute nearest vertex,
+      // if (!path) pt0 = pt
+      // else edge = pt0 -> pt; pt0 = pt; assert/emit [row, col, edge]
+      //
+      const pt = dispObj.parent.localToLocal(dispObj.x, dispObj.y, hexCont); // mouse (on mapCont)
+      // mouse-enabled object in hexCont (or last target.hex, if off-map...)
+      // const hex_cont = hexCont.getObjectUnderPoint(pt.x, pt.y, 1) as HexCont ?? target?.hex.cont;
+      // const hex = hex_cont?.hex2;
+      const hex = this.table.hexUnderObj(dispObj, false);
+      let lx = pt.x, ly = pt.y;
+      if (hex instanceof AnkhHex) {
+        const { x: hx, y: hy, hexDir } = hex.cornerDir(pt), ewDir = hexDir as EwDir;
+        const { x: cx, y: cy } = hex.cornerXY(ewDir);
+        const [dx, dy] = [hx - cx, hy - cy];                     // mouseToCorner (on hex)
+        const d2 = dx * dx + dy * dy;
+        let onTarget = (d2 < r2) && (H.ewDirs.includes(ewDir));
+        hex.cont.localToLocal(cx, cy, mark.parent, mark);        // mark.x, mark.y: corner (on mapCont)
+        mark.visible = onTarget;
+        target = onTarget ? { hex: hex, ewDir, mx: mark.x, my: mark.y } : undefined;
+        if (onTarget) { lx = mark.x, ly = mark.y } // snap to corner if on target;
+      }
+      lineShape.reset();
+      if (pathN) {
+        lineShape.graphics.mt(pathN.mx, pathN.my).lt(lx, ly);
+      }
+      hexMap.update();
+    }
+    // click:
+    const dropFunc = (dispObj: DisplayObject, ctx: DragInfo) => {
+      if (target) {
+        if (pathN?.hex === target.hex && pathN?.ewDir === target.ewDir) {
+          finalize()  // TODO return to normal, process path.
+          return;
+        }
+        if (path.length === 0) pathShape.graphics.mt(target.mx, target.my);
+        else pathShape.graphics.lt(target.mx, target.my);
+        path.push(pathN = target);
+        lineShape.reset();
+      } else {
+        // clear and reset path
+        path.length = 0;
+        pathN = undefined;
+        pathShape.reset();
+        lineShape.reset();
+      }
+      dragSplitter();
+    }
+    const finalize = () => {
+      // midAngle of two ewDirs as nsDirRot: [0, 60, 120, ... 240, 300, 0] => [30, 90, 150, ... 330]
+      // (Math.abs(a0 - a1) < 90) ? (a0 + a1) / 2 : 180 + (a0 + a1) / 2;
+      // Math.min(a0, a1)+30
+      const nsAngle = (ewdir0: EwDir, ewdir1: EwDir) => {
+        const a0 = H.ewDirRot[ewdir0], a1 = H.ewDirRot[ewdir1];
+        return Math.abs(a0 - a1) < 300 ? Math.min(a0, a1) + 30 : Math.max(a0, a1) + 30;
+      }
+      const nsDir = (nsAngle: number) => H.nsDirs.find((value) => H.nsDirRot[value] === nsAngle);
+
+      const edges0: [hex: AnkhHex, angle: number][] = path.map(({ hex, ewDir }, n) =>
+        (n + 1 < path.length) ? [hex, nsAngle(ewDir, path[n + 1].ewDir)] : undefined
+      )
+      const edges = edges0.filter(edge => !!edge);
+
+      const { row, col } = target.hex, rid = hexMap.regions.length as RegionId;
+      const splitSpec: SplitSpec = [[row, col, rid, false]];    // false => TP.edgeColor vs TP.riverColor
+      edges.forEach(([hex, nsAngle]) => {
+        const dir = nsDir(nsAngle);
+        hex.addEdge(nsAngle, TP.borderColor);
+        hexMap.addBorder(hex, dir);
+        splitSpec.push([row, col, dir])
+      });
+      lineShape.visible = pathShape.visible = false;
+      hexMap.splits.push(splitSpec);
+      this.table.dragger.stopDrag();
+      this.table.dragger.stopDragable(this.splitShape);
+      this.splitShape.visible = this.splitMark.visible = false;
+    }
+    const dragSplitter = () => {
+      this.splitShape.visible = this.splitShape.mouseEnabled = true;
+      dragger.dragTarget(this.splitShape, { x: 0, y: 0 });
+    }
+    dragger.makeDragable(this.splitShape, this, dragFunc, dropFunc);
+    dragger.clickToDrag(this.splitShape);
+    dragSplitter();
   }
 }

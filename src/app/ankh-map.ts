@@ -1,10 +1,10 @@
-import { C, Constructor, KeyBinder, RC, stime } from "@thegraid/easeljs-lib";
+import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
-import { H, HexDir } from "./hex-intfs";
+import { EwDir, H, HexDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
@@ -100,6 +100,19 @@ export class AnkhHex extends Hex2 {
   }
   filterAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
     return this.linkDirs.filter((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
+  }
+
+  cornerDir(pt: XY, parent = this.cont.parent ) {
+    const { x: x, y: y } = parent.localToLocal(pt.x, pt.y, this.cont); // on hex
+    const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
+    const ndx = Math.round(3 * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
+    const hexDir = ['W', 'SW', 'SW', 'S', 'SE', 'SE', 'E', 'NE', 'NE', 'N', 'NW', 'NW', 'W'][ndx] as HexDir;
+    return { x, y, hexDir };
+  }
+
+  cornerXY(ewDir: EwDir, rad = this.radius): XY {
+    const angleR = H.ewDirRot[ewDir] * Math.PI / 180;
+    return { x: Math.sin(angleR) * rad, y: -Math.cos(angleR) * rad }; // corner coordinates (on hex)
   }
 
   addEdge(angle: number, color: string) {

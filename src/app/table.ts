@@ -739,7 +739,7 @@ export class Table extends EventDispatcher  {
     this.gamePlay.gameState.start();   // enable Table.GUI to drive game state.
   }
 
-  makeDragable(tile: Container) {
+  makeDragable(tile: DisplayObject) {
     const dragger = this.dragger;
     dragger.makeDragable(tile, this, this.dragFunc, this.dropFunc);
     dragger.clickToDrag(tile, true); // also enable clickToDrag;
@@ -921,7 +921,18 @@ export class Table extends EventDispatcher  {
   }
   scaleParams = { initScale: .125, scale0: .05, scaleMax: 4, steps: 30, zscale: .20,  };
 
-  dispatchPressup(target: DisplayObject, ctd = true) { return this.dragger.getDragData(target)  }
+  dispatchPressupX(target: DisplayObject, ctd = true) { return this.dragger.getDragData(target)  }
+  getDragData(target: DisplayObject) { return target['DragData'] };
+  dispatchPressup(target, ctd = true) {
+    let dragData = this.getDragData(target);
+    dragData.clickToDrag = ctd;
+    let stage = target.stage, stageX = stage.mouseX, stageY = stage.mouseY;
+    let mouseE = { button: 0 } as NativeMouseEvent;
+    // MouseEvent with faux .nativeEvent:
+    let event = new MouseEvent(S.pressup, false, true, stageX, stageY, mouseE, -1, true, stageX, stageY);
+    target.dispatchEvent(event, target); // set dragData.dragCtx = startDrag()
+    return dragData;
+}
   /** Move [dragable] target to mouse as if clickToDrag at {x,y}. */
   dragTargetPatch(target: DisplayObject, dxy: XY = { x: 0, y: 0 }) {
     // invoke 'click' to start drag;
@@ -943,6 +954,7 @@ export class Table extends EventDispatcher  {
     /** scaleCont: a scalable background */
     const scaleC = new ScaleableContainer2(this.stage, this.scaleParams);
     this.dragger = new Dragger(scaleC);
+    this.dragger.dispatchPressup = this.dispatchPressup; // PATCH for nativeEvent?
     this.dragger.dragTarget = this.dragTargetPatch; // PATCH until next easeljs-lib
     if (!!scaleC.stage.canvas) {
       // Special case of makeDragable; drag the parent of Dragger!

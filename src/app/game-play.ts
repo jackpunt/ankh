@@ -311,10 +311,14 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
+    KeyBinder.keyBinder.setKey(' ', { thisArg: this, func: this.runSplitter, argVal: true })
 
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
+  }
+  runSplitter() {
+    this.gameState.runSplitShape();
   }
 
   backStates = [];

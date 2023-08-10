@@ -372,7 +372,9 @@ export class UtilButton extends Container implements Paintable {
 
 export class EdgeShape extends Shape {
   constructor(public color: string, parent) {
-    super(new Graphics().ss(12, 'round', 'round').s(color))
+    super()
+    this.reset()
     parent.addChild(this);
   }
+  reset(color = this.color) { this.graphics.c().ss(12, 'round', 'round').s(color)}
 }
