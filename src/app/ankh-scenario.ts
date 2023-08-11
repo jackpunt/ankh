@@ -299,21 +299,21 @@ export class ScenarioParser {
   }
 
   parseRegions(regionElt: RegionElt[]) {
-    const map = this.map;
+    const ankhMap = this.map;
     // regions have been split; river splits and given splits
     // now: make sure all the regionIds are correct:
     regionElt.forEach(([row, col, rid]) => {
       // assign battleOrder for region[seed]; in order, from saveScenario
       // we will simply permute the regions array.
-      const hex = map[row][col];
-      const rindex = map.regionIndex(row, col, hex);
-      const xregion = map.regions[rid - 1];
-      map.regions[rid - 1] = map.regions[rindex];
-      map.regions[rid - 1].forEach(hex => hex.district = rid);
-      map.regions[rindex] = xregion;
-      map.regions[rindex]?.forEach(hex => hex.district = rindex + 1);
+      const hex = ankhMap[row][col];
+      const rindex = ankhMap.regionIndex(row, col, hex);
+      const xregion = ankhMap.regions[rid - 1];
+      ankhMap.regions[rid - 1] = ankhMap.regions[rindex];
+      ankhMap.setRegionId(rid - 1);
+      ankhMap.regions[rindex] = xregion;
+      ankhMap.setRegionId(rindex);
 
-      map.regions[rid - 1]['Aname'] = `${hex}`
+      ankhMap.regions[rid - 1]['Aname'] = `${hex}`
     });
   }
 

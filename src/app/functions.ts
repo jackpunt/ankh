@@ -20,6 +20,18 @@ export function permute(stack: any[]) {
   }
   return stack;
 }
+/** select items from a that are also in b (based on keyf).
+ *
+ * elements of a that appear (& match) twice appear in result twice.
+ */
+export function Arrays_intersect<T>(a: T[], b: T[], keyf: ((v: T) => any) = v => v) {
+  // return a.filter(va => b.find(vb => keyf(va)===keyf(vb)))
+  const [outer, inner] = [a, b];
+  const outerKey = outer.map(keyf);
+  const innerKey = inner.map(keyf);
+  return outer.filter((av, n) => innerKey.includes(outerKey[n]));
+}
+
 export function removeEltFromArray(elt: any, array: any[]) {
   return array.splice(array.indexOf(elt), 1);
 }

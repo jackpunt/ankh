@@ -1,11 +1,11 @@
-import { C, stime } from "@thegraid/common-lib";
+import { C, XY, stime } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { DisplayObject } from "@thegraid/easeljs-module";
 import { Figure, GodFigure, Monument } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
-import type { ActionIdent, SplitSpec } from "./ankh-scenario";
+import type { ActionIdent, SplitDir, SplitElt, SplitSpec } from "./ankh-scenario";
 import type { GamePlay } from "./game-play";
-import { EwDir, H } from "./hex-intfs";
+import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Player } from "./player";
 import type { PlayerPanel, PowerLine } from "./player-panel";
 import { CircleShape, EdgeShape, HexShape, PaintableShape, UtilButton } from "./shapes";
@@ -13,6 +13,7 @@ import { DragContext, EventName } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { Hex1, Hex2 } from "./hex";
+import { Arrays_intersect } from "./functions";
 
 interface Phase {
   Aname?: string,
@@ -654,13 +655,13 @@ export class GameState {
 
   runSplitShape() {
     const hexMap = this.gamePlay.hexMap, hexCont = hexMap.mapCont.hexCont;
-    const rad = TP.hexRad, r = rad / 4, r2 = r * r;
+    const rad = TP.hexRad, r = rad / 4, rad2 = rad*rad*1.1;
     if (!this.splitShape) this.makeSplitShape(r);
     const mark = this.splitMark;
     const dragger = this.table.dragger;
     const pn = (n: number) => n.toFixed(2);
 
-    let target: { mx: number, my: number, hex: AnkhHex, ewDir: EwDir } = undefined;
+    let target: { mx: number, my: number, hex: AnkhHex, ewDir: EwDir, cxy: XY} = undefined;
     const path = [] as (typeof target)[];
     let pathN: typeof target = undefined; // the final element of path
     const pathShape = this.pathShape; // real segment, on Path
@@ -668,50 +669,81 @@ export class GameState {
     pathShape.reset(); lineShape.reset();
     pathShape.visible = lineShape.visible = true;
 
-    const isLegalTarget = (hex: AnkhHex, ctx: DragContext) => {
-
+    const inRangeOf = (cx, cy, base = path[0]) => {
+      const pn = (n: number) => n.toFixed(2);
+      const { mx, my } = path[0];
+      const d2 = (mx - cx) * (mx - cx) + (my - cy) * (my - cy);
+      return (d2 < rad2);
     }
 
-    const dragFunc = (splitShape: DisplayObject, ctx: DragInfo) => {
-      if (ctx.first) {
-        // mark legal corners...?
-
+    const doLine = (lx, ly) => {
+      lineShape.reset();
+      if (path[0]) {
+        lineShape.graphics.mt(path[0].mx, path[0].my).lt(lx, ly);
       }
+      hexMap.update();
+    }
+    const noMark = () => {
+      mark.visible = false;
+      target = undefined;
+    }
+
+
+    const dragFunc = (splitShape: Tile, ctx: DragInfo) => {
       const hex = this.table.hexUnderObj(splitShape, false);
       const pt = splitShape.parent.localToLocal(splitShape.x, splitShape.y, hexCont); // mouse (on mapCont)
       let lx = pt.x, ly = pt.y;
       if (hex instanceof AnkhHex) {
         const { x: hx, y: hy, hexDir } = hex.cornerDir(pt), ewDir = hexDir as EwDir;
+        if (!H.ewDirRot[ewDir]) {
+          noMark();
+          doLine(lx, ly);
+          return; // not onTarget
+        }
+        if (!path[0]) {
+          // check legal start:
+          if (hex.terrain === 'w') return;
+          const pred = ((chex: AnkhHex) => !!hex.findLinkHex((lh, ld) => lh==chex && chex.terrain !== 'w' && !!hex.canEnter(chex)))
+          const adjHexes = hex.cornerAdjHexes(ewDir, pred);
+          if (adjHexes.length !== 1) {
+            noMark();
+            return;
+          }
+        }
+        // isNearCorner(hex, ewDir, r)
+        const onCorner = hex.isNearCorner({ x: hx, y: hy }, ewDir, r)
         const { x: cx, y: cy } = hex.cornerXY(ewDir);
-        const [dx, dy] = [hx - cx, hy - cy];                     // mouseToCorner (on hex)
-        const d2 = dx * dx + dy * dy;
-        let onTarget = (d2 < r2) && (H.ewDirs.includes(ewDir));
-        hex.cont.localToLocal(cx, cy, mark.parent, mark);        // mark.x, mark.y: corner (on mapCont)
-        mark.visible = onTarget;
-        target = onTarget ? { hex: hex, ewDir, mx: mark.x, my: mark.y } : undefined;
-        if (onTarget) { lx = mark.x, ly = mark.y } // snap to corner if on target;
+
+        // if not adj to path[0] then not a target
+        const inRange = !path[0] || inRangeOf(pt.x, pt.y, path[0]);
+        if (!inRange) {
+          doLine(lx, ly);
+          return;
+        }
+
+        if (true || inRange) {
+          hex.cont.localToLocal(cx, cy, mark.parent, mark);        // mark.x, mark.y: corner (on mapCont)
+          mark.visible = onCorner;
+          target = onCorner ? { hex: hex, ewDir, mx: mark.x, my: mark.y, cxy: { x: cx, y: cy } } : undefined;
+          if (onCorner) { lx = mark.x, ly = mark.y } // snap to corner if on target;
+        }
       }
-      lineShape.reset();
-      if (pathN) {
-        lineShape.graphics.mt(pathN.mx, pathN.my).lt(lx, ly);
-      }
-      hexMap.update();
+      doLine(lx, ly);
     }
     // click:
     const dropFunc = (dispObj: DisplayObject, ctx: DragInfo) => {
       if (target) {
-        if (pathN?.hex === target.hex && pathN?.ewDir === target.ewDir) {
+        if (path[0]?.hex === target.hex && path[0]?.ewDir === target.ewDir) {
           finalize()  // TODO return to normal, process path.
           return;
         }
-        if (path.length === 0) pathShape.graphics.mt(target.mx, target.my);
+        if (!path[0]) pathShape.graphics.mt(target.mx, target.my);
         else pathShape.graphics.lt(target.mx, target.my);
-        path.push(pathN = target);
+        path.unshift(target);
         lineShape.reset();
       } else {
         // clear and reset path
         path.length = 0;
-        pathN = undefined;
         pathShape.reset();
         lineShape.reset();
       }
@@ -719,32 +751,50 @@ export class GameState {
     }
     const finalize = () => {
       // midAngle of two ewDirs as nsDirRot: [0, 60, 120, ... 240, 300, 0] => [30, 90, 150, ... 330]
+      // ewAngle would use ewDirRot
       // (Math.abs(a0 - a1) < 90) ? (a0 + a1) / 2 : 180 + (a0 + a1) / 2;
-      // Math.min(a0, a1)+30
-      const nsAngle = (ewdir0: EwDir, ewdir1: EwDir) => {
-        const a0 = H.ewDirRot[ewdir0], a1 = H.ewDirRot[ewdir1];
-        return Math.abs(a0 - a1) < 300 ? Math.min(a0, a1) + 30 : Math.max(a0, a1) + 30;
+      const midAngle = (dir0: HexDir, dir1: HexDir) => {
+        const a0 = H.dirRot[dir0], a1 = H.dirRot[dir1];
+        return (Math.abs(a0 - a1) <= 180) ? (a0 + a1) / 2 : ((360 + a0 + a1) / 2) % 360;
+        //return Math.abs(a0 - a1) < 300 ? Math.min(a0, a1) + 30 : (Math.max(a0, a1) + 30) % 360;
       }
-      const nsDir = (nsAngle: number) => H.nsDirs.find((value) => H.nsDirRot[value] === nsAngle);
-
-      const edges0: [hex: AnkhHex, angle: number][] = path.map(({ hex, ewDir }, n) =>
-        (n + 1 < path.length) ? [hex, nsAngle(ewDir, path[n + 1].ewDir)] : undefined
-      )
-      const edges = edges0.filter(edge => !!edge);
-
-      const { row, col } = target.hex, rid = hexMap.regions.length as RegionId;
-      const splitSpec: SplitSpec = [[row, col, rid, false]];    // false => TP.edgeColor vs TP.riverColor
-      edges.forEach(([hex, nsAngle]) => {
-        const dir = nsDir(nsAngle);
-        hex.addEdge(nsAngle, TP.borderColor);
-        hexMap.addBorder(hex, dir);
-        splitSpec.push([row, col, dir])
+      const nsDirOfAngle = (nsAngle: number) => H.nsDirs.find((value) => H.nsDirRot[value] === nsAngle);
+      const nsDirOfEwDirs = (ewDir0: EwDir, ewDir1: EwDir) => {
+        return nsDirOfAngle(midAngle(ewDir0, ewDir1))
+      }
+      console.log(stime(this, `.finalize: ------------------`), path.map(({ hex, ewDir }, n) => `${n}: ${hex.Aname}-${ewDir}`));
+      // for corner[n: hexn, ewDir] find corner[n+1] on same hex
+      const splits = path.map(({ hex: hex1, ewDir: ewDir1 }, n, ary) => {
+        if (n == 0) return undefined as [AnkhHex, NsDir];
+        let { hex: hex0, ewDir: ewDir0 } = ary[n - 1];
+        if (hex1 !== hex0) {
+          // [hex1,ewDir1] is same corner as [hex0,ewDirQ] need to find ewDirQ:
+          // there are 2 corners on the segment: [hex0, ewDir0] & [hex1, ewDir1];
+          // there are 2 hexes common to both points, may be neither hex0 nor hex1;
+          // need to find one of the common hexes, and the ewDirs to each corner.
+      const pc = ([hex, dir]) => `${hex.Aname}-${dir}`;
+          const c0adj = hex0.cornerAdjHexes(ewDir0); c0adj.unshift([hex0, ewDir0]);
+          const c1adj = hex1.cornerAdjHexes(ewDir1); c1adj.unshift([hex1, ewDir1]);
+          const inter = Arrays_intersect(c1adj, c0adj, ([hex, ewdir]) => hex); // elts of c1adj
+          // expect 1 or 2 common elements:
+          const [hexC1, ewDirC1] = inter[0];
+          const [hexC0, ewDirC0] = c0adj.find(([hexC0, dir]) => hexC0 === hexC1); // elts of c0adj
+          hex0 = hexC1; ewDir1 = ewDirC1; ewDir0 = ewDirC0;
+        }
+        const nsDir = nsDirOfEwDirs(ewDir0, ewDir1);
+        hex0.addEdge(nsDir, TP.borderColor)
+        return [hex0, nsDir] as [AnkhHex, NsDir];
       });
+      const { row, col } = target.hex, rid = hexMap.regions.length as RegionId;
+      const splitBid = [row, col, rid, false];    // false => TP.edgeColor vs TP.riverColor
+      const splitDirs = splits.slice(1).map(([hex, nsDir]) => [hex.row, hex.col, nsDir] as SplitDir);
+      const splitSpec = [splitBid, ...splitDirs] as SplitSpec;
       lineShape.visible = pathShape.visible = false;
-      hexMap.splits.push(splitSpec);
       this.table.dragger.stopDrag();
       this.table.dragger.stopDragable(this.splitShape);
       this.splitShape.visible = this.splitMark.visible = false;
+      hexMap.splits.push(splitSpec);
+      hexMap.addSplit(splitSpec, true);
     }
     const dragSplitter = () => {
       this.splitShape.visible = this.splitShape.mouseEnabled = true;

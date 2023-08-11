@@ -121,7 +121,7 @@ export class Hex {
     return `${TP.colorScheme[sc] ?? 'Empty'}@${this.rcsp}`
   }
 
-  /** convert LINKS object to Array */
+  /** convert LINKS object to Array of Hex */
   get linkHexes() {
     return Object.keys(this.links).map((dir: HexDir) => this.links[dir])
   }
@@ -129,11 +129,12 @@ export class Hex {
     if (inclCenter) func(this, undefined, this);
     this.linkDirs.forEach((dir: HexDir) => func(this.links[dir], dir, this));
   }
-  /** search each Hex linked to this. */
+  /** return HexDir to the first linked hex that satisfies predicate. */
   findLinkHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
     return this.linkDirs.find((dir: HexDir) => pred(this.links[dir], dir, this));
   }
 
+  /** continue in HexDir until pred is satisfied. */
   findInDir(dir: HexDir, pred: (hex: Hex, dir: HexDir, hex0: Hex) => boolean) {
     let hex: Hex = this;
     do {
@@ -142,6 +143,7 @@ export class Hex {
     return undefined;
   }
 
+  /** array of all hexes in line from dir. */
   hexesInDir(dir: HexDir, rv: Hex[] = []) {
     let hex: Hex = this;
     while (!!(hex = hex.links[dir])) rv.push(hex);

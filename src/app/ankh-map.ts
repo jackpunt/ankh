@@ -4,7 +4,7 @@ import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
-import { EwDir, H, HexDir } from "./hex-intfs";
+import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
@@ -73,7 +73,7 @@ class AnkhHexShape extends HexShape {
 export type Terrain = 'd' | 'f' | 'w';
 export class AnkhHex extends Hex2 {
   // directions that are blocked; non-adjacent in Ankh.
-  readonly borders: { [key in HexDir]?: boolean | undefined } = {};
+  readonly borders: { [key in NsDir]?: boolean | undefined } = {};
   Avisit: number = undefined;
   terrain: Terrain;
   regionId: RegionId;
@@ -94,28 +94,66 @@ export class AnkhHex extends Hex2 {
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
 
-  /** search each Hex linked to this. */
-  findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
+  /** find first [Border-adjacent] Hex linked to this that statifies predicate. */
+  findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean = () => true) {
     return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
   }
-  filterAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean) {
-    return this.linkDirs.filter((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
+  /** select each [Border-adjacent] Hex linked to this that satisfies predicate */
+  filterAdjHex(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
+    return this.linkDirs.filter(dir => !!this.links[dir] && !this.borders[dir]).filter(dir => pred(this.links[dir], dir, this), this);
   }
 
-  cornerDir(pt: XY, parent = this.cont.parent ) {
-    const { x: x, y: y } = parent.localToLocal(pt.x, pt.y, this.cont); // on hex
+  /** returns the dir to hex if there is no border, undefined otherwise */
+  canEnter(hex: AnkhHex) {
+    return this.findLinkHex((lhex, dir) => (lhex === hex) && !this.borders[dir]);
+  }
+
+  /** return XY of the corner nearest the given point.
+   *
+   * The perimeter is partitioned into 12 sectors cooresponding corners at each HexDir.
+   * @param xy {x,y}
+   * @param basis DisplayObject basis for xy coordinates.
+   * @return XY and HexDir for the nearest of 12 'corners' (ewDirs and nwDirs)
+   */
+  cornerDir(xy: XY, basis = this.cont.parent ) {
+    const { x: x, y: y } = basis.localToLocal(xy.x, xy.y, this.cont); // on hex
     const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
     const ndx = Math.round(3 * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
     const hexDir = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'][ndx] as HexDir;
     return { x, y, hexDir };
   }
 
+  /** the XY coordinates of the indicated ewDir corner. */
   cornerXY(ewDir: EwDir, rad = this.radius): XY {
     const angleR = H.ewDirRot[ewDir] * Math.PI / 180;
     return { x: Math.sin(angleR) * rad, y: -Math.cos(angleR) * rad }; // corner coordinates (on hex)
   }
+  static adjCornerDir: { [key in EwDir]: [NsDir, EwDir][] } = {
+    NE: [['N', 'SE'], ['EN', 'W']], E: [['EN', 'SW'], ['ES', 'NW']], SE: [['ES', 'W'], ['S', 'NE']],
+    SW: [['S', 'NE'], ['WS', 'E']], W: [['WS', 'NE'], ['WN', 'SE']], NW: [['WN', 'E'], ['N', 'SW']],
+  }
+  /** returns selected hexes adjacent to the indicated corner.
+   * @param pred (hex, nsDir) => boolean;
+  */
+  cornerAdjHexes(ewDir: EwDir, pred: ((hex: this, dir?: EwDir) => boolean) = (hex => !!hex), log=false) {
+    const adjC = AnkhHex.adjCornerDir[ewDir];
+    const adjH = adjC.map(([nsDir, ewDir]) => [this.links[nsDir], ewDir]) as [this, EwDir][];
+    const rv = adjH.filter(([hex, ewDir]) => !!hex && pred(hex, ewDir));
+    log && console.log(stime(this, `.cornerAdjHexes: ${this.Aname}-${ewDir} ${rv[0]?.[0].Aname}-${rv[0]?.[1]}`), adjC, adjH, rv);
+    return rv;
+  }
+  /** return true if given XY point is within r of the corner at ewDir. */
+  isNearCorner(pt: XY, ewDir: EwDir, r = 0.35 * this.radius) {
+    const { x: cx, y: cy } = this.cornerXY(ewDir);
+    const [dx, dy] = [pt.x - cx, pt.y - cy];                     // mouseToCorner (on hex)
+    const d2 = dx * dx + dy * dy;
+    return (d2 < r * r);
+  }
 
-  addEdge(angle: number, color: string) {
+  /** add an EdgeShape to infCont over the indicated edge of this Hex. */
+  addEdge(dir: HexDir, color: string) {
+    const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
+    const angle: number = dirRot[dir];
     const rshape = new EdgeShape(color, this.map.mapCont.infCont);
     const pt = this.cont.localToLocal(0, 0, rshape.parent);
     const { x, y } = pt, r = this.radius;
@@ -211,25 +249,25 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     if (!hex) return;
     const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
     e.filter(elt => !!elt).forEach(dir => {
-      hex.addEdge(dirRot[dir], color);
+      hex.addEdge(dir, color);
       if (border) this.addBorder(hex, dir);
     });
   }
 
   addSplit(splitSpec: SplitSpec, border?: boolean, ignoreBid = false) {
     this.splits.push(splitSpec);
-    const splitN = splitSpec[0] as SplitBid, map = this;
+    const splitN = splitSpec[0] as SplitBid, ankhMap = this;
     const splitD = splitSpec.slice(1) as SplitDir[];
 
     splitD.forEach(splitD => this.addEdges(splitD, border));
     const [row, col, bid] = splitN;
-    const bidHex = map[row][col];
-    const origRid = map.regionIndex(row, col, bidHex) + 1;
+    const bidHex = ankhMap[row][col];
+    const origRid = ankhMap.regionIndex(row, col, bidHex) + 1;
 
     // regionId = district = external Region Ident: 1--N
     // regionNdx = internal index; regions[regionNdx] => AnkhHex[]
     // Outside of 'addSplit': regionNdx == regionId - 1;
-    const newRid = ignoreBid ? map.regions.length + 1 : bid; // new regionNdx
+    const newRid = ignoreBid ? ankhMap.regions.length + 1 : bid; // new regionNdx
 
     // region will split to 2 region IDs: [regions.length, origNdx]
     // given Hex put in slot 'len', but labeled with: bid-1,
@@ -244,21 +282,25 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     const seed0 = [seedHex0.row, seedHex0.col, origRid] as RegionElt;
     const seed1 = [seedHex1.row, seedHex1.col, newRid] as RegionElt;
     const seeds = [seed0, seed1]; // [row1, col1, orid]
-    const newRs = map.findRegions(map.regions[origRid - 1], seeds);
+    const newRs = ankhMap.findRegions(ankhMap.regions[origRid - 1], seeds);
     // Assert: newRs.length = 2; labeled (possibly incorrectly) with [origRid, newRid];
 
     const bidHexInR1 = newRs[1].includes(bidHex);
     if (bidHexInR1) {
-      map.regions[origRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
-      map.regions[newRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
+      ankhMap.regions[origRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
+      ankhMap.regions[newRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
     } else {
-      map.regions[newRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
-      map.regions[origRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
+      ankhMap.regions[newRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
+      ankhMap.regions[origRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
       // regionIds are incorrect, fix them:
-      newRs[0].forEach(hex => hex.district = hex.regionId = newRid as RegionId);
-      newRs[1].forEach(hex => hex.district = hex.regionId = origRid as RegionId);
+      this.setRegionId(newRid - 1);
+      this.setRegionId(origRid - 1);
     }
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
+  }
+  setRegionId(regionNdx: RegionNdx) {
+    const regionId = regionNdx + 1 as RegionId, waterId = 0 as RegionId;
+    this.regions[regionNdx].map(hex => hex.regionId = hex.district = hex.terrain === 'w' ? waterId : regionId);
   }
 
   edgeShape(color = TP.borderColor) {
@@ -330,13 +372,14 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     const rids =regionElts.map(([row, col, rids]) => rids) ;
     seeds.forEach((hex, rndx) => {
       // put hex and its adjacent neighbors in the same region;
-      const region = [], rid = rids[rndx];
+      const region: T[] = [], rid = rids[rndx];
       regions[rndx] = region;
       if (!hex) return;   // bad seed
       if (hex.regionId !== undefined) return; // already done; seeds not distinct!
       if (setRegion(hex, region, rid)) return; // water seed! single hex in region...
       addNeighbors(hex, region, rid);
     });
+    regions.forEach(region => region.filter(hex => hex.terrain === 'w').forEach(hex => { hex.district = 0; hex.cont.updateCache() }));
     console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));
     return regions;
   }

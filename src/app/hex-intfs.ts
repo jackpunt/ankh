@@ -72,11 +72,12 @@ export namespace H {
   /** includes N,W, suitable for NsTopo */
   export const nsDirs: NsDir[] = [EN, ES, S, WS, WN, N]; // directions for NsTOPO
 
-  export const dirRot: { [key in HexDir]: number } = { N: 0, EN: 30, NE: 60, E: 90, ES: 120, SE: 150, S: 180, SW: 210, WS: 240, W: 270, WN: 300, NW: 330 }
   // angles for ewTopo!
   export const ewDirRot: {[key in EwDir] : number} = { NE: 30, E: 90, SE: 150, SW: 210, W: 270, NW: 330 }
   // angles for nwTopo!
   export const nsDirRot: {[key in NsDir] : number} = { N: 0, EN: 60, ES: 120, S: 180, WS: 240, WN: 300 }
+  export const dirRot: { [key in HexDir]: number } = { ...H.ewDirRot, ...H.nsDirRot }
+
   export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE, ES: WN, EN: WS, WS: EN, WN: ES }
   export const dirRevEW: {[key in EwDir] : EwDir} = { E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, EN: WS, ES: WN, WS: EN, WN: ES }
