@@ -210,17 +210,10 @@ export class GamePlay0 {
    */
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
-    const fromHex = tile.hex;
+    const fromHex = tile.fromHex;
     const info = { tile, fromHex, toHex, payCost };
-    if (toHex !== tile.hex) console.log(stime(this, `.placeEither:`), info);
-    // commit to pay, and verify payment made:
-    if (payCost) {
-      console.log(stime(this, `.placeEither: payment failed`), tile, toHex);
-      debugger;              // should not happen, since isLegalTarget() checks failToPayCost()
-      tile.moveTo(tile.hex); // abort; return to fromHex
-      return;
-    }
     if (toHex !== fromHex) this.logText(`Place ${tile} -> ${toHex}`, `gamePlay.placeEither`)
+    if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {
       this.logText(`Recycle ${tile} from ${fromHex?.Aname || '?'}`, `gamePlay.placeEither`)
@@ -311,7 +304,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
-    KeyBinder.keyBinder.setKey(' ', { thisArg: this, func: this.runSplitter, argVal: true })
+    KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
 
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
@@ -352,6 +345,7 @@ export class GamePlay extends GamePlay0 {
   }
 
   chooseAction(action: ActionIdent) {
+    if (!this.isPhase('ChooseAction')) return;
     // find action in actionSelectPanel, dispatch event to click highlighted button.
     const [button, n] = this.table.activeButtons[action];
     setTimeout(() => this.table.selectAction(action, button, n), 10);
@@ -408,8 +402,9 @@ export class GamePlay extends GamePlay0 {
       if (tile.cacheID) {
         tile.uncache();
       } else {
-        const rad = tile.radius;
-        tile.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
+        const rad = tile.radius, b = tile.getBounds() ?? { x: -rad, y: -rad, width: 2 * rad, height: 2 * rad };
+        // tile.cache(b?.x ?? -rad, b?.y ?? -rad, b?.width ?? 2 * rad, b?.height ?? 2 * rad, TP.cacheTiles);
+        tile.cache(b.x, b.y , b.width, b.height, TP.cacheTiles);
       }
     });
     this.hexMap.update();

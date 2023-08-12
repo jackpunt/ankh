@@ -86,8 +86,10 @@ export class Monument extends AnkhPiece {
   constructor(player: Player, serial: number, Aname = 'Monument') {
     super(player, serial, Aname);
     this.nameText.y -= this.radius/2;
-    const hitArea = new Shape(new Graphics().f(C.black).dc(0, 0, this.radius))
+    const rad = this.radius;
+    const hitArea = new Shape(new Graphics().f(C.black).dc(0, 0, rad))
     this.hitArea = hitArea;
+    this.setBounds(-rad, -rad, rad * 2, rad * 2);
   }
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
@@ -198,7 +200,7 @@ export class AnkhMeeple extends Meeple {
 
   constructor(player: Player, serial: number, Aname?: string) {
     super(`${Aname}\n${serial}`, player);
-    this.underlay = new CircleShape();
+    this.underlay = new CircleShape(); this.underlay.name = 'underlay-highlight';
     this.addChildAt(this.underlay, 0);
     this.underlay.visible = false;
     this.nameText.text = Aname;
@@ -229,7 +231,9 @@ export class AnkhMeeple extends Meeple {
       if (this.cacheID) {
         const { x, y, width, height } = this.getBounds();
         const nw = Math.max(width, 2 * rad), dw = nw - width;
-        this.cache(x - dw / 2, y - dw / 2, nw, nw); // assume symmetry
+        const nh = Math.max(height, 2 * rad), dh = nh - height;
+        this.setBounds(x - dw / 2, y - dh / 2, nw, nh);
+        this.cache(x - dw / 2, y - dh / 2, nw, nh);
       }
     } else {
       this.underlay.visible = false;
@@ -490,33 +494,47 @@ export class Scorpion extends Guardian3 {
     super(player, serial, `Scorpion`);
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
     const { x, y, width, height } = H.hexBounds(TP.hexRad, TP.useEwTopo ? 0 : 30);
-    this.setBounds(x, y, width, height * 1.1);
+    this.setBounds(x, y, width, height);
     this.cache(x, y, width, height);
     this.addDirDisk();
+  }
+  drawClaw(g: Graphics, color: string, cl = 5) {
+    const y = 3, py = -cl;
+    return g.s(color).ss(7, 'butt', 'miter').mt(-1, y).lt(0, py).lt(1, y);
+  }
+  makeClaw(cl = 5, color = this.player?.colorn ?? C.black) {
+    const clf = cl + 1, uparrow = '\u2191';
+    const sc = new Shape(this.drawClaw(new Graphics(), 'black', cl));
+    sc.setBounds(-4, -clf, 8, clf + 1);
+    const rv = sc;
+    return rv;
   }
 
   dirDisk: Container;
   dirRot = 0;
-  a1: CenterText;
-  a2: CenterText;
   addDirDisk() {
-    const uparrow = '\u2191', ax = this.radius/2, ay = this.radius * .8, ang = 30;
-    const a1 = this.a1 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
-    const a2 = this.a2 = new CenterText(uparrow, this.radius/2, this.player?.colorn ?? C.black);
+    const ax = this.radius/2, ay = this.radius * .8, ang = 30, cl = 3;
+    const a1 = this.makeClaw(cl), a2 = this.makeClaw(cl);
     a1.rotation = -ang;
     a2.rotation = ang;
     a1.x = -ax; a2.x = ax;
     a1.y = a2.y = -ay;
-    const dirDisk = this.dirDisk = new Container();
+    const dirDisk = this.dirDisk = new Container(); dirDisk.name = 'dirDisk';
     dirDisk.rotation = 30 + this.dirRot * 60;
     dirDisk.addChild(a1, a2);
     this.addChild(dirDisk);
+    const { x, y, width, height } = this.getBounds();
+    const clm = cl * 3;   // depends on miter, tan(cl/1)
+    this.setBounds(x - clm, y - clm, width + 2 * clm, height + 2 * clm)
+    this.cache(x - clm, y - clm, width + 2 * clm, height + 2 * clm)
   }
+
   diskRotate() {
     this.dirDisk.rotation = 30 + (this.dirRot = ++this.dirRot % 6) * 60;
     this.updateCache();
     console.log(stime(this, `.Scorpion: attackDirs =`), this.attackDirs);
   }
+
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
     if (this.hex !== this.startHex) {
@@ -524,20 +542,10 @@ export class Scorpion extends Guardian3 {
     }
   }
   get attackDirs() {
-    const rot1 = this.dirRot;
-    const rot2 = (rot1 + 1) % 6;
+    const rot1 = (this.dirRot) % 6;
+    const rot2 = (this.dirRot + 1) % 6;
     return [H.nsDirs[rot1], H.nsDirs[rot2]];
   }
-  override paint(pColor?: string, colorn?: string): void {
-    if (this.a1) {
-      let color = colorn ?? C.black;
-      if (C.dist(color, C.white) < 50) color = C.black;
-      this.a1.color = color;
-      this.a2.color = color;
-    }
-    super.paint(pColor, colorn);
-  }
-
 
 }
 

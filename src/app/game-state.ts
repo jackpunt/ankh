@@ -45,7 +45,6 @@ export class GameState {
 
   get playerFigures() { const plyr = this.gamePlay.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
 
-  doneButton: UtilButton;
   highlights: Figure[];
   conflictRegion: RegionId = 1;
   get panelsInConflict() {
@@ -68,7 +67,6 @@ export class GameState {
   }
 
   start(phase = 'BeginTurn') {
-    this.doneButton = this.gamePlay.table?.doneButton;
     this.phase(phase);
   }
 
@@ -78,11 +76,15 @@ export class GameState {
     this.state.start(startArg);
   }
 
-  button(label?: string, color = this.gamePlay.curPlayer.color, hide = false, afterUpdate = undefined) {
-    this.doneButton.label.text = label;
-    this.doneButton.paint(color, true);
-    this.doneButton.visible = this.doneButton.mouseEnabled = !!label;
-    this.doneButton.updateWait(hide, afterUpdate);
+  /** set label & paint button with color;
+   * empty label hides & disables.
+   * optional continuation function on 'drawend'.
+   */
+  doneButton(label?: string, color = this.gamePlay.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
+    const doneButton = this.table.doneButton;
+    doneButton.label.text = label;
+    doneButton.paint(color, true);
+    doneButton.updateWait(!!label, afterUpdate);
   }
 
   /** invoked when 'Done' button clicked. [or whenever phase is 'done' by other means] */
@@ -128,7 +130,7 @@ export class GameState {
           this.phase('EndTurn');  // assert: selectedActions[0] === 'Ankh'
         } else {
           this.selectedAction = undefined;
-          this.button(`Choice ${n} Done`);
+          this.doneButton(`Choice ${n} Done`);
          }
       },
       done: (ok?: boolean) => {
@@ -158,7 +160,7 @@ export class GameState {
       start: () => {
         this.highlights = this.playerFigures.filter(fig => fig.hex?.isOnMap)
         this.highlights.forEach(fig => fig.highlight(true, C.BLACK));
-        this.button('Move done');
+        this.doneButton('Move done');
       },
       done: (ok?: boolean) => {
         const nmoved = this.highlights.filter(fig => fig.hex !== fig.startHex).length;
@@ -179,7 +181,7 @@ export class GameState {
       start: () => {
         this.highlights = this.panel.highlightStable(true);
         this.playerFigures.forEach(fig => fig.faceUp()); // set meep.startHex
-        this.button('Summon done');
+        this.doneButton('Summon done');
       },
       // mouse enable summonable Meeples (Stable)
       // Mark legal hexes
@@ -216,14 +218,14 @@ export class GameState {
             });
           return;
         }
-        this.button();
+        this.doneButton();
         panel.activateAnkhPowerSelector();
       },
       // mouseEnable next Upgrades;
       // on click: move Anhk to button (cover: now unclickable), set bit on Player.
       // mouse disable button
       done: () => {
-        this.button('Done');
+        this.doneButton('Done');
         this.phase('EndAction')
       },
     },
@@ -261,23 +263,20 @@ export class GameState {
         hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx, 'rgba(240,240,240,.4'))
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
         this.runSplitShape();
-        this.button('Split done');
+        this.doneButton('Split done');
       },
       done: () => {
-        const hexMap = this.gamePlay.hexMap, mapCont = hexMap.mapCont;
-        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx));
+        const hexMap = this.gamePlay.hexMap;
+        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
         this.phase('Swap');
       },
-      // mouse enable edges (of land tiles)
       // disable edges of hexes in region of < 12 hexes!
-      // click each edge! to light
       // validate(<= 6 selected; from board/water to board/water; 6 hexes per region )
-      // click Done(assign number, phase(Swap))
     },
     Swap: {
       start: () => {
         console.log(stime(this, `Swap:`))
-        this.button('Swap done');
+        this.doneButton('Swap done');
       },
       done: () => {
         this.phase('EventDone');
@@ -291,19 +290,19 @@ export class GameState {
     },
     Claim: {
       start: () => {
-        // TODO: highlight AnkhToken source of PlayerPanel
-        // TODO: limit to One monument claimed; auto 'EventDone'
-        // TODO: highlight current Action until end of Action;
-        this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
-        this.button('Claim done');
+        const ankhToken = this.panel.ankhSource.sourceHexUnit; //takeUnit();
+        if (ankhToken) {
+          this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
+          this.table.dragger.dragTarget(ankhToken, { x: 8, y: 8 });
+          this.doneButton('Claim done');
+        } else {
+          const done = () => this.phase('EventDone');
+          this.panel.areYouSure(`No Ankh Tokens for claim.`, done, done);
+        }
       },
       done: () => {
         this.phase('EventDone');
       }
-      // x = isUnclaimedMonument() ?
-      // mouse enable Hex; with (x ? unclaimed : any monument) and adj(curPlayer))
-      // click: unmark & remark
-      // Done(phase(EventDone))
     },
     Conflict: {
       start: () => {
@@ -401,7 +400,7 @@ export class GameState {
         const panels = this.state.panels = this.panelsInConflict;
         panels.forEach(panel => panel.revealCards(true));
         this.gamePlay.hexMap.update();
-        this.button('Reveal Done', C.grey);
+        this.doneButton('Reveal Done', C.grey);
         //setTimeout(() => { state.done(); }, 8000);
       },
       done: () => {
@@ -431,7 +430,7 @@ export class GameState {
           panel.enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
         });
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
-        this.button('Build Done', panels[0].player.color);
+        this.doneButton('Build Done', panels[0].player.color);
       },
       // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
       done: (panel: PlayerPanel = this.state.panels[0]) => {
@@ -445,12 +444,12 @@ export class GameState {
         panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
         if (panels.length === 0) {
           this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
-          this.button('Build Done', C.grey, true, () => this.phase('Plague'));
+          this.doneButton('', C.grey, () => this.phase('Plague'));
           return;
         }
         console.log(stime(this, `Build.done: return NOT done...`))
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
-        this.button('Build Done', panels[0].player.color);
+        this.doneButton('Build Done', panels[0].player.color);
         // TODO: at ConflictDone, mark yellow cards green, and check reclaimCards (Cycle of Ma`at)
       }
     },

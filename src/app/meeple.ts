@@ -150,7 +150,7 @@ export class Meeple extends Tile {
       this.unMove();          // this.hex = this.startHex;
     }
     super.markLegal(table, setLegal);
-    this.startHex.isLegal = !!setLegal;
+    this.fromHex.isLegal = !!setLegal; // if (this.startHex)
     return;
   }
 

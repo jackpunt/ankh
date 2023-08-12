@@ -70,7 +70,7 @@ export namespace H {
   /** includes E,W, suitable for EwTopo */
   export const ewDirs: EwDir[] = [NE, E, SE, SW, W, NW]; // directions for EwTOPO
   /** includes N,W, suitable for NsTopo */
-  export const nsDirs: NsDir[] = [EN, ES, S, WS, WN, N]; // directions for NsTOPO
+  export const nsDirs: NsDir[] = [N, EN, ES, S, WS, WN]; // directions for NsTOPO
 
   // angles for ewTopo!
   export const ewDirRot: {[key in EwDir] : number} = { NE: 30, E: 90, SE: 150, SW: 210, W: 270, NW: 330 }

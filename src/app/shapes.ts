@@ -128,7 +128,7 @@ export class CircleShape extends PaintableShape {
     const g = this.g0 ? this.g0.clone() : new Graphics();
     ((this.fillc = fillc) ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
-    g.dc(0, 0, this.rad);
+    g.dc(0, 0, this.rad);  // presumably easlejs can determine Bounds of Circle.
     return g;
   }
 }

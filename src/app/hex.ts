@@ -675,8 +675,8 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     let rc: RC = { row: row0, col: col0 } // == {hex.row, hex.col}
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
-    const dirs = this.linkDirs;
-    const startDir = dirs[4]; // 'W' or 'NW'
+    const dirs = this.linkDirs;     // HexDirs of the extant Topo.
+    const startDir = dirs.includes('W') ? 'W' : 'WN'; // 'W' or 'NW'
     for (let ring = 1; ring < nh; ring++) {
       rc = this.nextRowCol(rc, startDir); // step West to start a ring
       // place 'ring' hexes along each axis-line:
