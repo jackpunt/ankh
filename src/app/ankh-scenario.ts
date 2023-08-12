@@ -207,7 +207,7 @@ export class AnkhScenario {
     ngods: 5,
     turn: 15,
     godNames: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
-    actions: { Move: [0,1,2,3,4], Summon: [2], Gain: [0,1,3,4], Ankh: [3,4] },
+    actions: { Move: [0,1,2,3,4], Summon: [2], Gain: [0,1,3,4], Ankh: [3,4], selected: [] },
     ankhs: [
       ['Inspiring', 'Omnipresent', 'Pyramid'],
       ['Inspiring', 'Omnipresent'],
@@ -409,7 +409,7 @@ export class ScenarioParser {
         const pids = actions[id] ?? [];
         pids.forEach((pid, cn) => table.setActionMarker(rowCont.getButton(cn), players[pid]));
       });
-      const selected = actions.selected;
+      const selected = actions.selected ?? [];
       table.activateActionSelect(true, selected[0])
     }
     if (splits) this.parseSplits(splits, turnSet);

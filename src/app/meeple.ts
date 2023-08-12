@@ -135,7 +135,7 @@ export class Meeple extends Tile {
     return undefined;
   }
 
-  isOnLine(hex0: Hex, fromHex = this.hex) {
+  isOnLine(hex0: Hex1, fromHex = this.hex) {
     return !!fromHex.linkDirs.find(dir => fromHex.hexesInDir(dir).includes(hex0));
     // return !!fromHex.linkDirs.find(dir => fromHex.findInDir(dir, hex => hex === hex0));
     // return !!fromHex.findLinkHex((hex, dir) => !!hex.findInDir(dir, hex => hex === hex0));

@@ -144,14 +144,14 @@ export class Hex {
   }
 
   /** array of all hexes in line from dir. */
-  hexesInDir(dir: HexDir, rv: Hex[] = []) {
-    let hex: Hex = this;
+  hexesInDir(dir: HexDir, rv: this[] = []) {
+    let hex: this = this;
     while (!!(hex = hex.links[dir])) rv.push(hex);
     return rv;
   }
 
   /** for each Hex in each Dir: func(hex, dir, this) */
-  forEachHexDir(func: (hex: Hex, dir: HexDir, hex0: Hex) => unknown) {
+  forEachHexDir(func: (hex: this, dir: HexDir, hex0: this) => unknown) {
     this.linkDirs.forEach((dir: HexDir) => this.hexesInDir(dir).filter(hex => !!hex).map(hex => func(hex, dir, this)));
   }
 
@@ -330,6 +330,7 @@ export class Hex2 extends Hex1 {
     return Math.sqrt(dx * dx + dy * dy); // tw == H.sqrt3
   }
   /** location of corner between dir0 and dir1; in parent coordinates. */
+  // hexmarket uses to find ewDir corner between two nwDir edges.
   cornerPoint(dir0: HexDir, dir1: HexDir) {
     let d0 = H.ewDirRot[dir0], d1 = H.ewDirRot[dir1]
     let a2 = (d0 + d1) / 2, h = this.radius

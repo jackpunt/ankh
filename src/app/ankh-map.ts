@@ -230,14 +230,15 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     hex.cont.updateCache();
   }
 
+  /** stop movement from hex in the given direction.
+   * Also stop movement in other direction (unless sym == false).
+   */
   addBorder(hex: AnkhHex, dir: HexDir, sym = true) {
-    if (!dir) return undefined;
+    if (!dir) return;
+    hex.borders[dir] = true;
     if (sym) {
-      hex.borders[dir] = true;
+      hex.links[dir].borders[H.dirRev[dir]] = true;
     }
-    const oHex = hex.links[dir], rdir = H.dirRev[dir];
-    oHex && (oHex.borders[rdir] = true); // testing with ewTopo does not find oHex.
-    return oHex;
   }
 
   /** add graphics to rshape to show edges
@@ -300,7 +301,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
   setRegionId(regionNdx: RegionNdx) {
     const regionId = regionNdx + 1 as RegionId, waterId = 0 as RegionId;
-    this.regions[regionNdx].map(hex => hex.regionId = hex.district = hex.terrain === 'w' ? waterId : regionId);
+    this.regions[regionNdx].map(hex => hex.regionId = hex.district = ((hex.terrain === 'w') ? waterId : regionId));
   }
 
   edgeShape(color = TP.borderColor) {
@@ -320,11 +321,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
     AnkhMap.wspec.forEach(spec => ([r, c]: hexSpec) => {
-      const hex = this[r][c];
-      Object.keys(hex.links).forEach((dir: HexDir) => {
-        const ohex = hex.links[dir];
-        if (ohex.terrain !== 'w') this.addBorder(hex, dir, false); // one-way border: Apep can exit
-      });
+      const whex = this[r][c];
+      whex.forEachHexDir((ohex, dir) => {
+        if (ohex?.terrain !== 'w') this.addBorder(ohex, H.dirRev[dir], false); // one-way border: Apep can exit
+      })
     });
   }
 
@@ -361,7 +361,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     const addNeighbors = (hex: T, region: T[], regionId: RegionId) => {
       hex.forEachLinkHex((nhex: T, dir: HexDir) => {
         if (nhex.regionId !== undefined) return;
-        if (hex.borders[dir]) return;          // not semantically adjacent
+        if (hex.borders[dir] && nhex.terrain !== 'w') return;          // not semantically adjacent
         // adjacent water is in each region, but does not propagate.
         if (setRegion(nhex, region, regionId)) return;
         addNeighbors(nhex, region, regionId);
@@ -377,7 +377,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       if (!hex) return;   // bad seed
       if (hex.regionId !== undefined) return; // already done; seeds not distinct!
       if (setRegion(hex, region, rid)) return; // water seed! single hex in region...
-      addNeighbors(hex, region, rid);
+      addNeighbors(hex, region, rid);   // claim adjacent hexes and water
+      hexAry.forEach(hex => hex.terrain === 'w' && (hex.regionId = undefined)); // water again available!
     });
     regions.forEach(region => region.filter(hex => hex.terrain === 'w').forEach(hex => { hex.district = 0; hex.cont.updateCache() }));
     console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));
