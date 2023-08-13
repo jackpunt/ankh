@@ -302,7 +302,7 @@ export class GamePlay extends GamePlay0 {
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
   runSplitter() {
-    this.gameState.runSplitShape();
+    this.gameState.ankhMapSplitter.runSplitShape();
   }
 
   backStates = [];

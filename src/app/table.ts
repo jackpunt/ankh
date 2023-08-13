@@ -1,7 +1,7 @@
 import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
-import { AnkhHex, AnkhMap } from "./ankh-map";
+import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { type GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
@@ -9,7 +9,7 @@ import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
 import { XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
-import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
+import { CenterText, CircleShape, HexShape, PaintableShape, PolyShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
@@ -94,6 +94,38 @@ export class ActionContainer extends Container {
 }
 interface ScoreShape extends Shape {
   color: string;
+}
+class RegionMarker extends Tile {
+  override get radius() { return TP.ankh1Rad }
+  override makeShape(): PaintableShape {
+    return new PolyShape(4, 0, 'rgba(40,40,40,.7)', this.radius, C.WHITE);
+  }
+  constructor(public regionId = 1, public hexMap: HexMap<AnkhHex>) {
+    super(`Region\n${regionId}`);
+    const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
+    this.baseShape.paint();
+    this.addChild(txt);
+  }
+  override setPlayerAndPaint(player: Player): this {
+    return this;
+  }
+  override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
+    ctx.nLegal = 1;
+    return false;
+  }
+  override isLegalRecycle(ctx: DragContext): boolean {
+    return false;
+  }
+
+  lastXY: XY = {x: 400, y: 400};
+  override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
+    const hex = this.hexMap.hexUnderObj(this, false);
+    if ((this.hexMap as AnkhMap<AnkhHex>).regions[this.regionId-1].includes(hex)) {
+      this.lastXY = {x: this.x, y: this.y};
+    } else {
+      this.x = this.lastXY.x; this.y = this.lastXY.y;
+    }
+  }
 }
 
 /** to own file... */
@@ -356,6 +388,7 @@ export class Table extends EventDispatcher  {
     this.makeActionCont();
     this.makeEventCont();
     this.makeScoreStacks();
+    this.makeRegionMarkers();
     this.makePerPlayer();
 
     this.gamePlay.recycleHex = this.makeRecycleHex();
@@ -740,6 +773,29 @@ export class Table extends EventDispatcher  {
     const scores = this.playerScores
     return this.panelForPlayer.sort((pa, pb) => scores[pa.player.index] - scores[pb.player.index]);
   }
+
+  // TODO: AnkhTable extends Table { override hexMap: HexMap<AnkhHex> }
+  regionMarkers: RegionMarker[] = [];
+  makeRegionMarkers(n: RegionId = 8) {
+    for (let regionId: RegionId = n; regionId > 0; --regionId) {
+      const marker = new RegionMarker(regionId, this.hexMap as HexMap<AnkhHex>);
+      this.regionMarkers.unshift(marker);
+      this.hexMap.mapCont.markCont.addChild(marker);
+      marker.updateCache();
+    }
+  }
+
+  setRegionMarker(rid = this.regionMarkers.length as RegionId) {
+    const marker = this.regionMarkers[rid - 1]
+    const hexMap = this.hexMap as AnkhMap<AnkhHex>, regions = hexMap.regions;
+    const region = regions[rid-1], nHexes = region.length;
+    const txy = (regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
+      return {x: pv.x + cv.x, y: pv.y + cv.y}
+    })
+    const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
+    hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
+  }
+
 
   // Initially: 0.[np-pid-1], that is for 4 plyrs: 0.3, 0.2, 0.1, 0.0 (reverse player order)
   setPlayerScore(plyr: Player, score: number, rank?: number) {

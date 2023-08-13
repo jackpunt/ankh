@@ -177,38 +177,6 @@ export class AnkhHex extends Hex2 {
 export type hexSpec = [r: number, c: number];
 export type hexSpecr = [r: number, c: number, ...e: HexDir[]];
 
-class RegionMarker extends Tile {
-  override get radius() { return TP.ankh1Rad }
-  override makeShape(): PaintableShape {
-    return new PolyShape(4, 0, 'rgba(40,40,40,.7)', this.radius, C.WHITE);
-  }
-  constructor(public regionId = 1, public hexMap: HexMap<AnkhHex>) {
-    super(`Region\n${regionId}`);
-    const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
-    this.baseShape.paint();
-    this.addChild(txt);
-  }
-  override setPlayerAndPaint(player: Player): this {
-    return this;
-  }
-  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-    ctx.nLegal = 1;
-    return false;
-  }
-  override isLegalRecycle(ctx: DragContext): boolean {
-    return false;
-  }
-
-  lastXY: XY = {x: 400, y: 400};
-  override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
-    const hex = this.hexMap.hexUnderObj(this, false);
-    if ((this.hexMap as AnkhMap<AnkhHex>).regions[this.regionId-1].includes(hex)) {
-      this.lastXY = {x: this.x, y: this.y};
-    } else {
-      this.x = this.lastXY.x; this.y = this.lastXY.y;
-    }
-  }
-}
 
 export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   static fspec: hexSpec[] = [
@@ -231,7 +199,6 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
 
   regions: T[][] = [];
   splits: SplitSpec[] = [];
-  regionMarkers: RegionMarker[] = [];
 
   constructor(radius?: number, addToMapCont?: boolean, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC ? AnkhHex as any as HexConstructor<T> : hexC);
@@ -252,10 +219,9 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return super.addToMapCont(hexC ?? AnkhHex as any as HexConstructor<T>);
   }
 
-  override makeAllDistricts(nh?: number, mh?: number) {
+    override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.regions[0] = this.hexAry.concat();
-    this.makeRegionMarker();
     this.setRegionId(1)
     this.addTerrain();
     this.addRiverSplits();
@@ -340,27 +306,8 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       this.setRegionId(newRid);
       this.setRegionId(origRid);
     }
-    this.makeRegionMarker();
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
     return [origRid, newRid];
-  }
-
-  makeRegionMarker() {
-    const regionId = this.regionMarkers.length + 1;
-    const marker = new RegionMarker(regionId, this)
-    this.regionMarkers.push(marker);
-    this.mapCont.markCont.addChild(marker);
-    marker.updateCache();
-  }
-
-  setRegionMarker(rid = this.regionMarkers.length as RegionId) {
-    const marker = this.regionMarkers[rid - 1];
-    const region = this.regions[rid-1], nHexes = region.length;
-    const txy = (this.regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
-      return {x: pv.x + cv.x, y: pv.y + cv.y}
-    })
-    const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
-    this.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
   }
 
   /** Set hex.district = regionId; for all (non-water) hexes in region[regionId-1] */

@@ -410,7 +410,7 @@ export class ScenarioParser {
     }
     if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
-    this.map.regions.forEach((r, n) => this.map.setRegionMarker(n + 1 as RegionId));
+    this.map.regions.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId));
     guards?.forEach((name, ndx) => {
       if (typeof name !== 'string') name = name.name;
       const source = table.guardSources[ndx];
