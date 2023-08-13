@@ -200,9 +200,9 @@ class RegionMarker extends Tile {
   }
 
   lastXY: XY = {x: 400, y: 400};
-  override dragFunc0(hex: AnkhHex, ctx: DragContext): void {
-    const hexu = this.hexMap.hexUnderObj(this, false);
-    if ((this.hexMap as AnkhMap<AnkhHex>).regions[this.regionId-1].includes(hexu)) {
+  override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
+    const hex = this.hexMap.hexUnderObj(this, false);
+    if ((this.hexMap as AnkhMap<AnkhHex>).regions[this.regionId-1].includes(hex)) {
       this.lastXY = {x: this.x, y: this.y};
     } else {
       this.x = this.lastXY.x; this.y = this.lastXY.y;
@@ -342,6 +342,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     }
     this.makeRegionMarker();
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
+    return [origRid, newRid];
   }
 
   makeRegionMarker() {
@@ -349,9 +350,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     const marker = new RegionMarker(regionId, this)
     this.regionMarkers.push(marker);
     this.mapCont.markCont.addChild(marker);
+    marker.updateCache();
   }
 
-  setRegionMarker(rid: RegionId) {
+  setRegionMarker(rid = this.regionMarkers.length as RegionId) {
     const marker = this.regionMarkers[rid - 1];
     const region = this.regions[rid-1], nHexes = region.length;
     const txy = (this.regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
@@ -464,7 +466,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     this.update();
   }
   regionIndex(row: number, col: number, hex = this[row][col]) {
-    return this.regions.findIndex(r => r?.includes(hex));
+    return this.regions.findIndex(r => r?.includes(hex)) as RegionId;
   }
   /** debug aid: return array of {r.Aname, r.index, r.length} */
   regionList(regions = this.regions) {

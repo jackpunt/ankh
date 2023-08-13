@@ -828,7 +828,10 @@ export class GameState {
       const splitDirs = splits.slice(1).map(([hex, nsDir]) => [hex.row, hex.col, nsDir] as SplitDir);
       const splitSpec = [splitBid, ...splitDirs] as SplitSpec;
       //hexMap.splits.push(splitSpec);
-      hexMap.addSplit(splitSpec, true);
+      const [origRid, newRid ] = hexMap.addSplit(splitSpec, true);
+      hexMap.setRegionMarker(origRid);
+      hexMap.setRegionMarker(newRid);
+      hexMap.update();
     }
     const dragSplitter = () => {
       this.splitShape.visible = this.splitShape.mouseEnabled = true;
