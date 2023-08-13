@@ -54,7 +54,7 @@ export class AnkhToken extends AnkhMeeple {
       if (hex.tile) {
         hex.tile.setPlayerAndPaint(this.player);
         this.highlight(false);
-        if (this.gamePlay.isPhase('Claim')) this.gamePlay.gameState.done();
+        if (this.gamePlay.isPhase('Claim')) this.gamePlay.phaseDone(hex); // Claim done
       }
     }
     return rv;

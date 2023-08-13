@@ -212,7 +212,8 @@ export class GamePlay0 {
     if (!tile) return;
     const fromHex = tile.fromHex;
     const info = { tile, fromHex, toHex, payCost };
-    if (toHex !== fromHex) this.logText(`Place ${tile} -> ${toHex}`, `gamePlay.placeEither`)
+    const verb = this.gamePhase.Aname;
+    if (toHex !== fromHex) this.logText(`${verb} ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {

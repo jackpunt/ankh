@@ -71,8 +71,8 @@ export class GameState {
   }
 
   phase(phase: string, startArg?: any) {
+    console.log(stime(this, `.phase: ${this.state?.Aname ?? 'BeginGame'} -> ${phase}`));
     this.state = this.states[phase];
-    console.log(stime(this, `.phase:`), phase);
     this.state.start(startArg);
   }
 
@@ -84,7 +84,7 @@ export class GameState {
     const doneButton = this.table.doneButton;
     doneButton.label.text = label;
     doneButton.paint(color, true);
-    doneButton.updateWait(!!label, afterUpdate);
+    doneButton.updateWait(false, afterUpdate);
   }
 
   /** invoked when 'Done' button clicked. [or whenever phase is 'done' by other means] */
@@ -239,7 +239,7 @@ export class GameState {
     },
     Event: {
       start: () => {
-        console.log(stime(this, `.Event: ${this.eventName}`));
+        // console.log(stime(this, `.Event: ${this.eventName}`));
         this.phase(this.eventName);  // --> EventDone
       },
     },
@@ -300,7 +300,8 @@ export class GameState {
           this.panel.areYouSure(`No Ankh Tokens for claim.`, done, done);
         }
       },
-      done: () => {
+      done: (hex: AnkhHex) => {
+        this.table.logText(`${this.gamePlay.curPlayer.godName} Claimed ${hex}`)
         this.phase('EventDone');
       }
     },
@@ -329,8 +330,8 @@ export class GameState {
     ConflictInRegion: {
       panels: [],
       start: () => {
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
+        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel=>panel.player.godName)}`);
         const omni = panels.filter(panel => panel.hasAnkhPower('Omnipresent'));
         omni.forEach(panel => panel.player.coins += panel.nRegionsWithFigures());
 
@@ -341,7 +342,7 @@ export class GameState {
     },
     Dominate: {
       start: (panel: PlayerPanel) => {
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}] Player-${panel.player.index}`));
+        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] Player-${panel.player.index}`);
         this.scoreMonuments(true); // monunent majorities (for sole player in region)
         this.phase('ConflictNextRegion');
       }
@@ -433,7 +434,8 @@ export class GameState {
         this.doneButton('Build Done', panels[0].player.color);
       },
       // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
-      done: (panel: PlayerPanel = this.state.panels[0]) => {
+      done: (panel: PlayerPanel = this.state.panels[0], monument: Monument) => {
+          this.table.logText(`${panel.player.godName} built Monument: ${monument.hex.toString()}`);
         // no cost if Done *without* building (cbir>0)
         if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
           this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
@@ -495,7 +497,7 @@ export class GameState {
     BattleResolution: {
       panels: [],
       start: () => {
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
+        this.table.logText(`${this.state.Aname}[${this.conflictRegion}]`);
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) {
           // wtf? plague killed the all?
@@ -505,6 +507,7 @@ export class GameState {
         const panels0 = panels.concat();
         panels.forEach(panel => panel.strength = panel.strengthInRegion(this.conflictRegion - 1));
         panels.sort((a, b) => b.strength - a.strength);
+        this.table.logText(stime(this, `.BattleResolution: strengths = ${panels.map(panel => panel.reasons)}`));
         console.log(stime(this, `.BattleResolution: strengths =`), ...panels.map(panel => panel.reasons));
 
         const d = panels[0].strength - panels[1].strength
@@ -528,7 +531,8 @@ export class GameState {
           if (powers.includes('Worshipful') && player.coins > 2) (player.coins -= 2, dev += 1); // assume yes, they want the point.
           if (powers.includes('Commanding')) this.addFollowers(player, 3, `Commanding[${this.conflictRegion}]`);
           this.addDevotion(player, dev, `BattleResolution[${this.conflictRegion}]`);
-          console.log(stime(this, `.BattleResolution: ${winner.name} wins, get ${dev} Devotion`));
+          this.table.logText(stime(this, `BattleResolution: ${winner.name} wins; +${dev} Devotion`));
+          console.log(stime(this, `.BattleResolution: ${winner.name} wins, gets ${dev} Devotion`));
           panels.splice(0, 1); // remove winner, panels now has all the losers.
         }
         const winp = winner.player;
@@ -588,16 +592,20 @@ export class GameState {
   setup() {
 
   }
-
-  gainFollowersAction() {
-    const player = this.gamePlay.curPlayer;
+  countCurrentGain(player = this.gamePlay.curPlayer) {
     // Osiris Portal begins offMap.
     const allMonts = this.gamePlay.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
     const monts =  allMonts.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
     const mine = monts.filter(mont => mont.hex.findAdjHex(hex => hex.meep?.player === player));
-    const n = mine.length;
-    this.addFollowers(player, n, `Gain Followers action`)
-    if (player.god.ankhPowers.includes('Revered')) this.addFollowers(player, 1, `Revered`);
+    const n = mine.length + (player.god.ankhPowers.includes('Revered') ? 1 : 0);
+    return n
+  }
+
+  gainFollowersAction() {
+    const player = this.gamePlay.curPlayer;
+    const n = this.countCurrentGain(player);
+    const revered = player.god.ankhPowers.includes('Revered') ? ' (Revered)' : '';
+    this.addFollowers(player, n, `Gain Followers action${revered}`);
   }
 
   addFollowers(player: Player, n: number, reason?: string) {

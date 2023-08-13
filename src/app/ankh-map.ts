@@ -86,6 +86,10 @@ export class AnkhHex extends Hex2 {
   override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
   override set tile(tile: Tile) { super.tile = tile; }
 
+  override toString(sc?: string): string {
+    return `${this.piece ?? this.Aname}`;
+  }
+
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
     if (!this.overlay) this.overlay = new HexShape(undefined); // for showRegion()
     this.overlay.paint('rgba(250,250,250,.3)');

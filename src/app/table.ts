@@ -19,13 +19,13 @@ import { ClassByName } from "./class-by-name";
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
 
 export type EventName = 'Claim' | 'Split' | 'Conflict' | 'merge' | 'redzone';
-export interface EventButton extends Container { isEvent: boolean, pid: number; }
+export interface ActionButton extends Container { isEvent: boolean, pid: number, rollover?: ((b: ActionButton, over: boolean) => void) }
 interface EventIcon extends Container { eventName: EventName, pid: number; }
 interface ScoreMark extends RectShape { score: number, rank: number }
 
 /** rowCont is an ActionContainer; children are EventButton. */
 export class ActionContainer extends Container {
-  constructor(public rad = 30) {
+  constructor(public rad = 30, public table: Table) {
     super();
     this.highlight = new CircleShape(C.WHITE, this.rad + 5, '');
     this.highlight.name = `highlight`;
@@ -33,9 +33,9 @@ export class ActionContainer extends Container {
     this.highlight.visible = true;
   }
   highlight: PaintableShape;
-  active: DisplayObject; // most recently activated button
+  active: ActionButton; // most recently activated button
   /** just the Buttons, ignore the highlight Shape. */
-  get buttons() { return this.children.filter(c => (c instanceof Container)) as EventButton[] }
+  get buttons() { return this.children.filter(c => (c instanceof Container)) as ActionButton[] }
 
   getButton(cn: number) {
     return this.buttons[cn];
@@ -50,19 +50,47 @@ export class ActionContainer extends Container {
   activate() {
     const hl = this.highlight;
     const button = this.nextButton ?? this.resetToFirstButton(); // reset after Event!
+    const rowCont = button.parent as ActionContainer; // === this !!!
     hl.paint(C.WHITE);
     hl.x = button.x;
     hl.y = button.y;
     hl.visible = button.mouseEnabled = true;
     this.active = button;
+    if (this.rollover) button.on('rollover', () => this.rollover(button, true), this);
+    if (this.rollover) button.on('rollout', () => this.rollover(button, false), this);
     this.stage.update();
     return button;
   }
 
   deactivate() {
-    if (this.active) this.highlight.visible = this.active.mouseEnabled = false;
+    if (this.active) {
+      this.active.removeAllEventListeners('rollover');
+      this.active.removeAllEventListeners('rollout');
+      this.highlight.visible = this.active.mouseEnabled = false;
+    }
     this.stage.update();
   }
+
+  rollover: (button: ActionButton, over?: boolean) =>void;
+
+  gainText = new Container();
+  overGain(button: ActionButton, v: boolean) {
+    const gt = this.gainText;
+    if (v) {
+      const bg = new Shape(new Graphics().f('rgba(240,240,240,.8').dc(0, 0, 15));
+      const txt = new CenterText(`${this.table.gamePlay.gameState.countCurrentGain()}`);
+      gt.addChild(bg, txt);
+      gt.x = button.x + TP.ankhRad; gt.y = button.y - TP.ankhRad;
+      button.parent.addChild(gt);
+      button.stage.update();
+    } else {
+      // hide hoverText
+      gt.removeAllChildren();
+      button.stage.update();
+    }
+  }
+
+
 }
 interface ScoreShape extends Shape {
   color: string;
@@ -174,7 +202,7 @@ export class Table extends EventDispatcher  {
     this.turnLog.log(line, 'table.logTurn'); // in top two lines
   }
   logText(line: string, from = '') {
-    const text = `//${this.gamePlay.turnNumber}: ${line}`;
+    const text = `// ${this.gamePlay.turnNumber}: ${line}`;
     this.textLog.log(text, from); // scrolling lines below
     this.gamePlay.logWriter.writeLine(text);
 
@@ -465,7 +493,9 @@ export class Table extends EventDispatcher  {
   }
 
   actionPanels: ActionContainer[] = [];
-  actionRows: { id: ActionIdent, dn?: number }[] = [{ id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }];
+  actionRows: { id: ActionIdent, dn?: number, ro?: boolean }[] = [
+    { id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }
+  ];
   makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.2) {
     const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
     const wide = 400;
@@ -479,15 +509,17 @@ export class Table extends EventDispatcher  {
     //for (let rn = 0; rn < actionRows.length; rn++) {
     this.actionRows.forEach((actionRow, rn) => {
       const nc = np + 2 + (actionRow.dn ?? 0), dx = wide / (nc - 1), id = actionRow.id;
-      const rowCont = new ActionContainer(rad);
+      const rowCont = new ActionContainer(rad, this);
       rowCont.name = `rowCont-${id}`;
       rowCont.y = rn * rh;
       actionCont.addChild(rowCont);
+      const overName = `over${actionRow.id}`; // 'overGain'
+      rowCont.rollover = rowCont[overName] as (button: ActionButton, over: boolean) => void;
       const k = firstChar(actionRow.id);
       for (let cn = 0; cn < nc; cn++) {
         // make ActionSelectButton:
         const color = (cn < nc - 1) ? C.lightgrey : C.coinGold;
-        const button = this.makeCircleButton(color, rad, k) as EventButton; // container with CircleShape(radius)
+        const button = this.makeCircleButton(color, rad, k) as ActionButton; // container with CircleShape(radius)
         button.name = `${id}-${cn}`;
         button.isEvent = (cn === nc - 1);
         button.x = cn * dx;
@@ -500,7 +532,8 @@ export class Table extends EventDispatcher  {
   }
 
   /** mark Action as selected, inform GamePlay & phaseDone() */
-  selectAction (id: ActionIdent, button: EventButton, cn: number) {
+  selectAction (id: ActionIdent, button: ActionButton, cn: number) {
+    ;(button.parent as ActionContainer).rollover?.(button, false);  // implicit 'rollout'
     this.gamePlay.selectedAction = id;
     this.gamePlay.selectedActionIndex = cn;
     if (button.isEvent) {
@@ -512,7 +545,7 @@ export class Table extends EventDispatcher  {
     this.gamePlay.phaseDone(); // --> phase(selectedAction)
   }
 
-  setActionMarker(button: EventButton, player = this.gamePlay.curPlayer, color?: string) {
+  setActionMarker(button: ActionButton, player = this.gamePlay.curPlayer, color?: string) {
     const rad = (button.children[0] as CircleShape).rad;
     const god = player.god;
     const ankhToken = god.getAnkhMarker(rad);
@@ -526,7 +559,7 @@ export class Table extends EventDispatcher  {
     button.stage.update();
   }
 
-  activeButtons: {[index: string]: [EventButton, number]} = {}
+  activeButtons: {[index: string]: [ActionButton, number]} = {}
   /**
    * On each row: activate or deactivate the first button without an AnkhMarker on each line.
    * If a row is 'full' (previous Event) it is reset to the beginning.
@@ -540,14 +573,18 @@ export class Table extends EventDispatcher  {
     this.activeButtons = {};
     this.actionRows.map(({id, dn}, cn) => {
       const rowCont = this.actionPanels[id] as ActionContainer;
-      if (!activate) { rowCont.deactivate() }  // highlight & mouse = false
-      else if (isAfter) { this.activeButtons[id]= [rowCont.activate(), cn]; active++; }
+      if (!activate) {
+        rowCont.deactivate();   // highlight & mouse = false
+      } else if (isAfter) {
+        this.activeButtons[id]= [rowCont.activate(), cn];
+        active++; // number of rows activated.
+      }
       isAfter = isAfter || id === afterRow;
     })
     if (cat) {
       // [de]activate 'Cat' & 'Pass' buttons..?
     }
-    // this.doneButton.visible = this.doneButton.mouseEnabled = true;
+    this.stage.enableMouseOver(active > 0 ? 5 : 0);// enable or disable MouseOver
     return active > 0;
   }
 
@@ -879,7 +916,7 @@ export class Table extends EventDispatcher  {
     const lm = history[0]
     const prev = lm ? `${lm.Aname}${lm.ind}#${tn-1}` : ""
     const robo = plyr.useRobo ? AT.ansiText(['red','bold'],"robo") : "----";
-    const info = { turn: `#${tn}`, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
+    const info = { turn: tn, plyr: plyr.Aname, prev, gamePlay: this.gamePlay, curPlayer: plyr }
     console.log(stime(this, `.logCurPlayer --${robo}--`), info);
     this.logTurn(`//${tn}: ${plyr.Aname}`);
   }

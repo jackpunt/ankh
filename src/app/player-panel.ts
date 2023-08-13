@@ -109,7 +109,7 @@ export class PlayerPanel extends Container {
       if (panel0 === panel) {
         this.table.off('buildDone', onBuildDone);
         panel0.canBuildInRegion = undefined;
-        this.player.gamePlay.phaseDone(panel0);
+        this.player.gamePlay.phaseDone(panel0, monument);
       }
     })
   }
@@ -482,10 +482,10 @@ export class PlayerPanel extends Container {
   static readonly cardSpecs: CardSpec[] = [
     ['Flood', '+1 Follower for each Figure in fertile space; they cannot be killed in Battle.', 0],
     ['Build Monument', 'Build a monument for 3 Followers', 0],
-    ['Plague of Locusts', 'Kill units unless highest bid', 1],
-    ['Chariots', '+3 strength in battle resolution', 3],
+    ['Plague of Locusts [+1]', 'Kill units unless highest bid', 1],
+    ['Chariots [+3]', '+3 strength in battle resolution', 3],
     ['Miracle', '+1 devotion for each Figure killed', 0],
-    ['Drought', '+1 devotion per Figure in desert, if you win', 1],
+    ['Drought [+1]', '+1 devotion per Figure in desert, if you win', 1],
     ['Cycle of Ma`at', 'Reclaim all Battle Cards after battle resolution', 0],
   ]
 

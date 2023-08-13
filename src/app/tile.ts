@@ -166,7 +166,7 @@ export class Tile extends Tile0 {
   }
 
   override toString(): string {
-    return `${this.Aname.replace('\n','-')}@${this.hex?.Aname ?? '?'}`;
+    return `${this.Aname.replace('\n','-')}@${this.hex?.Aname ?? this.fromHex?.Aname ?? '?'}`;
   }
 
 
