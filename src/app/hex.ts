@@ -1,5 +1,5 @@
 import { C, Constructor, F, RC, S } from "@thegraid/easeljs-lib";
-import { Container, Graphics, Point, Text } from "@thegraid/easeljs-module";
+import { Container, DisplayObject, Graphics, Point, Text } from "@thegraid/easeljs-module";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
 import { HexShape, LegalMark } from "./shapes";
@@ -524,6 +524,12 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
     this.link(hex)   // link to existing neighbors
     return hex
   }
+
+  hexUnderObj(dragObj: DisplayObject, legalOnly = true ) {
+    const pt = dragObj.parent.localToLocal(dragObj.x, dragObj.y, this.mapCont.markCont);
+    return this.hexUnderPoint(pt.x, pt.y, legalOnly);
+  }
+
   /** find first Hex matching the given predicate function */
   findHex<K extends T>(fn: (hex: K) => boolean): K {
     for (let hexRow of this) {

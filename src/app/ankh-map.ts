@@ -3,10 +3,12 @@ import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
-import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
+import { Hex, Hex1, Hex2, HexConstructor, HexMap } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { EdgeShape, HexShape } from "./shapes";
+import { Player } from "./player";
+import { CenterText, EdgeShape, HexShape, PaintableShape, PolyShape } from "./shapes";
+import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 
@@ -176,7 +178,36 @@ export type hexSpec = [r: number, c: number];
 export type hexSpecr = [r: number, c: number, ...e: HexDir[]];
 
 class RegionMarker extends Tile {
+  override get radius() { return TP.ankh1Rad }
+  override makeShape(): PaintableShape {
+    return new PolyShape(4, 0, 'rgba(40,40,40,.7)', this.radius, C.WHITE);
+  }
+  constructor(public regionId = 1, public hexMap: HexMap<AnkhHex>) {
+    super(`Region\n${regionId}`);
+    const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
+    this.baseShape.paint();
+    this.addChild(txt);
+  }
+  override setPlayerAndPaint(player: Player): this {
+    return this;
+  }
+  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
+    ctx.nLegal = 1;
+    return false;
+  }
+  override isLegalRecycle(ctx: DragContext): boolean {
+    return false;
+  }
 
+  lastXY: XY = {x: 400, y: 400};
+  override dragFunc0(hex: AnkhHex, ctx: DragContext): void {
+    const hexu = this.hexMap.hexUnderObj(this, false);
+    if ((this.hexMap as AnkhMap<AnkhHex>).regions[this.regionId-1].includes(hexu)) {
+      this.lastXY = {x: this.x, y: this.y};
+    } else {
+      this.x = this.lastXY.x; this.y = this.lastXY.y;
+    }
+  }
 }
 
 export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
@@ -224,6 +255,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.regions[0] = this.hexAry.concat();
+    this.makeRegionMarker();
     this.setRegionId(1)
     this.addTerrain();
     this.addRiverSplits();
@@ -272,12 +304,12 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     splitD.forEach(splitD => this.addEdges(splitD, border));
     const [row, col, bid] = splitN;
     const bidHex = ankhMap[row][col];
-    const origRid = ankhMap.regionIndex(row, col, bidHex) + 1;
+    const origRid = ankhMap.regionIndex(row, col, bidHex) + 1 as RegionId;
 
     // regionId = district = external Region Ident: (1 .. N)
     // regionNdx = internal index; regions[regionNdx] => AnkhHex[]: (0 .. N-1)
     // Outside of this 'addSplit' critical section: regionNdx === regionId - 1;
-    const newRid = ankhMap.regions.length + 1; // new regionNdx
+    const newRid = ankhMap.regions.length + 1 as RegionId; // new regionNdx
     // Ignore 'bid': it is either len+1 (rspec) or irrelevant (followed by region-list or swap)
 
     // region (origNdx) will split to 2 region IDs: [origRid, newRid]
@@ -305,11 +337,30 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       ankhMap.regions[newRid - 1] = newRs[0]; // put in region Index cooresponding to regionId
       ankhMap.regions[origRid - 1] = newRs[1]; // put in region Index cooresponding to regionId
       // regionIds are incorrect, fix them:
-      this.setRegionId(newRid as RegionId);
-      this.setRegionId(origRid as RegionId);
+      this.setRegionId(newRid);
+      this.setRegionId(origRid);
     }
+    this.makeRegionMarker();
     // console.log(stime(this, `.split: newRs`), map.regionList(newRs), ids);
   }
+
+  makeRegionMarker() {
+    const regionId = this.regionMarkers.length + 1;
+    const marker = new RegionMarker(regionId, this)
+    this.regionMarkers.push(marker);
+    this.mapCont.markCont.addChild(marker);
+  }
+
+  setRegionMarker(rid: RegionId) {
+    const marker = this.regionMarkers[rid - 1];
+    const region = this.regions[rid-1], nHexes = region.length;
+    const txy = (this.regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
+      return {x: pv.x + cv.x, y: pv.y + cv.y}
+    })
+    const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
+    this.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
+  }
+
   /** Set hex.district = regionId; for all (non-water) hexes in region[regionId-1] */
   setRegionId(regionId: RegionId) {
     const regionNdx = regionId -1, waterId = 0 as RegionId;

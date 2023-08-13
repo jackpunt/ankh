@@ -783,8 +783,7 @@ export class Table extends EventDispatcher  {
   }
 
   hexUnderObj(dragObj: DisplayObject, legalOnly = true ) {
-    const pt = dragObj.parent.localToLocal(dragObj.x, dragObj.y, this.hexMap.mapCont.markCont);
-    return this.hexMap.hexUnderPoint(pt.x, pt.y, legalOnly);
+    return this.hexMap.hexUnderObj(dragObj, legalOnly);
   }
 
   dragContext: DragContext;
@@ -849,7 +848,7 @@ export class Table extends EventDispatcher  {
       this.stopDragging();
     } else {
       // mark legal targets for tile; SHIFT for all hexes, if payCost
-      const hexIsLegal = (hex: Hex2) => ctx.nLegal += ((hex !== tile.hex) && (hex.isLegal = tile.isLegalTarget(hex, ctx)) ? 1 : 0);
+      const hexIsLegal = (hex: Hex2) => ((hex !== tile.hex) && (hex.isLegal = tile.isLegalTarget(hex, ctx)) && (ctx.nLegal += 1));
       tile.markLegal(this, hexIsLegal, ctx);           // delegate to check each potential target
       this.gamePlay.recycleHex.isLegal = tile.isLegalRecycle(ctx); // do not increment ctx.nLegal!
       tile.moveTo(undefined); // notify source Hex, so it can scale; also triggers nextUnit !!

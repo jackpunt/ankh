@@ -3,7 +3,7 @@ import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easel
 import type { Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
-import type { Tile } from "./tile";
+import { Tile } from "./tile";
 
 export class C1 {
   static GREY = 'grey';
@@ -88,7 +88,7 @@ export class HexShape extends PaintableShape {
     readonly radius = TP.hexRad,
     readonly tilt = TP.useEwTopo ? 30 : 0,  // ewTopo->30, nsTopo->0
   ) {
-    super((color: string) => this.hscgf(color));
+    super((fillc) => this.hscgf(fillc));
     this.setHexBounds(); // Assert radius & tilt are readonly, so bounds never changes!
   }
 
@@ -132,7 +132,22 @@ export class CircleShape extends PaintableShape {
     return g;
   }
 }
+export class PolyShape extends PaintableShape {
+  g0: Graphics;
+  constructor(public nsides = 4, public tilt = 0, public fillc = C.white, public rad = 30, public strokec = C.black, g0?: Graphics) {
+    super((fillc) => this.pscgf(fillc));
+    this.g0 = g0?.clone();
+    this.paint(fillc);
+  }
 
+  pscgf(fillc: string) {
+    const g = this.g0 ? this.g0.clone() : new Graphics();
+    ((this.fillc = fillc) ? g.f(fillc) : g.ef());
+    (this.strokec ? g.s(this.strokec) : g.es());
+    g.dp(0, 0, this.rad, this.nsides, 0, this.tilt * H.degToRadians);
+    return g;
+  }
+}
 export class RectShape extends PaintableShape {
   static rectWHXY(w: number, h: number, x = -w / 2, y = -h / 2, g0 = new Graphics()) {
     return g0.dr(x, y, w, h)
@@ -152,7 +167,7 @@ export class RectShape extends PaintableShape {
   g0: Graphics;
   rect: XYWH;
   constructor({ x = 0, y = 0, w = 30, h = 30 }: XYWH, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
-    super((fillc) => this.cscgf(fillc));
+    super((fillc) => this.rscgf(fillc));
     this.rect = { x, y, w: w, h: h }
     this.g0 = g0?.clone();
     this.paint(fillc);
@@ -162,7 +177,7 @@ export class RectShape extends PaintableShape {
     g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
   }
 
-  cscgf(fillc: string) {
+  rscgf(fillc: string) {
     const g = this.g0 ? this.g0.clone() : new Graphics();
     const { x, y, w, h } = this.rect;
     (fillc ? g.f(fillc) : g.ef());
