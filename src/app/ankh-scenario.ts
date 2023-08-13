@@ -309,29 +309,25 @@ export class ScenarioParser {
       const rindex = ankhMap.regionIndex(row, col, hex);
       const xregion = ankhMap.regions[rid - 1];
       ankhMap.regions[rid - 1] = ankhMap.regions[rindex];
-      ankhMap.setRegionId(rid - 1);
+      ankhMap.setRegionId(rid);
       ankhMap.regions[rindex] = xregion;
-      ankhMap.setRegionId(rindex);
+      ankhMap.setRegionId(rindex + 1 as RegionId);
 
       ankhMap.regions[rid - 1]['Aname'] = `${hex}`
     });
   }
 
-  // console.log(stime(this, `.regions: input`), region0.region);
-  // console.log(stime(this, `.regions: result`), map.regionList());
   parseSplits(splits: SplitSpec[], turnSet = false) {
     const map = this.map;
     if (map.splits.length > 3) {
       map.splits = [];
       map.noRegions();
       map.addRiverSplits();
-      map.initialRegions();
     }
     splits.forEach((splitSpec) => {
-      map.addSplit(splitSpec, true, true); // ignore bid; parseRegions will sort it out.
+      map.addSplit(splitSpec, true); // ignore bid; parseRegions will sort it out.
     })
     map.update();
-    // console.log(stime(this, `.split adjRegions:`), map.regionList());
   }
 
   /** Place (or replace) all the Figures on the map. */

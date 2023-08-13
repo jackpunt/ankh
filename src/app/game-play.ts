@@ -236,16 +236,6 @@ export class GamePlay0 {
     tile.sendHome();  // recycleTile
   }
 }
-/** GamePlayD has compatible hexMap(mh, nh) but does not share components. used by Planner */
-export class GamePlayD extends GamePlay0 {
-  //override hexMap: HexMaps = new HexMap();
-  constructor(gods: string[], nh = TP.nHexes, mh = TP.mHexes) {
-    super(gods);
-    this.hexMap.Aname = `GamePlayD#${this.id}`;
-    this.hexMap.makeAllDistricts(nh, mh); // included in GamePlay0
-    return;
-  }
-}
 
 /** GamePlay with Table & GUI (KeyBinder, ParamGUI & Dragger) */
 export class GamePlay extends GamePlay0 {

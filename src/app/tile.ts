@@ -115,6 +115,23 @@ export class Tile extends Tile0 {
   }
   source: TileSource<Tile>;
 
+  // Tile
+  constructor(
+    /** the owning Player. */
+    public readonly Aname?: string,
+    player?: Player,
+  ) {
+    super()
+    Tile.allTiles.push(this);
+    this.name = className(this);
+    if (!Aname) this.Aname = `${this.name}\n${Tile.allTiles.length}`;
+    const rad = this.radius;
+    if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
+    this.addChild(this.baseShape);
+    this.setPlayerAndPaint(player);
+    this.nameText = this.addTextChild(rad / 2);
+  }
+
   nameText: Text;
   get nB() { return 0; }
   get nR() { return 0; }
@@ -135,23 +152,6 @@ export class Tile extends Tile0 {
     if (this.hex?.tile === this) this.hex.tile = undefined;
     this._hex = hex;
     if (hex !== undefined) hex.tile = this;
-  }
-
-  // Tile
-  constructor(
-    /** the owning Player. */
-    public readonly Aname?: string,
-    player?: Player,
-  ) {
-    super()
-    Tile.allTiles.push(this);
-    this.name = className(this);
-    if (!Aname) this.Aname = `${this.name}\n${Tile.allTiles.length}`;
-    const rad = this.radius;
-    if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
-    this.addChild(this.baseShape);
-    this.setPlayerAndPaint(player);
-    this.nameText = this.addTextChild(rad / 2);
   }
 
   override updateCache(compositeOperation?: string): void {

@@ -121,10 +121,12 @@ export class GameSetup {
     if (scenario.turn === undefined || scenario.godNames === undefined) scenario.godNames = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
     if (scenario.turn === undefined || scenario.guards === undefined) scenario.guards = fillGuardNames(this.guards, scenario.guards);
 
+    // Inject Table into GamePlay
     const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay;
 
-    table.layoutTable(gamePlay)              // mutual injection, all the GUI components, makeAllDistricts(), addTerrain, initialRegions
+    // Inject GamePlay to Table; all the GUI components, makeAllDistricts(), addTerrain, initialRegions
+    table.layoutTable(gamePlay)              // mutual injection
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     // if (this.stage.canvas) {
