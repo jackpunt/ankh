@@ -136,7 +136,7 @@ export class AnkhHex extends Hex2 {
   }
   static adjCornerDir: { [key in EwDir]: [NsDir, EwDir][] } = {
     NE: [['N', 'SE'], ['EN', 'W']], E: [['EN', 'SW'], ['ES', 'NW']], SE: [['ES', 'W'], ['S', 'NE']],
-    SW: [['S', 'NE'], ['WS', 'E']], W: [['WS', 'NE'], ['WN', 'SE']], NW: [['WN', 'E'], ['N', 'SW']],
+    SW: [['S', 'NW'], ['WS', 'E']], W: [['WS', 'NE'], ['WN', 'SE']], NW: [['WN', 'E'], ['N', 'SW']],
   }
   /** returns selected hexes adjacent to the indicated corner.
    * @param pred (hex, nsDir) => boolean;
@@ -160,7 +160,7 @@ export class AnkhHex extends Hex2 {
   addEdge(dir: HexDir, color: string) {
     const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
     const angle: number = dirRot[dir];
-    const rshape = new EdgeShape(color, this.map.mapCont.infCont);
+    const rshape = new EdgeShape(color, dir, this.map.mapCont.infCont);
     const pt = this.cont.localToLocal(0, 0, rshape.parent);
     const { x, y } = pt, r = this.radius;
     // 0-degrees is 'North'; -sin() because y-axis goes South.
@@ -244,6 +244,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     if (!dir) return;
     hex.borders[dir] = true;
     if (sym) {
+      if (!H.nsDirs.includes(dir as NsDir)) debugger;
       hex.links[dir].borders[H.dirRev[dir]] = true;
     }
   }
@@ -256,6 +257,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     if (!hex) return;
     const color = this.splits.length >= 3 ? TP.borderColor : TP.riverColor;;
     hexDir.filter(elt => !!elt).forEach(dir => {
+      if (!H.nsDirs.includes(dir as NsDir)) debugger; // assuming TP.useNs
       hex.addEdge(dir, color);
       if (border) this.addBorder(hex, dir);
     });
@@ -317,7 +319,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   }
 
   edgeShape(color = TP.borderColor) {
-    return new EdgeShape(color, this.mapCont.infCont); // slightly darker
+    return new EdgeShape(color, undefined, this.mapCont.infCont); // slightly darker
   }
 
   addTerrain() {

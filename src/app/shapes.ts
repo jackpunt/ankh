@@ -1,7 +1,7 @@
 import { C, F, XY, XYWH } from "@thegraid/common-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
-import { H } from "./hex-intfs";
+import { H, HexDir } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
 import { Tile } from "./tile";
 
@@ -386,10 +386,10 @@ export class UtilButton extends Container implements Paintable {
 }
 
 export class EdgeShape extends Shape {
-  constructor(public color: string, parent) {
+  constructor(public color: string, public dir: HexDir, parent: Container) {
     super()
     this.reset()
     parent.addChild(this);
   }
-  reset(color = this.color) { this.graphics.c().ss(12, 'round', 'round').s(color)}
+  reset(color = this.color) { this.graphics.c().ss(12, 'round', 'round').s(color) }
 }

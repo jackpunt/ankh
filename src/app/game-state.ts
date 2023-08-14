@@ -274,10 +274,21 @@ export class GameState {
     },
     Swap: {
       start: () => {
-        console.log(stime(this, `Swap:`))
+        console.log(stime(this, `Swap:`));
+        this.ankhMapSplitter.runSwap();
+        // TODO: no Button until 'finalize'
         this.doneButton('Swap done');
       },
       done: () => {
+        const hexMap = this.gamePlay.hexMap;
+        const [rid1, rid2] = this.ankhMapSplitter.newRegionIds;
+        const [l1, l2] = [hexMap.regions[rid1 - 1].length, hexMap.regions[rid2 - 1].length];
+        const OhWell = () => this.phase('EventDone');
+        const UndoIt = () => this.ankhMapSplitter.removeLastSplit(); // TODO: remove doneButton & newRegionIds?
+        if (l1 < 6 || l2 < 6) {
+          this.panel.areYouSure(`Region is too small`, OhWell, UndoIt);
+          return;
+        }
         this.phase('EventDone');
       }
 

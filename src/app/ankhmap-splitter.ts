@@ -2,7 +2,7 @@ import { C, XY, stime } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { DisplayObject } from "@thegraid/easeljs-module";
 import { AnkhHex, RegionId } from "./ankh-map";
-import { SplitDir, SplitSpec } from "./ankh-scenario";
+import { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { Arrays_intersect } from "./functions";
 import { GameState, SplitterShape } from "./game-state";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
@@ -10,9 +10,16 @@ import { CircleShape, EdgeShape } from "./shapes";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 import { GamePlay } from "./game-play";
-import { Table } from "./table";
+import { DragContext, RegionMarker, Table } from "./table";
 
 export class AnkhMapSplitter {
+  isLegalSwap(toHex: AnkhHex, ctx: DragContext): boolean {
+    const marker = ctx.tile as RegionMarker;
+    if (marker.regionId > this.table.regionMarkers.length) return false;
+    if (!toHex || toHex.terrain === 'w') return false;
+    return true;
+  }
+
   constructor (public gameState: GameState) {
     this.gamePlay = gameState.gamePlay;
     this.table = gameState.table;
@@ -91,17 +98,14 @@ export class AnkhMapSplitter {
 
       let lx = pt.x, ly = pt.y;
       if (hex instanceof AnkhHex) {
-        const { x: hx, y: hy, hexDir } = hex.cornerDir(pt), ewDir = hexDir as EwDir;
+        const xyHexDir = hex.cornerDir(pt), ewDir = xyHexDir.hexDir as EwDir;
+        const onCorner = hex.isNearCorner(xyHexDir, ewDir, r)  // isNearCorner(hex, ewDir, r)
+        const cid = onCorner && cornerId(hex, ewDir);
         if (!H.ewDirRot[ewDir]) {
           noMark();
           doLine(lx, ly);
           return; // not onTarget
         }
-        // isNearCorner(hex, ewDir, r)
-        const onCorner = hex.isNearCorner({ x: hx, y: hy }, ewDir, r)
-        const { x: cx, y: cy } = hex.cornerXY(ewDir);
-        const cid = onCorner && cornerId(hex, ewDir);
-
         if (!path[0]) {
           // check legal start:
           if (hex.terrain === 'w') return;
@@ -120,6 +124,10 @@ export class AnkhMapSplitter {
           doLine(lx, ly);  // no more after reaching a terminal.
           return;
         }
+        if (path.length >= 6) {
+          doLine(lx, ly);  // too long, need to start again.
+          return;
+        }
         // if not adj to path[0] then not a target
         const inRange = !path[0] || inRangeOf(pt.x, pt.y, path[0]);
         if (!inRange) {
@@ -128,18 +136,19 @@ export class AnkhMapSplitter {
         }
 
         if (true || inRange) {
-          hex.cont.localToLocal(cx, cy, mark.parent, mark);        // mark.x, mark.y: corner (on mapCont)
+          const cxy = hex.cornerXY(ewDir);
+          hex.cont.localToLocal(cxy.x, cxy.y, mark.parent, mark); // mark.x, mark.y: corner (on mapCont)
           mark.visible = onCorner;
-          target = onCorner ? { hex: hex, ewDir, mx: mark.x, my: mark.y, cxy: { x: cx, y: cy }, cid } : undefined;
+          target = onCorner ? { hex: hex, ewDir, mx: mark.x, my: mark.y, cxy, cid } : undefined;
           if (onCorner) { lx = mark.x, ly = mark.y } // snap to corner if on target;
         }
       }
       doLine(lx, ly);
     }
     // click:
-    const dropFunc = (dispObj: DisplayObject, ctx: DragInfo) => {
+    const dropFunc = (splitShape: DisplayObject, ctx: DragInfo) => {
       if (target) {
-        if (path[0]?.hex === target.hex && path[0]?.ewDir === target.ewDir) {
+        if (path.length > 1 && path[0]?.cid === target.cid) {
           finalize()  // TODO return to normal, process path.
           return;
         }
@@ -153,7 +162,7 @@ export class AnkhMapSplitter {
         pathShape.reset();
         lineShape.reset();
       }
-      dragSplitter();
+      dragSplitter(); // keep going...
     }
     let seed: AnkhHex;
     const finalize = () => {
@@ -181,7 +190,8 @@ export class AnkhMapSplitter {
       const splits = path.map(({ hex: hex1, ewDir: ewDir1 }, n, ary) => {
         if (n == 0) return undefined as [AnkhHex, NsDir];
         let { hex: hex0, ewDir: ewDir0 } = ary[n - 1];
-        if (hex1 !== hex0) {
+        let [hexU, ewDirU] = [hex0, ewDir0];
+        if (hexU !== hex1) {
           // [hex1,ewDir1] is same corner as [hex0,ewDirQ] need to find ewDirQ:
           // there are 2 corners on the segment: [hex0, ewDir0] & [hex1, ewDir1];
           // there are 2 hexes common to both points, may be neither hex0 nor hex1;
@@ -192,18 +202,22 @@ export class AnkhMapSplitter {
           // expect 1 or 2 common elements:
           const [hexC1, ewDirC1] = inter[0];
           const [hexC0, ewDirC0] = c0adj.find(([hexC0, dir]) => hexC0 === hexC1); // elts of c0adj
-          hex0 = hexC1; ewDir1 = ewDirC1; ewDir0 = ewDirC0;
+          hexU = hexC1;
+          ewDir1 = ewDirC1;
+          ewDirU = ewDirC0;
+          const nsDir = nsDirOfEwDirs(ewDirU, ewDir1);
+          if (!nsDir) debugger;
         }
-        const nsDir = nsDirOfEwDirs(ewDir0, ewDir1);
-        hex0.addEdge(nsDir, TP.borderColor)
-        seed = hex0; // it has an edge, must be a real hex.
-        return [hex0, nsDir] as [AnkhHex, NsDir];
+        const nsDir = nsDirOfEwDirs(ewDirU, ewDir1);
+        if (!nsDir) debugger;
+        // hexU.addEdge(nsDir, TP.borderColor);
+        seed = hexU; // it has an edge, must be a real hex.
+        return [hexU, nsDir] as [AnkhHex, NsDir];
       });
       const { row, col } = seed, rid = hexMap.regions.length + 1 as RegionId;
       const splitBid = [row, col, rid, false];    // false => TP.edgeColor vs TP.riverColor
       const splitDirs = splits.slice(1).map(([hex, nsDir]) => [hex.row, hex.col, nsDir] as SplitDir);
       const splitSpec = [splitBid, ...splitDirs] as SplitSpec;
-      //hexMap.splits.push(splitSpec);
       const [origRid, newRid] = this.newRegionIds = hexMap.addSplit(splitSpec, true);
       this.table.setRegionMarker(origRid);
       this.table.setRegionMarker(newRid);
@@ -218,5 +232,51 @@ export class AnkhMapSplitter {
     dragger.clickToDrag(this.splitShape);
     dragSplitter();
   }
+  removeLastSplit() {
+    const hexMap = this.gamePlay.hexMap;
+    const splitsX = this.gamePlay.hexMap.splits.slice(2); // not the rivers!
+    const splitSpec = splitsX.pop();
+    const splitN = splitSpec[0] as SplitBid;
+    // const [row, col, bid] = splitN, hex0 = hexMap[row][col];
+    // const ri = hexMap.regionIndex(row, col, hex0);
+    let hex1: AnkhHex, hex2: AnkhHex;
+    const splitD = splitSpec.slice(1);
+    splitD.forEach(([row, col, dir])  => {
+      const hex = hexMap[row][col], rDir = H.dirRev[dir];
+      const edge = hex.cont.removeChildType(EdgeShape, (es) => es.dir === dir)[0];
+      hex.cont.updateCache();
+      hex1 = hex;  // save for seeds to merge.
+      hex2 = hex.links[dir];
+      delete hex1.borders[dir];
+      delete hex2.borders[rDir];
+    })
+    // Assert: r1 or r2 is the LAST region, has not been Swapped [yet] TODO: search for highest rid
+    const rid1a = hex1.regionId, rid2a = hex2.regionId, len = hexMap.regions.length;
+    const [rid1, rid2] = (rid2a === len) ? [rid1a, rid2a] : [rid2a, rid1a];
+    const r1 = hexMap.regions[rid1 - 1];
+    const r2 = hexMap.regions[rid2 - 1];
+    const regionElt = [r1[0].row, r1[0].col, rid1] as RegionElt;
+    const newRs = hexMap.findRegions(r1.concat(r2), [regionElt]); // merge all to rid1
+    const oldR = hexMap.regions.pop();
+    hexMap.regions[rid1 - 1] = newRs[0];
+    hexMap.setRegionId(rid1);  // maybe unnecessary; findRegions should set everything; but Water!
+    const m2 = this.table.regionMarkers.pop();
+    m2.x = m2.y = 0; // TODO ??
+    hexMap.update();
+  }
+
   newRegionIds = [];
+  swapRegionId = undefined;
+
+  runSwap() {
+    // inPhase('Swap'); RegionMarkers can be moved
+    // either newRegionId can be moved to anywhere.
+    // when newRegionId is dropped in another region (not in newRegionId)
+    // then that target destination becomes 'swapRegionId'
+    // if swapRegionId is already set, unMove() to get it back to 'startHex'
+    // associate the new 'swapRegionId' to the 'empty' region (the drop marker's startHex->regionId)
+    // and swap the regions.
+    // if a newRegion is dropped in the other newRegion, just swap them.
+  }
+
 }
