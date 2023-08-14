@@ -296,6 +296,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
+    KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
 
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
@@ -303,6 +304,11 @@ export class GamePlay extends GamePlay0 {
   }
   runSplitter() {
     this.gameState.ankhMapSplitter.runSplitShape();
+    console.log(stime(this, `.runSplitter`), this.hexMap.regions);
+  }
+  undoSplit() {
+    this.gameState.ankhMapSplitter.removeLastSplit();
+    console.log(stime(this, `.undoSplit`), this.hexMap.regions);
   }
 
   backStates = [];

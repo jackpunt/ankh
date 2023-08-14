@@ -27,7 +27,8 @@ export class GameState {
   constructor(public gamePlay: GamePlay) {
     Object.keys(this.states).forEach((key) => this.states[key].Aname = key);
   }
-  ankhMapSplitter: AnkhMapSplitter;
+  _ankhMapSplitter: AnkhMapSplitter;
+  get ankhMapSplitter() { return this._ankhMapSplitter ?? (this._ankhMapSplitter = new AnkhMapSplitter(this)) }
 
   state: Phase;
   get table() { return this.gamePlay?.table; }
@@ -68,10 +69,10 @@ export class GameState {
     this.phase(phase);
   }
 
-  phase(phase: string, startArg?: any) {
+  phase(phase: string, ...args: any[]) {
     console.log(stime(this, `.phase: ${this.state?.Aname ?? 'BeginGame'} -> ${phase}`));
     this.state = this.states[phase];
-    this.state.start(startArg);
+    this.state.start(...args);
   }
 
   /** set label & paint button with color;
@@ -257,20 +258,14 @@ export class GameState {
       start: () => {
         // todo: disable table.dragger!
         console.log(stime(this, `.Split:`));
-        const hexMap = this.gamePlay.hexMap;
-        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx, 'rgba(240,240,240,.4'))
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
-        if (!this.ankhMapSplitter) this.ankhMapSplitter = new AnkhMapSplitter(this);
         this.ankhMapSplitter.runSplitShape();
         this.doneButton('Split done');
       },
       done: () => {
-        const hexMap = this.gamePlay.hexMap;
-        hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
         this.phase('Swap');
       },
       // disable edges of hexes in region of < 12 hexes!
-      // validate(<= 6 selected; from board/water to board/water; 6 hexes per region )
     },
     Swap: {
       start: () => {
@@ -282,7 +277,7 @@ export class GameState {
       done: () => {
         const hexMap = this.gamePlay.hexMap;
         const [rid1, rid2] = this.ankhMapSplitter.newRegionIds;
-        const [l1, l2] = [hexMap.regions[rid1 - 1].length, hexMap.regions[rid2 - 1].length];
+        const [l1, l2] = [hexMap.regions[rid1 - 1]?.length ?? 0, hexMap.regions[rid2 - 1]?.length ?? 0];
         const OhWell = () => this.phase('EventDone');
         const UndoIt = () => this.ankhMapSplitter.removeLastSplit(); // TODO: remove doneButton & newRegionIds?
         if (l1 < 6 || l2 < 6) {

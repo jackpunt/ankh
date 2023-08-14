@@ -40,13 +40,14 @@ export class AnkhMapSplitter {
     this.lineShape = hexMap.edgeShape(TP.splitColor);
     this.pathShape = hexMap.edgeShape(TP.splitColor);
   }
-  lineShape: EdgeShape;
-  pathShape: EdgeShape;
+  lineShape: EdgeShape; // singleton: rubberband, follow the mouse
+  pathShape: EdgeShape; // singleton: extend graphics to show each selected edge
 
   runSplitShape() {
     const hexMap = this.gamePlay.hexMap, hexCont = hexMap.mapCont.hexCont;
-    const rad = TP.hexRad, r = rad / 4, rad2 = rad*rad*1.1;
+    const rad = TP.hexRad, r = rad / 4, rangeSq = (rad + 2 * r) * (rad + 2 * r);
     if (!this.splitShape) this.makeSplitShape(r);
+    hexMap.regions.filter(r => r.length > 12).forEach((region, ndx) => hexMap.showRegion(ndx, 'rgba(240,240,240,.4'))
     const mark = this.splitMark;
     const dragger = this.table.dragger;
     const pn = (n: number) => n.toFixed(2);
@@ -69,7 +70,7 @@ export class AnkhMapSplitter {
       const pn = (n: number) => n.toFixed(2);
       const { mx, my } = path[0];
       const d2 = (mx - cx) * (mx - cx) + (my - cy) * (my - cy);
-      return (d2 < rad2);
+      return (d2 < rangeSq);
     }
 
     const doLine = (lx, ly) => {
@@ -221,9 +222,11 @@ export class AnkhMapSplitter {
       const [origRid, newRid] = this.newRegionIds = hexMap.addSplit(splitSpec, true);
       this.table.setRegionMarker(origRid);
       this.table.setRegionMarker(newRid);
+      hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
       hexMap.update();
-      this.gameState.done([origRid, newRid]); // --> Swap:
+      this.gameState.phase('Swap'); // --> Swap:
     }
+
     const dragSplitter = () => {
       this.splitShape.visible = this.splitShape.mouseEnabled = true;
       dragger.dragTarget(this.splitShape, { x: 0, y: 0 });
@@ -232,6 +235,7 @@ export class AnkhMapSplitter {
     dragger.clickToDrag(this.splitShape);
     dragSplitter();
   }
+
   removeLastSplit() {
     const hexMap = this.gamePlay.hexMap;
     const splitsX = this.gamePlay.hexMap.splits.slice(2); // not the rivers!
@@ -243,25 +247,34 @@ export class AnkhMapSplitter {
     const splitD = splitSpec.slice(1);
     splitD.forEach(([row, col, dir])  => {
       const hex = hexMap[row][col], rDir = H.dirRev[dir];
-      const edge = hex.cont.removeChildType(EdgeShape, (es) => es.dir === dir)[0];
+      const edge = hexMap.mapCont.infCont.removeChildType(EdgeShape, (es) => (es.hex === hex) && (es.dir === dir));
       hex.cont.updateCache();
       hex1 = hex;  // save for seeds to merge.
       hex2 = hex.links[dir];
       delete hex1.borders[dir];
       delete hex2.borders[rDir];
     })
-    // Assert: r1 or r2 is the LAST region, has not been Swapped [yet] TODO: search for highest rid
-    const rid1a = hex1.regionId, rid2a = hex2.regionId, len = hexMap.regions.length;
-    const [rid1, rid2] = (rid2a === len) ? [rid1a, rid2a] : [rid2a, rid1a];
+    // move region of last split to last slot in regions;
+    const rid1a = hex1.regionId, rid2a = hex2.regionId, ridN = hexMap.regions.length as RegionId;
+    const [rid1, rid2] = (rid1a < rid2a) ? [rid1a, rid2a] : [rid2a, rid1a];
+    const rm1 = this.table.regionMarkers[rid1 - 1];
     const r1 = hexMap.regions[rid1 - 1];
     const r2 = hexMap.regions[rid2 - 1];
-    const regionElt = [r1[0].row, r1[0].col, rid1] as RegionElt;
-    const newRs = hexMap.findRegions(r1.concat(r2), [regionElt]); // merge all to rid1
+
+    for (let ridS = rid2; ridS < ridN; ridS++) {
+      rm1.swapRegions(ridS, ridS + 1 as RegionId); // ripple to the end of the list.
+    }
+    // now the r2 is in slot ridN; suitable to be pop'd
     const oldR = hexMap.regions.pop();
+    if (oldR !== r2) debugger;   // Assert (oldR === r2)
+    const mergedR = r1.concat(r2);
+    const regionElt = [r1[0].row, r1[0].col, rid1] as RegionElt;
+    const newRs = hexMap.findRegions(mergedR, [regionElt]);      // newRs[0] is (r1 + r2)
     hexMap.regions[rid1 - 1] = newRs[0];
     hexMap.setRegionId(rid1);  // maybe unnecessary; findRegions should set everything; but Water!
-    const m2 = this.table.regionMarkers.pop();
-    m2.x = m2.y = 0; // TODO ??
+    const rmN = this.table.regionMarkers[ridN - 1];
+    rmN.x = rmN.y = 0; // TODO ??
+    rmN.parent.addChild(rmN)
     hexMap.update();
   }
 

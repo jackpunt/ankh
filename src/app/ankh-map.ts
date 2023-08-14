@@ -160,7 +160,7 @@ export class AnkhHex extends Hex2 {
   addEdge(dir: HexDir, color: string) {
     const dirRot = TP.useEwTopo ? H.ewDirRot : H.nsDirRot;
     const angle: number = dirRot[dir];
-    const rshape = new EdgeShape(color, dir, this.map.mapCont.infCont);
+    const rshape = new EdgeShape(color, this, dir, this.map.mapCont.infCont);
     const pt = this.cont.localToLocal(0, 0, rshape.parent);
     const { x, y } = pt, r = this.radius;
     // 0-degrees is 'North'; -sin() because y-axis goes South.
@@ -316,10 +316,11 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
   setRegionId(regionId: RegionId) {
     const regionNdx = regionId -1, waterId = 0 as RegionId;
     this.regions[regionNdx].map(hex => hex.regionId = hex.district = ((hex.terrain === 'w') ? waterId : regionId));
+    this.regions[regionNdx].map(hex => hex.cont.updateCache());
   }
 
-  edgeShape(color = TP.borderColor) {
-    return new EdgeShape(color, undefined, this.mapCont.infCont); // slightly darker
+  edgeShape(color = TP.borderColor, hex?: Hex2, dir?: HexDir) {
+    return new EdgeShape(color, hex, dir, this.mapCont.infCont); // slightly darker
   }
 
   addTerrain() {

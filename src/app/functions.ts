@@ -1,6 +1,6 @@
 import { Constructor } from "@thegraid/common-lib";
+import { Container, DisplayObject, Text } from "@thegraid/easeljs-module";
 import { CenterText } from "./shapes";
-import { BitmapText, DisplayObject, Text } from "@thegraid/easeljs-module";
 
 export function selectN<T>(bag: T[], n = 1, remove = true) {
   const rv: T[] = [];
@@ -35,9 +35,10 @@ export function Arrays_intersect<T>(a: T[], b: T[], keyf: ((v: T) => any) = v =>
 export function removeEltFromArray(elt: any, array: any[]) {
   return array.splice(array.indexOf(elt), 1);
 }
-export function removeChildType<T>(type: Constructor<T>, pred = (dobj: T) => true ): T[] {
-  const rems = this.children.filter((c: DisplayObject) => (c instanceof type) && pred(c));
-  this.removeChild(...rems);
+export function removeChildType<T extends DisplayObject>(type: Constructor<T>, pred = (dobj: T) => true ): T[] {
+  const cont = this as Container;
+  const rems = cont.children.filter((c: DisplayObject) => (c instanceof type) && pred(c)) as T[];
+  cont.removeChild(...rems);
   return rems;
 }
 export function textBounds(t: Text | string, fs?: number, cons: Constructor<Text> = CenterText) {

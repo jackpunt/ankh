@@ -386,7 +386,7 @@ export class UtilButton extends Container implements Paintable {
 }
 
 export class EdgeShape extends Shape {
-  constructor(public color: string, public dir: HexDir, parent: Container) {
+  constructor(public color: string, public hex: Hex2, public dir: HexDir, parent: Container) {
     super()
     this.reset()
     parent.addChild(this);

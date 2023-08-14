@@ -112,6 +112,7 @@ export class RegionMarker extends Tile {
     return this;
   }
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
+    if (this.regionId > this.hexMap.regions.length) return false;
     if (!this.gamePlay.isPhase('Swap')) {
       ctx.nLegal = 1;
       return false;
@@ -128,7 +129,7 @@ export class RegionMarker extends Tile {
   override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
     const hex = this.hexMap.hexUnderObj(this, false);
     const swap = this.gamePlay.isPhase('Swap');
-    const legalXY = hex && hex.isOnMap && (swap ? hex.terrain !== 'w' : this.hexMap.regions[this.regionId - 1].includes(hex));
+    const legalXY = hex && hex.isOnMap && (swap ? hex.terrain !== 'w' : this.hexMap.regions[this.regionId - 1]?.includes(hex));
 
     if (ctx?.info.first) {
 
@@ -150,8 +151,8 @@ export class RegionMarker extends Tile {
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     const hex = targetHex as AnkhHex;
     const gamePlay = this.gamePlay, table = this.table, hexMap = this.hexMap;
-    if (!gamePlay.isPhase('Swap')) { super.dropFunc(targetHex, ctx); return; }
-    if (!hex) debugger;
+    if (!gamePlay.isPhase('Swap')) { return; }
+    if (!hex) return;
     const regionA = this.regionId, regionB = hex.regionId
     if (regionA === regionB) { super.dropFunc(targetHex, ctx); return; }
     this.swapRegions(regionA, regionB);
@@ -844,6 +845,7 @@ export class Table extends EventDispatcher  {
     }, {x: 0, y: 0})
     const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
     hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
+    return;
   }
 
 
