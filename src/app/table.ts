@@ -95,6 +95,8 @@ export class ActionContainer extends Container {
 interface ScoreShape extends Shape {
   color: string;
 }
+
+/** a Tile, but it lives on markCont !! */
 export class RegionMarker extends Tile {
   override get radius() { return TP.ankh1Rad }
   override makeShape(): PaintableShape {
@@ -125,11 +127,12 @@ export class RegionMarker extends Tile {
     return false;
   }
 
-  lastXY: XY = {x: 400, y: 400}; // <--- a bit like targtHex
+  readonly lastXY: XY = { x: 500, y: 500 }; // <--- a bit like targtHex
   override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
-    const hex = this.hexMap.hexUnderObj(this, false);
     const swap = this.gamePlay.isPhase('Swap');
-    const legalXY = hex && hex.isOnMap && (swap ? hex.terrain !== 'w' : this.hexMap.regions[this.regionId - 1]?.includes(hex));
+    const hex = this.hexMap.hexUnderObj(this, swap);
+    const legalXY = !!hex && hex.isOnMap && (swap ? hex.terrain !== 'w' : this.hexMap.regions[this.regionId - 1]?.includes(hex));
+    const srcCont = (ctx.info as DragInfo).srcCont;
 
     if (ctx?.info.first) {
 
@@ -139,14 +142,16 @@ export class RegionMarker extends Tile {
       return;
     } else if (legalXY) {
       ctx.targetHex = hex;
-      this.lastXY = { x: this.x, y: this.y };
+      // record location in original parent coordinates:
+      this.parent.localToLocal(this.x, this.y, srcCont, this.lastXY);
       if (swap) {
-        super.dragFunc0(legalHex, ctx);
-        this.x = this.lastXY.x; this.y = this.lastXY.y;
+        super.dragFunc0(legalHex, ctx); // set ctx.target and showMark()
       }
     } else {
-      this.x = this.lastXY.x; this.y = this.lastXY.y;
+      // keep this at lastXY (in dragCont coordinates):
+      srcCont.localToLocal(this.lastXY.x, this.lastXY.y, this.parent, this);
     }
+    return;
   }
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     const hex = targetHex as AnkhHex;
@@ -154,8 +159,10 @@ export class RegionMarker extends Tile {
     if (!gamePlay.isPhase('Swap')) { return; }
     if (!hex) return;
     const regionA = this.regionId, regionB = hex.regionId
-    if (regionA === regionB) { super.dropFunc(targetHex, ctx); return; }
-    this.swapRegions(regionA, regionB);
+    if (regionA !== regionB) {
+      this.swapRegions(regionA, regionB);
+    }
+    return;
   }
 
   /** marker(ra=4, '4') has moved into region of marker(rb=1, '1') */
@@ -173,7 +180,9 @@ export class RegionMarker extends Tile {
     mb.x = ma.x; mb.y = ma.y;
     // the marker for RegionB ('1') now in same location as marker for RegionA ('4')
     // move ma '4' to its center of regionB
-    table.setRegionMarker(rb);
+    table.setRegionMarker(rb);  // move ma to center of rb
+    const mb2 = table.regionMarkers[rb];
+    mb2.lastXY.x = mb2.x; mb2.lastXY.y = mb2.y; // using srcCont coords!
     hexMap.update();
   }
 }
@@ -845,6 +854,7 @@ export class Table extends EventDispatcher  {
     }, {x: 0, y: 0})
     const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
     hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
+    hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker.lastXY);
     return;
   }
 

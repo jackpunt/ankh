@@ -279,7 +279,7 @@ export class GameState {
         const [rid1, rid2] = this.ankhMapSplitter.newRegionIds;
         const [l1, l2] = [hexMap.regions[rid1 - 1]?.length ?? 0, hexMap.regions[rid2 - 1]?.length ?? 0];
         const OhWell = () => this.phase('EventDone');
-        const UndoIt = () => this.ankhMapSplitter.removeLastSplit(); // TODO: remove doneButton & newRegionIds?
+        const UndoIt = () => this.ankhMapSplitter.removeLastSplit();
         if (l1 < 6 || l2 < 6) {
           this.panel.areYouSure(`Region is too small`, OhWell, UndoIt);
           return;

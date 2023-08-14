@@ -149,8 +149,8 @@ export class AnkhMapSplitter {
     // click:
     const dropFunc = (splitShape: DisplayObject, ctx: DragInfo) => {
       if (target) {
-        if (path.length > 1 && path[0]?.cid === target.cid) {
-          finalize()  // TODO return to normal, process path.
+        if (path[0]?.cid === target.cid) {
+          if (path.length > 1) finalize();
           return;
         }
         if (!path[0]) pathShape.graphics.mt(target.mx, target.my);
@@ -274,7 +274,6 @@ export class AnkhMapSplitter {
     hexMap.setRegionId(rid1);  // maybe unnecessary; findRegions should set everything; but Water!
     const rmN = this.table.regionMarkers[ridN - 1];
     rmN.x = rmN.y = 0; // TODO ??
-    rmN.parent.addChild(rmN)
     hexMap.update();
   }
 
