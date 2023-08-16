@@ -48,6 +48,9 @@ export class GamePlay0 {
   get gamePhase() { return this.gameState.state; }
   isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
   phaseDone(...args: any[]) { this.gameState.done(...args); }
+  get isConflictState() {
+    return (this.gameState.conflictRegion !== undefined);
+  }
 
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
@@ -297,11 +300,18 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
-
+    KeyBinder.keyBinder.setKey('C', () => {
+      const up = (cardSelectorsUp = !cardSelectorsUp);
+      this.allPlayers.forEach(player => {
+        player.panel.activateCardSelector(up);
+      })
+    })
+    let cardSelectorsUp = false;
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
+
   runSplitter() {
     this.gameState.ankhMapSplitter.runSplitShape();
     console.log(stime(this, `.runSplitter`), this.hexMap.regions);
@@ -326,11 +336,12 @@ export class GamePlay extends GamePlay0 {
   }
   // TODO: setup undo index to go fwd and back? wire into undoPanel?
   nstate = 0;
+  /** move fwd(older) or backward(newer) in the state vector */
   pickState(back = true) {
-    this.nstate = back ? Math.min(this.backStates.length, this.nstate + 1) : Math.max(0, this.nstate - 1);
+    this.nstate = back ? Math.min(this.backStates.length - 1, this.nstate + 1) : Math.max(0, this.nstate - 1);
     const state = this.backStates[this.nstate];
     console.log(stime(this, `.pickState -------- #${this.nstate} turn=${state.turn}:`), state);
-    this.table.parseScenenario(state);
+    this.table.parseScenenario(state); // typically sets gamePlay.turnNumber
     this.setNextPlayer(this.turnNumber);
   }
 

@@ -26,7 +26,7 @@ export class TP {
   static ankh1Rad = 36;
   static ankh2Rad = 48;
   static warriorPerPlayer = 6;
-  static textLogLines = 6;
+  static textLogLines = 13;
   static placeAdjacent = true;
   static alwaysShift = false;
   static parallelAttack = true;  // true --> N intersects S
@@ -67,6 +67,7 @@ export class TP {
   static splitColor = '#6D9686'; // lighter than borderColor
   static ankhChar = '\u2625';
   static ankhString = `${'\u2625'}`;
+  static inRedzone = 20;     // score in the redzone
 
 
   /** map size for (dpb, dop) */

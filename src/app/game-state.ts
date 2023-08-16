@@ -3,7 +3,9 @@ import { Figure, GodFigure, Monument } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
+import { json } from "./functions";
 import type { GamePlay } from "./game-play";
+import { God } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
 import type { PlayerPanel, PowerLine } from "./player-panel";
@@ -45,9 +47,9 @@ export class GameState {
   get playerFigures() { const plyr = this.gamePlay.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
 
   highlights: Figure[];
-  conflictRegion: RegionId = 1;
+  conflictRegion = undefined;
   get panelsInConflict() {
-    return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion(this.conflictRegion - 1));
+    return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion((this.conflictRegion ?? 0) - 1));
   }
   panelsInThisConflict: PlayerPanel[];
   buildPanels: PlayerPanel[];
@@ -295,14 +297,16 @@ export class GameState {
     },
     Claim: {
       start: () => {
+        const done = () => this.phase('EventDone');
         const ankhToken = this.panel.ankhSource.sourceHexUnit; //takeUnit();
-        if (ankhToken) {
+        if (ankhToken?.nClaimableMonuments(this.panel.player) > 0) {
           this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
           this.table.dragger.dragTarget(ankhToken, { x: 8, y: 8 });
           this.doneButton('Claim done');
+        } else if (ankhToken) {
+          this.panel.areYouSure(`No monuments to Claim.`, done);
         } else {
-          const done = () => this.phase('EventDone');
-          this.panel.areYouSure(`No Ankh Tokens for claim.`, done, done);
+          this.panel.areYouSure(`No Ankh Tokens for claim.`, done);
         }
       },
       done: (hex: AnkhHex) => {
@@ -426,7 +430,7 @@ export class GameState {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const buildPanels = []; let t: PowerLine;
         const panels = this.state.panels = this.panelsInConflict.filter(panel =>
-          (t = panel.hasCardInBattle('Build Monument'), buildPanels.push(t), t) && (panel.canAffordMonument));
+          (t = panel.hasCardInBattle('Build'), buildPanels.push(t), t) && (panel.canAffordMonument));
         if (panels.length === 0) {
           console.log(stime(this, `.BuildMonument: no panels will Build ()`), ...buildPanels.map(p=>p ?p.name : ''));
           this.phase('Plague');
@@ -464,8 +468,9 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.state.panels = this.panelsInConflict.filter(panel => panel.hasCardInBattle('Plague'));
-        if (panels.length === 0) { this.phase('ScoreMonuments'); return; }
+        const panels = this.state.panels = this.panelsInConflict;
+        const hasPlague = panels.filter(panel => panel.hasCardInBattle('Plague'));
+        if (hasPlague.length === 0) { this.phase('ScoreMonuments'); return; }
         panels.forEach(panel => panel.enablePlagueBid(this.conflictRegion));
       },
       done: (p: PlayerPanel) => {
@@ -483,10 +488,14 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.state.panels = this.panelsInConflict;
-        panels.sort((a, b) => a.strength - b.strength);
-
-        // reveal bids, sacrifice followers, determine highest bidder, kill-units
+        const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
+        panels.forEach(panel => panel.showCardSelector(false, ''));
+        panels.sort((a, b) => b.plagueBid - a.plagueBid);
+        const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]
+        const isWinner = (b0 > b1);
+        const winner = isWinner ? panels[0].player.god : undefined;
+        this.table.logText(`Plague[${rid}] ${winner.Aname ?? 'Nobody'} survives! [${b0}]`)
+        this.deadFigs('Plague', winner, rid);
         this.phase('ScoreMonuments');
       },
     },
@@ -502,20 +511,19 @@ export class GameState {
     BattleResolution: {
       panels: [],
       start: () => {
-        this.table.logText(`${this.state.Aname}[${this.conflictRegion}]`);
-        const panels = this.state.panels = this.panelsInConflict;
+        const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
+        this.table.logText(`${this.state.Aname}[${rid}]`);
         if (panels.length === 0) {
           // wtf? plague killed the all?
-          console.log(stime(this, `.BattleResolution: no Figures in Battle[${this.conflictRegion}]`));
+          this.table.logText(`Battle[${rid}]: no Figures in Battle[${rid}]`);
           this.phase('ConflictNextRegion'); return;
         }
         const panels0 = panels.concat();
-        panels.forEach(panel => panel.strength = panel.strengthInRegion(this.conflictRegion - 1));
+        panels.forEach(panel => panel.strength = panel.strengthInRegion(rid - 1));
         panels.sort((a, b) => b.strength - a.strength);
-        this.table.logText(stime(this, `.BattleResolution: strengths = ${panels.map(panel => panel.reasons)}`));
-        console.log(stime(this, `.BattleResolution: strengths =`), ...panels.map(panel => panel.reasons));
+        panels.forEach(panel => this.table.logText(`Battle[${rid}] ${json(panel.reasons)}`))
 
-        const d = panels[0].strength - panels[1].strength
+        const d = panels[0].strength - (panels[1]?.strength ?? 0) // after Plague, only one Player...
         let winner = (d > 0) && panels[0];
         if (d == 0) {          // consider tiebreaker;
           const curPanel = this.gamePlay.curPlayer.panel;
@@ -523,44 +531,38 @@ export class GameState {
           // TODO: offer curPanel a choice, mark choice used.
           if (contenders.includes(curPanel)) {
             winner = curPanel;
-            console.log(stime(this, `.BattleResolution: ${winner.name} gets uses tiebreaker (${d})`));
+            console.log(stime(this, `Battle[${rid}]: ${winner.name} uses tiebreaker (${d})`));
             curPanel.canUseTiebreaker = false
           }
         }
         if (winner) {
           const powers = winner.player.god.ankhPowers, player = winner.player;
-          let dev = 0;
-          dev += 1
-          if (powers.includes('Glorious') && d >= 3) dev += 3;
-          if (powers.includes('Bountiful') && player.score <= 20) dev += 3;
-          if (powers.includes('Worshipful') && player.coins > 2) (player.coins -= 2, dev += 1); // assume yes, they want the point.
-          if (powers.includes('Commanding')) this.addFollowers(player, 3, `Commanding[${this.conflictRegion}]`);
-          this.addDevotion(player, dev, `BattleResolution[${this.conflictRegion}]`);
-          this.table.logText(stime(this, `BattleResolution: ${winner.name} wins; +${dev} Devotion`));
-          console.log(stime(this, `.BattleResolution: ${winner.name} wins, gets ${dev} Devotion`));
+          let dev = 0, reasons = '';
+          const devResaon = (n, reason) => {dev += n, reasons = `${reasons} ${reason}:${n}`}
+          devResaon(1, 'Win');
+          if (powers.includes('Glorious') && d >= 3) devResaon(3, 'Glorios');
+          if (powers.includes('Bountiful') && player.score <= TP.inRedzone) devResaon(1, 'Bountiful');
+          if (powers.includes('Worshipful') && player.coins >= 2) (player.coins -= 2, devResaon(1, 'Worshipful')); // assume yes, they want the point.
+          if (powers.includes('Commanding')) this.addFollowers(player, 3, `Commanding[${rid}]`);
+          this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`);
+          this.addDevotion(player, dev, `Battle[${rid}]`);
           panels.splice(0, 1); // remove winner, panels now has all the losers.
         }
         const winp = winner.player;
         panels.forEach(panel => {
           if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
-            this.addDevotion(panel.player, 2, `Magnanimous[${this.conflictRegion}]`);
+            this.addDevotion(panel.player, 2, `Magnanimous[${rid}]`);
           }
         });
-        // TODO Set adjacency.
-        const belongsTo = (fig: Figure, player: Player) => { return fig.player === player }
-        const floodProtected = (fig: Figure, player: Player, ) => player.panel.hasCardInBattle('Flood') && fig.hex.terrain === 'd';
-        const regionId = this.conflictRegion;
-        const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
-        const deadFigs = figuresInRegion.map(fig => !(fig instanceof GodFigure) && !belongsTo(fig, winp) && !floodProtected(fig, fig.player) ? fig : undefined).filter(fig => !!fig);
-        console.log(stime(this, `.BattleResolution: Figures KIA:`), deadFigs);
-        deadFigs.forEach(fig => fig.sendHome());
+
+        this.deadFigs('Battle', winner.player.god, rid, true);
 
         // ASSERT: panels0 is [still] sorted by player rank.
         const worships0 = panels0.filter(panel => panel.hasAnkhPower('Workshipful'));
         const workship1 = worships0.filter(panel => panel.player.coins >= 2)
         workship1.forEach(panel => {
-          this.addFollowers(panel.player, -2, `Worshipful[${this.conflictRegion}]`);
-          this.addDevotion(panel.player, 1, `Worshipful[${this.conflictRegion}]`);
+          this.addFollowers(panel.player, -2, `Worshipful[${rid}]`);
+          this.addDevotion(panel.player, 1, `Worshipful[${rid}]`);
         });
         panels0.forEach(panel => panel.battleCardsToTable());
         this.phase('ConflictNextRegion')
@@ -597,6 +599,19 @@ export class GameState {
   setup() {
 
   }
+        // TODO Set adjacency.
+  deadFigs(cause: string, winner: God, rid: RegionId, floodProtects = false) {
+    const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
+    const region = this.gamePlay.hexMap.regions[rid - 1];
+    const figsInRegion = region.filter(hex => !!hex.meep).map(hex => hex.meep as Figure);
+    const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !winner.controlsFigure(fig));
+    const deadFigs = floodProtects ? deadFigs0.filter(fig => !floodProtected(fig, fig.player)) : deadFigs0;
+    this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
+    deadFigs.forEach(fig => fig.sendHome());
+    return deadFigs;
+  }
+
+
   countCurrentGain(player = this.gamePlay.curPlayer) {
     // Osiris Portal begins offMap.
     const allMonts = this.gamePlay.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
@@ -621,16 +636,16 @@ export class GameState {
 
   addDevotion(player: Player, n: number, reason?: string) {
     player.score += n;
-    this.gamePlay.logText(`${player.god.name} gains ${n} Devotion: ${reason}`);
+    this.gamePlay.logText(`${player.god.name} ${n>=0?'gains':'loses'} ${Math.abs(n)} Devotion: ${reason}`);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
   /** score each monument type in conflictRegion */
   scoreMonuments(dom = false) {
-    const regionNdx = this.conflictRegion - 1;
+    const rid = this.conflictRegion, regionNdx = rid - 1;
     const allPlayers = this.gamePlay.allPlayers;
     const players = this.panelsInConflict.map(panel => panel.player);
-    console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]`), players);
+    console.log(stime(this, `.scoreMonuments[${rid}]`), players);
     const hexes = this.gamePlay.hexMap.regions[regionNdx].filter(hex => (hex.tile instanceof Monument) && hex.tile.player);
     const tiles = hexes.map(hex => hex.tile);
     const types = GameState.typeNames;
@@ -640,10 +655,16 @@ export class GameState {
     const sortedCount = countsOfTypeByPlayer.map(pnary => pnary.sort((a, b) => b.n - a.n));
     // reduce to elment[0]
     const deltas = sortedCount.map(pnary => ({t: pnary[0].type, p: pnary[0].player, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) }));
-    const winers = deltas.map(({ p, n, d, t }) => ({ p: ((n > 0 && d > 0) ? p : undefined), n, d, t }));
-    winers.forEach(({ p, n, d, t }) => {
-      console.log(stime(this, `.scoreMonuments[${this.conflictRegion}]: ${t} -> Player=${p?.Aname}, d=${d}, n=${n}`))
-      if (players.includes(p)) this.addDevotion(p, 1, `Score Monuments[${this.conflictRegion}]`);
+    const winners = deltas.map(({ p, n, d, t }) => ({ p: ((n > 0 && d > 0) ? p : undefined), n, d, t }));
+    winners.forEach(({ p, n, d, t }) => {
+      console.log(stime(this, `.scoreMonuments[${rid}]: ${t} -> Player=${p?.Aname}, d=${d}, n=${n}`));
+    })
+    const winp = players.filter(player => winners.find(({p})=> p === player));
+    const winnerp = winp.map(p => winners.filter(elt => elt.p === p)); // monuments won by player
+    const winsum = winnerp.map(winpary => winpary.reduce((pv, { p, n, d, t }) => ({ p, n, d, t: `${pv?.t ?? ''} ${t}` })))
+    winsum.forEach(({ p, n, d, t }) => {
+      const dev = t.split(' ').length;
+      this.addDevotion(p, dev, `${t}`);
     })
     return;
   }

@@ -47,3 +47,7 @@ export function textBounds(t: Text | string, fs?: number, cons: Constructor<Text
     const x = 0, y = 0
     return {x,y,w,h}
 }
+/** extreme form of JSON-minification */
+export function json(obj: object): string {
+  return JSON.stringify(obj).replace(/"/g, '')
+}

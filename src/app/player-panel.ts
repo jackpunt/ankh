@@ -1,7 +1,8 @@
-import { C, DragInfo, S, stime } from "@thegraid/easeljs-lib";
-import { Container, Graphics, MouseEvent, Shape } from "@thegraid/easeljs-module";
+import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
+import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
+import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
 import { Hex2 } from "./hex";
 import { Meeple } from "./meeple";
@@ -10,13 +11,15 @@ import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { TileSource } from "./tile-source";
-import { AnkhToken } from "./ankh-token";
 
 
 /** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */
 export interface PowerLine extends Container {
   ankhToken: AnkhToken;
   button: CircleShape;
+  qmark: Text;
+  text: Text;
+  docText: UtilButton;
   showDocText: (vis?: boolean) => void
 }
 
@@ -27,22 +30,30 @@ export interface AnkhPowerCont extends Container {
   guardianSlot: number;
 }
 
+interface ConfirmCont extends Container {
+  titleText: Text;
+  messageText: Text;
+  buttonYes: UtilButton;
+  buttonCan: UtilButton;
+}
+
 interface CardSelector extends Container {
   y0: number;    // drag keep this.y = y0;
   x0: number;    //
-  dxmax: number; // drag is not to exceed Math.abs(this.x - x0) > dxmax;
+  doneButton: UtilButton;
   dragFunc0: (hex: Hex2, ctx: DragContext) => void;
   dropFunc0: () => void;
   powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
 }
-type CardSpec = [name: string, doc: string, power: number];
 
+type CardSpec = [name: string, text: string, doc: string, power: number];
+type PowerSpec = [name: string, text: string, doc: string, power?: number];
 export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
   isPlayerInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx];
-    return region.find(hex => hex.meep?.player === this.player) ?? false; // TODO: account for SetGod adjancency
+    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.player.god;
+    return !!region.find(hex => (hex.meep instanceof Figure) && god.controlsFigure(hex.meep));
   }
   templeHexesInRegion(regionNdx: number) {
     const region = this.table.gamePlay.hexMap.regions[regionNdx];
@@ -74,13 +85,17 @@ export class PlayerPanel extends Container {
   reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
   /** BattleResolution phase */
   strengthInRegion(regionNdx: number) {
-    this.reasons = {name: this.name, total: 0};
+    this.reasons = { name: this.name, total: 0 };
     this.strength = 0;
-    const addStrength = (val, why) => { this.strength += val; this.reasons[why] = val; this.reasons.total = this.strength; }
+    const addStrength = (val: number, why: string) => {
+      this.strength += val;
+      this.reasons[why] = val;
+      this.reasons.total = this.strength;
+    }
     const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionNdx); addStrength(nFigures, 'Figures');
     const cardsInPlay = this.cardsInBattle;
-    const cardSpecsInPlay = cardsInPlay.map(pl => PlayerPanel.cardSpecs.find(([name, doc, power]) => name === pl.name));
-    cardSpecsInPlay.forEach(([name, doc, power]) => addStrength(power, name));
+    const cardSpecsInPlay = cardsInPlay.map(pl => PlayerPanel.cardSpecs.find(([name, text, doc, power]) => name === pl.name));
+    cardSpecsInPlay.forEach(([name, text, doc, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
       const activeTemples = temples.filter(tmpl => tmpl.filterAdjHex(hex => hex.meep?.player == this.player));
@@ -91,11 +106,15 @@ export class PlayerPanel extends Container {
     return this.strength;
   }
 
-  plagueBid = 0;  // TODO wireup a NumCounter (with a close-gesture)
+  get plagueBid() { return this.bidCounter.getValue() }
+  set plagueBid(v: number) { this.bidCounter.setValue(v) }
   enablePlagueBid(region: RegionId): void {
     this.plagueBid = 0;
-    this.player.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
+    this.bidCounter.visible = true;
+    this.showCardSelector(true, 'Bid Done');
+    // this.player.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
+
   canBuildInRegion: RegionId = undefined; // disabled.
   // really: detectBuildDne.
   enableBuild(regionId: RegionId): void {
@@ -136,28 +155,28 @@ export class PlayerPanel extends Container {
     this.makeConfirmation();
     this.makeAnkhSource();
     this.makeAnkhPowerGUI();
-    this.makeCardSelector();
     this.makeFollowers();
+    this.makeCardSelector();
     this.makeStable();
   }
-  static readonly ankhPowers = [
+  static readonly ankhPowers: PowerSpec[][] = [
     [
-      ['Commanding', '+3 Followers when win battle'],
-      ['Inspiring', 'Monument cost is 0'],
-      ['Omnipresent', '+1 Follower per occupied region in Conflict'],
-      ['Revered', '+1 Follower in Gain action']
+      ['Commanding', undefined, '+3 Followers when win battle'],
+      ['Inspiring', undefined, 'Monument cost is 0'],
+      ['Omnipresent', undefined, '+1 Follower per occupied region in Conflict'],
+      ['Revered', undefined, '+1 Follower in Gain action']
     ],
     [
-      ['Resplendent', '+3 Strength when 3 of a kind'],
-      ['Obelisk', 'Teleport to Obelisk before battle'],
-      ['Temple', '+2 strength when adjacent to Temple'],
-      ['Pyramid', 'Summon to Pyramid']
+      ['Resplendent', undefined, '+3 Strength when 3 of a kind'],
+      ['Obelisk', undefined, 'Teleport to Obelisk before battle'],
+      ['Temple', undefined, '+2 strength when adjacent to Temple'],
+      ['Pyramid', undefined, 'Summon to Pyramid']
     ],
     [
-      ['Glorious', '+3 Devotion when win by 3 Strength'],
-      ['Magnanimous', '+2 Devotion when 2 Figures in battle and lose'],
-      ['Bountiful', '+1 Devotion when gain Devotion in Red'],
-      ['Worshipful', '+1 Devotion when sacrifice 2 after Battle']
+      ['Glorious', undefined, '+3 Devotion when win by 3 Strength'],
+      ['Magnanimous', undefined, '+2 Devotion when 2 Figures in battle and lose'],
+      ['Bountiful', undefined, '+1 Devotion when gain Devotion in Red'],
+      ['Worshipful', undefined, '+1 Devotion when sacrifice 2 after Battle']
     ], // rank 2
   ];
   get metrics() {
@@ -186,24 +205,24 @@ export class PlayerPanel extends Container {
     this.setOutline(show ? 4 : 2, show ? this.bg1 : this.bg0);
   }
 
-  confirmContainer: Container;
+  confirmContainer: ConfirmCont;
   makeConfirmation() {
     const { wide, high, brad, gap, rowh } = this.metrics;
     const { table } = this.objects;
-    const conf = this.confirmContainer = new Container();
+    const conf = this.confirmContainer = new Container() as ConfirmCont;
     const bg0 = new RectShape({ x: 0, y: - brad - gap, w: wide, h: high }, '', '');
     bg0.paint('rgba(240,240,240,.2)');
     const bg1 = new RectShape({ x: 0, y: 4 * rowh - brad - 2 * gap, w: wide, h: high - 4 * rowh + gap }, '', '');
     bg1.paint('rgba(240,240,240,.8)');
 
-    const title = new CenterText('Are you sure?', 30);
+    const title = conf.titleText = new CenterText('Are you sure?', 30);
     title.x = wide / 2;
     title.y = 3.85 * rowh;
-    const msgText = new CenterText('', 30);
+    const msgText = conf.messageText = new CenterText('', 30);
     msgText.x = wide / 2;
     msgText.y = 5 * rowh;
-    const button1 = new UtilButton('lightgreen', 'Yes', TP.ankhRad);
-    const button2 = new UtilButton('rgb(255, 100, 100)', 'Cancel', TP.ankhRad);
+    const button1 = conf.buttonYes = new UtilButton('lightgreen', 'Yes', TP.ankhRad);
+    const button2 = conf.buttonCan = new UtilButton('rgb(255, 100, 100)', 'Cancel', TP.ankhRad);
     button1.y = button2.y = 6 * rowh;
     button1.x = wide * .4;
     button2.x = wide * .6;
@@ -216,17 +235,17 @@ export class PlayerPanel extends Container {
   clickConfirm(yes = true) {
     // let target = (this.confirmContainer.children[2] as UtilButton);
     if (!this.confirmContainer.visible) return;
+    const buttonYes = this.confirmContainer.buttonYes;
+    const buttonCan = this.confirmContainer.buttonCan;
     const event = new MouseEvent(S.click, false, true, 0, 0, undefined, -1, true, 0, 0);
-    (yes ? this.buttonYes : this.buttonCan).dispatchEvent(event);
+    (yes ? buttonYes : buttonCan).dispatchEvent(event);
   }
 
-  buttonYes: UtilButton;
-  buttonCan: UtilButton;
-  areYouSure(msg: string, yes: () => void, cancel: () => void, afterUpdate: () => void = () => {}) {
+  areYouSure(msg: string, yes: () => void, cancel?: () => void, afterUpdate: () => void = () => {}) {
     const { panel, table } = this.objects;
     const conf = this.confirmContainer;
-    const button1 = this.buttonYes = conf.children[2] as UtilButton;
-    const button2 = this.buttonCan = conf.children[3] as UtilButton;
+    const button1 = conf.buttonYes;
+    const button2 = conf.buttonCan;
     const msgText = conf.children[4] as CenterText;
     msgText.text = msg;
     const clear = (func: () => void) => {
@@ -236,9 +255,12 @@ export class PlayerPanel extends Container {
       table.doneButton.mouseEnabled = table.doneButton.visible = true;
       button1.updateWait(false, func);
     }
+    button2.visible = !!cancel;
+    button1.label.text = !!cancel ? 'Yes' : 'Continue';
+    conf.titleText.text = !!cancel ? 'Are your sure?' : 'Click to Confirm';
 
     button1.on(S.click, () => clear(yes), this, true);
-    button2.on(S.click, () => clear(cancel), this, true);
+    button2.on(S.click, () => clear(cancel ?? yes), this, true);
     console.log(stime(this, `.areYouSure?, ${msg}`));
     panel.localToLocal(0, 0, table.overlayCont, conf);
     conf.visible = true;
@@ -322,9 +344,9 @@ export class PlayerPanel extends Container {
     // colCont has: 2 x (MarkerToken, AnkhToken), 4 x PowerLine
     const powerLines = colCont.children.filter((ch: PowerLine) => (ch instanceof Container) && !(ch instanceof AnkhToken)) as PowerLine[];
     powerLines.forEach(pl => {
-      // enable and show qmark:
-      const qmark = pl.button.parent.children.find(ch => (ch instanceof CenterText) && ch.text === '?') as CenterText;
-      pl.button.mouseEnabled = qmark.visible = (activate && !pl.ankhToken);
+      const active = (activate && !pl.ankhToken)
+      pl.button.paint(active ? 'lightgrey' : C.WHITE);
+      pl.button.mouseEnabled = pl.qmark.visible = active; // enable and show qmark:
     });
     this.stage.update();
   }
@@ -361,13 +383,13 @@ export class PlayerPanel extends Container {
     });
   }
 
-  makePowerLines(colCont: AnkhPowerCont, powerList, onClick) {
+  makePowerLines(colCont: AnkhPowerCont, powerList: PowerSpec[], onClick) {
     const panel = this;
     const {brad, gap, rowh, dir,} = panel.metrics;
     const { player } = panel.objects;
       // place powerLines --> selectAnkhPower:
       colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
-      powerList.forEach(([powerName, docString], nth) => {
+      powerList.forEach(([powerName, powerText, docString, power], nth) => {
         const powerLine = new Container() as PowerLine;
         powerLine.name = powerName;
         powerLine.x = brad + gap;
@@ -381,14 +403,23 @@ export class PlayerPanel extends Container {
         button.mouseEnabled = false;
         powerLine.addChild(button);
         powerLine.button = button;
-        const qmark = new CenterText('?', brad * 1.4, player.color);
+        const qmark = new CenterText('?', brad * 1.4, C.BLACK);
         qmark.visible = qmark.mouseEnabled = false;
+        if (!!power) {
+          // show Card power in qmark:
+          qmark.text = `+${power}`;
+          qmark.color = C.BLACK;
+          qmark.x -= brad / 10;
+          qmark.visible = true;
+        }
         powerLine.addChild(qmark);
+        powerLine.qmark = qmark;
 
-        const text = new CenterText(powerName, brad);
+        const text = new CenterText(powerText ?? powerName, brad);
         text.textAlign = 'left';
         text.x = brad + gap;
         powerLine.addChild(text);
+        powerLine.text = text;
 
         const [w, h] = [text.getMeasuredWidth(), text.getMeasuredHeight()];
         const hitArea = new Shape(new Graphics().f(C.black).dr(0, -brad / 2, w, h));
@@ -401,6 +432,7 @@ export class PlayerPanel extends Container {
         doctext.visible = false;
         panel.table.overlayCont.addChild(doctext);
         powerLine.localToLocal(doctext.x, doctext.y, panel.table.overlayCont.parent, doctext);
+        powerLine.docText = doctext;
         const showDocText = powerLine.showDocText = (vis = !doctext.visible) => {
           const pt = text.parent.localToLocal(text.x, text.y, doctext.parent, doctext);
           doctext.x -= dir * (60 + doctext.label.getMeasuredWidth() / 2);
@@ -480,13 +512,13 @@ export class PlayerPanel extends Container {
   }
 
   static readonly cardSpecs: CardSpec[] = [
-    ['Flood', '+1 Follower for each Figure in fertile space; they cannot be killed in Battle.', 0],
-    ['Build Monument', 'Build a monument for 3 Followers', 0],
-    ['Plague of Locusts [+1]', 'Kill units unless highest bid', 1],
-    ['Chariots [+3]', '+3 strength in battle resolution', 3],
-    ['Miracle', '+1 devotion for each Figure killed', 0],
-    ['Drought [+1]', '+1 devotion per Figure in desert, if you win', 1],
-    ['Cycle of Ma`at', 'Reclaim all Battle Cards after battle resolution', 0],
+    ['Flood', 'Flood', '+1 Follower for each Figure in fertile space; they cannot be killed in Battle.', 0],
+    ['Build', 'Build Monument', 'Build a monument for 3 Followers', 0],
+    ['Plague', 'Plague of Locusts', 'Kill units unless highest bid', 1],
+    ['Chariots','Chariots', '+3 strength in battle resolution', 3],
+    ['Miracle', 'Miracle', '+1 devotion for each Figure killed', 0],
+    ['Drought','Drought', '+1 devotion per Figure in desert, if you win', 1],
+    ['Cycle', 'Cycle of Ma`at', 'Reclaim all Battle Cards after battle resolution', 0],
   ]
 
   cardSelector: CardSelector;
@@ -495,58 +527,75 @@ export class PlayerPanel extends Container {
     const apCont = cardSelector as Container as AnkhPowerCont;
     const { wide, high, dir, brad, gap, rowh } = this.metrics;
     const { panel, table, player, gamePlay } = this.objects;
+    const x = 0, y = -(brad + gap), w = wide * .5, h = high, di = (1 - dir) / 2;
+    const dxmax = [wide - w, w][di], dxmin = dxmax - wide;
     const dragFunc = (dobj: CardSelector, info: DragInfo) => {
-      const dxmax = wide * table.scaleCont.scaleX;
       if (dobj.x0 === undefined) {
-        dobj.x0 = dobj.x;
+        dobj.x0 = dobj.x; // coordinate on DragCont! [is aligned with mapCont.panelCont?]
         dobj.y0 = dobj.y;
       }
       dobj.y = dobj.y0;
-      dobj.x = Math.max(dobj.x0-dxmax, Math.min(dobj.x0+dxmax, dobj.x));
+      dobj.x = Math.max(dobj.x0 + dxmin, Math.min(dobj.x0 + dxmax, dobj.x))
     }
     const dropFunc = () => {}
     table.dragger.makeDragable(cardSelector, this, dragFunc, dropFunc);
-    const x = 0, y = -(brad + gap), w = wide / 2, h = high;
     const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.9)', )
     cardSelector.addChild(bg);
     this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
     const inHand = PlayerPanel.colorForState['inHand'];
     cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
     // add a Done button:
-    const doneButton = new UtilButton(player.color, 'Done');
-    cardSelector.addChild(doneButton);
-    doneButton.y = 4 * rowh;
-    doneButton.x = w - 2 * (brad + gap);
-    doneButton.on(S.click, () => {
-      this.showCardSelector(false);
-      doneButton.updateWait(false, () => {
-        gamePlay.phaseDone(panel);
-      }, this);
-    });
-
+    {
+      const doneButton = cardSelector.doneButton = new UtilButton(player.color, 'Done');
+      cardSelector.addChild(doneButton);
+      doneButton.y = 4 * rowh;
+      doneButton.x = w - 2 * (brad + gap);
+      doneButton.on(S.click, () => {
+        const nSelected = this.cardsInState('inBattle').length;
+        if (nSelected === 0) {
+          this.blink(doneButton, 80, true);
+          return; // you must select a card
+        }
+        this.player.god.cardsUsedInBattle = nSelected;
+        this.showCardSelector(false);
+        this.bidCounter.visible = false;
+        doneButton.updateWait(false, () => {
+          gamePlay.phaseDone(panel);
+        }, this);
+      });
+    }
+    // add Plague Counter:
+    {
+      const [x, y] = [w - 2 * (brad + gap), 1 * rowh];
+      const counter = this.bidCounter = new BidCounter(panel, 'bid', 0, 'orange', TP.ankh1Rad);
+      counter.x = x; counter.y = y;
+      counter.visible = false;
+      counter.clickToInc(panel.player.coinCounter);
+      panel.cardSelector.addChild(counter);
+    }
     const cont = table.hexMap.mapCont.eventCont;
     cont.addChild(cardSelector);
-    panel.localToLocal(w / 2 * (1 - dir), 0, cont, cardSelector, );
+    panel.localToLocal((wide - w) * (1 - dir) / 2, 0, cont, cardSelector,);
     this.activateCardSelector(false);
   }
+  bidCounter: BidCounter;
 
   get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
   activateCardSelector(activate = true) {
     const selector = this.cardSelector;
     selector.powerLines.forEach(pl => {
       const color = pl.button.colorn, inHand = PlayerPanel.colorForState['inHand'];
-      if (pl.name === 'Build Monument' && (color === inHand)) {
-        const colorB = this.canAffordMonument ? inHand : PlayerPanel.dubiusBuildColor;
-        pl.button.paint(colorB, true);
-        pl.button.colorn = color;
+      if (pl.name === 'Build' && (color === inHand)) {
+        pl.text.color = this.canAffordMonument ? C.BLACK : 'rgb(180,0,0)';
       }
       pl.button.mouseEnabled = activate && (color === inHand);
     });
     this.showCardSelector(activate);
   }
 
-  showCardSelector(vis = true) {
+  showCardSelector(vis = true, done = 'Done') {
     this.cardSelector.visible = vis;
+    this.cardSelector.doneButton.text = done;
     this.cardSelector.powerLines.forEach(pl => pl.showDocText(false));
   }
 
@@ -581,13 +630,36 @@ export class PlayerPanel extends Container {
   allCardsToHand(vis = false) {
     this.cardSelector.powerLines.forEach(pl => pl.button.paint(PlayerPanel.colorForState['inHand']));
   }
+  blink(dispObj: DisplayObject, del = 80, vis = dispObj.visible){
+    dispObj.visible = !vis;
+    this.stage.update();
+    setTimeout(() => { dispObj.visible = vis; this.stage.update(); }, del);
+  }
 
   // button.parent is the PowerLine.
   selectForBattle(evt, button: CircleShape) {
+    const max = this.player.god.cardsUsedInBattle;
+
     const colorInHand = PlayerPanel.colorForState['inHand']
     const colorInBattle = PlayerPanel.colorForState['inBattle']
-    button.paint(button.colorn === colorInHand ? colorInBattle : colorInHand);
+    button.paint((button.colorn === colorInHand) ? colorInBattle : colorInHand);
+    if(this.cardsInState('inBattle').length > max) {
+      button.paint(colorInHand);
+      this.blink(button);
+    }
     button.stage.update();
   }
 
+}
+class BidCounter extends NumCounter {
+  constructor(public panel: PlayerPanel, name: string, initValue?: string | number, color?: string, fontSize?: number, fontName?: string, textColor?: string) {
+    super(name, initValue, color, fontSize, fontName, textColor);
+  }
+
+  override incValue(incr: number): void {
+    if (this.getValue() + incr < 0) return;
+    if (this.panel.player.coins - incr < 0) return;
+    this.updateValue(this.getValue() + incr);
+    this.dispatchEvent(new ValueEvent('incr', -incr));
+  }
 }

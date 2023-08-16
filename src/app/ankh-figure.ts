@@ -13,6 +13,7 @@ import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
+import { God } from "./god";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -356,8 +357,9 @@ export class GodFigure extends Figure {
     // return Meeple.allMeeples.find(meep => meep instanceof GodFigure && meep.name == name) as GodFigure;
   }
 
-  constructor(player: Player, serial?: number, Aname?: string) {
-    super(player, serial, Aname);
+  constructor(player: Player, serial?: number, god?: God) {
+    super(player, serial, god.Aname);
+    god.figure = this;
   }
 
   override get radius() { return TP.ankh2Rad; }

@@ -458,7 +458,7 @@ export class Table extends EventDispatcher  {
     this.hexMap.update();
     // position turnLog & turnText
     {
-      const parent = this.scaleCont, n = TP.nHexes + 2, colx = -14;
+      const parent = this.scaleCont, colx = -15;
       this.setToRowCol(this.turnLog, 6, colx);
       this.setToRowCol(this.bagLog, 6, colx);
       this.setToRowCol(this.textLog, 6, colx);
@@ -773,7 +773,7 @@ export class Table extends EventDispatcher  {
 
   readonly emptyColor = 'rgb(240,240,240)';
   makeScoreStacks(row = TP.nHexes + .5, col = -7.2, np = Player.allPlayers.length, w = 34) {
-    const inRed = 20;
+    const inRed = TP.inRedzone;
     const redzone = 'rgb(230,100,100)', win = C.lightgreen;
     const scoreCont = this.scoreCont = new Container();
     this.hexMap.mapCont.resaCont.addChild(scoreCont);
@@ -782,7 +782,7 @@ export class Table extends EventDispatcher  {
     //scoreCont.y +=  sh / 2;
     // a RectShape for each score slot:
     for (let cn = 0; cn < 32; cn++) {   // a value for 'score'
-      const stroke = cn < inRed ? redzone : cn > 30 ? win : C.grey;
+      const stroke = cn <= inRed ? redzone : cn > 30 ? win : C.grey;
       const stackRect = new RectShape({ x, y: -sh / 2, w, h: sh }, C.white, stroke, new Graphics().ss(gap));
       stackRect.x = cn * dx;
       scoreCont.addChild(stackRect);
@@ -848,7 +848,7 @@ export class Table extends EventDispatcher  {
     const marker = this.regionMarkers[rid - 1];
     const hexMap = this.hexMap as AnkhMap<AnkhHex>, regions = hexMap.regions;
     const region = regions[rid - 1], nHexes = region.length;
-    if (region.length === 0) debugger; // we have injected a intial value, but something is wrong.
+    if (region.length === 0) 'debugger'; // we have injected a intial value, but something is wrong.
     const txy = (regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
       return {x: pv.x + cv.x, y: pv.y + cv.y}
     }, {x: 0, y: 0})
@@ -1201,22 +1201,5 @@ export class Table extends EventDispatcher  {
 }
 
 class ScaleableContainer2 extends ScaleableContainer {
-  /**
-   * set scale exactly; set scale index approximately and return it.
-   * @param ns new scale
-   * @param xy scale around this point (so 'p' does not move on display) = {0,0}
-   * @param sxy move to offset? in new coords?
-   * @returns the nearby scaleNdx
-   */
-  setScale(ns = 1.0, xy: XY = { x: 0, y: 0 }, sxy: XY = { x: 0, y: 0 }): number {
-    this.getScale(this.findIndex(ns)); // close appx, no side effects.
-    this.scaleInternal(this.scaleX, ns, xy);
-    return ns;
-  }
-  override scaleContainer(di: number, xy?: XY): number {
-    let os = this.scaleX;   // current -> old / original scale
-    let ns = this.incScale(di);
-    if (di == 0) { os = 0; ns = this.getScale(this.initIndex) }
-    return this.scaleInternal(os, ns, xy);
-  }
+
 }

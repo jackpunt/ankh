@@ -60,6 +60,19 @@ export class AnkhToken extends AnkhMeeple {
     return rv;
   }
 
+  nClaimableMonuments(player = this.player) {
+    const hexAry = player.gamePlay.hexMap.hexAry;
+    const allMonuments = hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
+    const unClaimedMnts = allMonuments.filter(mon => !mon.player)
+    const numUnclaimed = unClaimedMnts.length;
+
+    const isAdjacentToPlayer = (monument: Monument) => {
+      return !!monument.hex.findLinkHex(hex => hex.meep?.player === player);
+    }
+    const claimable = ((numUnclaimed === 0 ) ? allMonuments : unClaimedMnts).filter(mnt => isAdjacentToPlayer(mnt))
+    return claimable.length;
+  }
+
   override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
     const tile = hex.tile, player = this.player;
     if (!player.gamePlay.isPhase('Claim') && (this.hex === this.source.hex)) return false;

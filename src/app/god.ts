@@ -1,6 +1,6 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhSource, Portal } from "./ankh-figure";
+import { AnkhMeeple, AnkhSource, Figure, GodFigure, Portal } from "./ankh-figure";
 import { Hex2 } from "./hex";
 import type { Meeple } from "./meeple";
 import { Player } from "./player";
@@ -8,6 +8,7 @@ import { CenterText, CircleShape } from "./shapes";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
+import { AnkhHex } from "./ankh-map";
 
 
 /** Looks like AnkhToken, but is just a marker for Actions & Events */
@@ -62,18 +63,20 @@ export class God {
     cont.addChild(tname);
     return cont;
   }
-
+  get cardsUsedInBattle() { return 1; }
+  set cardsUsedInBattle(n: number) { }
+  figure: GodFigure;
+  /** SetGod will override */
+  controlsFigure(figure: Figure) {
+    return (figure.player === this.player);
+  }
 }
 class Anubis extends God {
   constructor() { super('Anubis', 'green') }
 
-}
-
-class Amun extends God {
-  constructor() { super('Amun', 'red') }
   override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
     super.makeSpecial(cont0, wh, table);
-    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AmunHex.scale;
+    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AnubisHex.scale;
     cont0.addChild(cont);
     const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
     const sgap = (wh.width / sc - 6 * rad) / 4;
@@ -82,7 +85,7 @@ class Amun extends God {
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont.addChild(circle);
-      const hex = table.newHex2(0, 0, `amun-${i}`, AmunHex);
+      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex);
       hex.cont.visible = false;
       cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       hex.legalMark.setOnHex(hex);
@@ -91,7 +94,7 @@ class Amun extends God {
   }
 }
 /** AmunHex scales the Tile or Meep by .8 */
-class AmunHex extends Hex2 {
+class AnubisHex extends Hex2 {
   static scale = .8;
 
   override get meep() { return super.meep; }
@@ -103,7 +106,7 @@ class AmunHex extends Hex2 {
     }
     super.meep = meep;
     if (meep !== undefined) {
-      meep.scaleX = meep.scaleY = AmunHex.scale;
+      meep.scaleX = meep.scaleY = AnubisHex.scale;
       meep.updateCache();
     }
   }
@@ -117,9 +120,21 @@ class AmunHex extends Hex2 {
     }
     super.tile = tile;
     if (tile !== undefined) {
-      tile.scaleX = tile.scaleY = AmunHex.scale;
+      tile.scaleX = tile.scaleY = AnubisHex.scale;
       tile.updateCache();
     }
+  }
+}
+
+class Amun extends God {
+  tokenFaceUp = true;
+  constructor() { super('Amun', 'red') }
+
+  override get cardsUsedInBattle(): number {
+    return this.tokenFaceUp ? 2 : 1
+  }
+  override set cardsUsedInBattle(n: number) {
+    if (n > 1) this.tokenFaceUp = false;
   }
 }
 
@@ -144,7 +159,7 @@ class Osiris extends God {
   constructor() { super('Osiris', 'lightgreen') }
   override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
     super.makeSpecial(cont0, wh, table);
-    const hex = table.newHex2(0, 0, `portals`, AmunHex)
+    const hex = table.newHex2(0, 0, `portals`, AnubisHex)
     cont0.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * 1.5;
@@ -161,6 +176,12 @@ class Ra extends God {
 
 class SetGod extends God {
   constructor() { super('Set', C.coinGold) }
+  override controlsFigure(figure: Figure) {
+    const figIsAdjacent = (fig: Figure) => !!fig.hex.findLinkHex(hex => hex === this.figure.hex);
+    if (super.controlsFigure(figure)) return true;
+    if (!this.player.gamePlay.isConflictState) return false;
+    return !(figure instanceof GodFigure) && figIsAdjacent(figure);
+  }
 }
 
 class Toth extends God {

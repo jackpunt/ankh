@@ -33,7 +33,7 @@ type EventElt = PlayerId[];
 /** [row, col, bid] -> new rid, with battle order = bid ;
  * - For Ex: [3, 0, 1], [4, 0, 'N', 'EN'], [4, 1, 'N']
  */
-export type SplitBid = [row: number, col: number, bid: RegionId, split?: boolean ];
+export type SplitBid = [row: number, col: number, bid: RegionId];
 export type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir];
 export type SplitElt = (SplitBid | SplitDir)
 export type SplitSpec = SplitElt[];
@@ -173,7 +173,7 @@ export class AnkhScenario {
   ];
   static preBattle: Scenario = {
     ngods: 2,
-    godNames: ["Amun", "Osiris"],
+    // godNames: ["Amun", "Osiris"],
     turn: 9,
     regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3]],
     splits: [],
@@ -189,7 +189,7 @@ export class AnkhScenario {
 
   static preSplit: Scenario = {
     ngods: 2,
-    godNames: ["Amun", "Osiris"],
+    // godNames: ["Amun", "Osiris"],
     turn: 10,
     regions: [[4,5,1],[4,6,2],[3,5,3]],
     splits: [],
@@ -202,6 +202,21 @@ export class AnkhScenario {
     ankhs: [["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
     places: [[2,6,"MumCat",1],[0,4,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",null],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
   };
+  static preClaim = {
+    ngods: 2,
+    // godNames: ["Amun","Anubis"],
+    turn: 13,
+    regions: [[6,7,1],[7,7,2],[0,1,3],[4,5,4]],
+    splits: [[[6,6,4,false],[6,7,"S"],[7,6,"EN"],[6,7,"WN"],[6,6,"EN"],[6,6,"N"]]],
+    guards: ["MumCat","Apep","Scorpion"],
+    events: [0,1,0,1,1,0],
+    actions: {"Move":[0,1],"Summon":[],"Gain":[1,1,0],"Ankh":[0],"selected":[]},
+    coins: [8,1],
+    scores: [4,2],
+    stable: [[],[]],
+    ankhs: [["Revered","Omnipresent","Pyramid","Temple","Bountiful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
+    places: [[4,7,"MumCat",1],[1,3,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[5,6,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[8,2,"Warrior",1],[3,5,"Warrior",1],[6,6,"Warrior",2],[3,6,"Warrior",2],[5,7,"Warrior",2],[7,5,"GodFigure",1],[2,8,"GodFigure",2]],
+  }
 
   static AltMidKingdom5: Scenario = {
     ngods: 5,
@@ -350,7 +365,7 @@ export class ScenarioParser {
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
       const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
-      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god.Aname) as GodFigure;
+      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure;
       let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       piece.moveTo(hex);
@@ -480,7 +495,9 @@ export class ScenarioParser {
     const scores = table.playerScores;
     if (!silent) console.log(stime(this, `.saveState: ----------- `), { turn, ngods, godNames })
 
-    const regions = gamePlay.hexMap.regions.map((region, n) => region && [region[0].row, region[0].col, n + 1]);
+    const allRegions = gamePlay.hexMap.regions;
+    const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as SplitBid);
+    const regions = rawRegions.filter(r => !!r);
     const splits = gamePlay.hexMap.splits.slice(2);
     const events = table.eventCells.slice(0, table.nextEventIndex).map(elt => elt.pid);
     const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;

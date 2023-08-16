@@ -125,7 +125,7 @@ export class AnkhMapSplitter {
           doLine(lx, ly);  // no more after reaching a terminal.
           return;
         }
-        if (path.length >= 6) {
+        if (path.length > 6) {
           doLine(lx, ly);  // too long, need to start again.
           return;
         }
