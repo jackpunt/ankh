@@ -73,19 +73,26 @@ export class ActionContainer extends Container {
 
   rollover: (button: ActionButton, over?: boolean) =>void;
 
-  gainText = new Container();
+  readonly gainText = (() => {
+    const gt = new Container();
+    gt.name = 'gainText';
+    const bg = new Shape(new Graphics().f('rgba(240,240,240,.8').dc(0, 0, 15));
+    const txt = new CenterText('0');
+    gt.addChild(bg, txt);
+    return gt;
+  })();
+
   overGain(button: ActionButton, v: boolean) {
     const gt = this.gainText;
     if (v) {
-      const bg = new Shape(new Graphics().f('rgba(240,240,240,.8').dc(0, 0, 15));
-      const txt = new CenterText(`${this.table.gamePlay.gameState.countCurrentGain()}`);
-      gt.addChild(bg, txt);
-      gt.x = button.x + TP.ankhRad; gt.y = button.y - TP.ankhRad;
+      (gt.children[1] as Text).text = `${this.table.gamePlay.gameState.countCurrentGain()}`;
+      // 'button' is not a Container, so add gainText to button's (ActionContaine) parent:
+      button.localToLocal(TP.ankhRad, -TP.ankhRad, button.parent, gt);
       button.parent.addChild(gt);
       button.stage.update();
     } else {
-      // hide hoverText
-      gt.removeAllChildren();
+      // remove gainText, so resetToFirstButton is not confused:
+      gt.parent?.removeChild(gt);
       button.stage.update();
     }
   }
@@ -699,6 +706,7 @@ export class Table extends EventDispatcher  {
   addDoneButton(actionCont: Container, rh: number) {
     const w = 90, h = 56;
     const doneButton = this.doneButton = new UtilButton('lightgreen', 'Done', 36, C.black);
+    doneButton.name = 'doneButton';
     doneButton.x = -(w);
     doneButton.y = 3 * rh;
     doneButton.label.textAlign = 'right';
