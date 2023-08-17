@@ -1,14 +1,12 @@
 import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
-import type { AnkhMeeple, AnkhPiece } from "./ankh-figure";
+import type { AnkhMeeple, AnkhPiece, Guardian } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
-import { Hex, Hex1, Hex2, HexConstructor, HexMap } from "./hex";
+import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { Player } from "./player";
-import { CenterText, EdgeShape, HexShape, PaintableShape, PolyShape } from "./shapes";
-import { DragContext } from "./table";
+import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 
@@ -81,6 +79,7 @@ export class AnkhHex extends Hex2 {
   regionId: RegionId;
   overlay: HexShape;
   get piece() { return this.tile ?? this.meep }
+  isStableHex(): this is StableHex { return false; } // must be function/method not a 'get' to use 'is...'
 
   override get meep(): AnkhMeeple { return super.meep as AnkhMeeple; }
   override set meep(meep: Meeple) { super.meep = meep; }
@@ -114,24 +113,34 @@ export class AnkhHex extends Hex2 {
     return this.findLinkHex((lhex, dir) => (lhex === hex) && !this.borders[dir]);
   }
 
-  /** return XY of the corner nearest the given point.
+  /**
+   * return XY of the corner nearest the given point.
    *
    * The perimeter is partitioned into 12 sectors cooresponding corners at each HexDir.
    * @param xy {x,y}
-   * @param basis DisplayObject basis for xy coordinates.
+   * @param basis DisplayObject basis for xy coordinates (this.cont.parent --> hexMap.hexCont).
    * @return XY and HexDir for the nearest of 12 'corners' (ewDirs and nwDirs)
    */
-  cornerDir(xy: XY, basis = this.cont.parent ) {
+  cornerDir(xy: XY, basis = this.cont.parent, topo? : 'EW' | 'NS' ) {
     const { x: x, y: y } = basis.localToLocal(xy.x, xy.y, this.cont); // on hex
     const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
-    const ndx = Math.round(3 * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
-    const hexDir = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'][ndx] as HexDir;
+    const n = topo ? 1.5 : 3;
+    const ndx  = Math.round(n * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
+    const dirs = topo === 'EW' ? this.ewHexDirs : topo === 'NS' ? this.nsHexDirs : this.anyHexDirs;
+    const hexDir = dirs[ndx] as HexDir;
     return { x, y, hexDir };
   }
+  ewHexDirs = ['W', 'SW', 'SE', 'E', 'NE', 'NW', 'W'];
+  nsHexDirs = ['WS', 'S', 'ES', 'EN', 'N', 'WN', 'WS'];
+  anyHexDirs = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'];
 
-  /** the XY coordinates of the indicated ewDir corner. */
-  cornerXY(ewDir: EwDir, rad = this.radius): XY {
-    const angleR = H.ewDirRot[ewDir] * Math.PI / 180;
+  /**
+   * The XY coordinates of the indicated hexDir corner (or would-be corner for the indicated topo).
+   *
+   * simply convert from polar to cartesian coords; sin(angle(dir))*radius
+   */
+  cornerXY(hexDir: HexDir, rad = this.radius): XY {
+    const angleR = H.dirRot[hexDir] * Math.PI / 180;
     return { x: Math.sin(angleR) * rad, y: -Math.cos(angleR) * rad }; // corner coordinates (on hex)
   }
   static adjCornerDir: { [key in EwDir]: [NsDir, EwDir][] } = {
@@ -148,9 +157,9 @@ export class AnkhHex extends Hex2 {
     log && console.log(stime(this, `.cornerAdjHexes: ${this.Aname}-${ewDir} ${rv[0]?.[0].Aname}-${rv[0]?.[1]}`), adjC, adjH, rv);
     return rv;
   }
-  /** return true if given XY point is within r of the corner at ewDir. */
-  isNearCorner(pt: XY, ewDir: EwDir, r = 0.35 * this.radius) {
-    const { x: cx, y: cy } = this.cornerXY(ewDir);
+  /** return true if given XY point is within r of the corner at hexDir. */
+  isNearCorner(pt: XY, hexDir: HexDir, r = 0.35 * this.radius) {
+    const { x: cx, y: cy } = this.cornerXY(hexDir);
     const [dx, dy] = [pt.x - cx, pt.y - cy];                     // mouseToCorner (on hex)
     const d2 = dx * dx + dy * dy;
     return (d2 < r * r);
@@ -172,7 +181,20 @@ export class AnkhHex extends Hex2 {
     rshape.graphics.mt(x0, y0).lt(x1, y1);
   }
 }
+export class StableHex extends AnkhHex {
+  size: number;  // TP.ankh1Rad | TP.ankh2rad; ideally would be readonly constructor arg, but newHex2()...
+  usedBy: Guardian;  // gets set, but not un-set
+  override isStableHex() { return true; }
 
+  override get meep() { return super.meep; }
+  override set meep(meep: AnkhMeeple) {
+    super.meep = meep;
+    if (!meep) return;
+    if (this.usedBy && this.usedBy !== meep) debugger;
+    if (this.size !== meep.radius) debugger;
+    this.usedBy = meep as Guardian;  // never un-set usedBy.
+  }
+}
 /** row, col, terrain-type, edges(river) */
 export type hexSpec = [r: number, c: number];
 export type hexSpecr = [r: number, c: number, ...e: HexDir[]];

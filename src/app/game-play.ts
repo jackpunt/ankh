@@ -48,9 +48,7 @@ export class GamePlay0 {
   get gamePhase() { return this.gameState.state; }
   isPhase(name: string) { return this.gamePhase === this.gameState.states[name]; }
   phaseDone(...args: any[]) { this.gameState.done(...args); }
-  get isConflictState() {
-    return (this.gameState.conflictRegion !== undefined);
-  }
+  get isConflictState() { return (this.gameState.conflictRegion !== undefined); }
 
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
@@ -313,7 +311,8 @@ export class GamePlay extends GamePlay0 {
   }
 
   runSplitter() {
-    this.gameState.ankhMapSplitter.runSplitShape();
+    this.gameState.phase('Split');
+    // this.gameState.ankhMapSplitter.runSplitShape();
     console.log(stime(this, `.runSplitter`), this.hexMap.regions);
   }
   undoSplit() {

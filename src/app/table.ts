@@ -3,17 +3,17 @@ import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape,
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
+import { ClassByName } from "./class-by-name";
 import { type GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
-import { Hex, Hex2, HexMap, IHex, RecycleHex } from "./hex";
-import { XYWH } from "./hex-intfs";
+import { Hex, Hex2, HexMap, IHex } from "./hex";
+import { H, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
 import { CenterText, CircleShape, HexShape, PaintableShape, PolyShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import { ClassByName } from "./class-by-name";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -211,6 +211,7 @@ export interface DragContext {
   info: MinDragInfo;    // we only use { first, event }
   tile: Tile;           // the DisplayObject being dragged
   nLegal?: number;      // number of legal drop tiles (excluding recycle)
+  phase?: string;       // keysof GameState.states
 }
 
 class TextLog extends Container {
@@ -257,6 +258,7 @@ class TextLog extends Container {
       this.nReps = 0;
     }
     this.stage?.update();
+    return line;
   }
 }
 
@@ -300,8 +302,7 @@ export class Table extends EventDispatcher  {
     this.turnLog.log(line, 'table.logTurn'); // in top two lines
   }
   logText(line: string, from = '') {
-    const text = `// ${this.gamePlay.turnNumber}: ${line}`;
-    this.textLog.log(text, from); // scrolling lines below
+    const text = this.textLog.log(`// ${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
     this.gamePlay.logWriter.writeLine(text);
 
   }
@@ -553,7 +554,7 @@ export class Table extends EventDispatcher  {
     const image = new Tile(name).addImageBitmap(name); // ignore Tile, get image.
     image.y = -TP.hexRad / 2; // recenter
 
-    const rHex = this.newHex2(row, col, name, RecycleHex);
+    const rHex = this.newHex2(row, col, name, AnkhHex);
     this.setToRowCol(rHex.cont, row, col);
     rHex.rcText.visible = rHex.distText.visible = false;
     rHex.setHexColor(C.WHITE);
@@ -858,11 +859,15 @@ export class Table extends EventDispatcher  {
     const region = regions[rid - 1], nHexes = region.length;
     if (region.length === 0) 'debugger'; // we have injected a intial value, but something is wrong.
     const txy = (regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
-      return {x: pv.x + cv.x, y: pv.y + cv.y}
-    }, {x: 0, y: 0})
-    const [cx, cy] = [txy.x/nHexes, txy.y/nHexes];
-    hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker);
-    hexMap.mapCont.hexCont.localToLocal(cx, cy, marker.parent, marker.lastXY);
+      return { x: pv.x + cv.x, y: pv.y + cv.y }
+    }, { x: 0, y: 0 })
+    const [cx, cy] = [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
+    // move marker to 'corner' of hex:
+    const hex = hexMap.hexUnderPoint(cx, cy, false);
+    const { hexDir } = hex.cornerDir({ x: cx, y: cy }, undefined, 'NS')
+    const cxy = hex.cornerXY(hexDir);
+    hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker);
+    hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker.lastXY);
     return;
   }
 
@@ -939,6 +944,7 @@ export class Table extends EventDispatcher  {
         lastCtrl:  event?.ctrlKey,
         info: info,
         nLegal: 0,
+        phase: this.gamePlay.gamePhase.Aname,
       }
       this.dragContext = ctx;
       if (!tile.isDragable(ctx)) {

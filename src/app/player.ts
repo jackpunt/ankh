@@ -16,7 +16,7 @@ export class Player {
   readonly Aname: string;
   constructor(
     readonly index: number,
-    readonly godName: string,
+    godName: string,
     public readonly gamePlay: GamePlay, // for headless, allow GamePlay0
   ) {
     const godc = God.constructors.find(g => g.name === godName);
@@ -28,10 +28,12 @@ export class Player {
   }
 
   god: God;
+  get godName() { return this.god.Aname; }
+
   /** much useful context about this Player. */
   panel: PlayerPanel;
   get color() { return this.god.color; }
-  readonly stableHexes: Hex2[] = [];
+  get stableHexes() { return this.panel.stableHexes; }
 
   allOf<T extends Tile>(claz: Constructor<T>) { return (Tile.allTiles as T[]).filter(t => t instanceof claz && t.player === this); }
   allOnMap<T extends Tile>(claz: Constructor<T>) { return this.allOf(claz).filter(t => t.hex?.isOnMap); }

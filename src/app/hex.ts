@@ -200,7 +200,7 @@ export class Hex1 extends Hex {
 }
 /** One Hex cell in the game, shown as a polyStar Shape */
 export class Hex2 extends Hex1 {
-  // cont holds hexShape(color), rcText, distText, capMark
+  /** Child of mapCont.hexCont: HexCont holds hexShape(color), rcText, distText, capMark */
   readonly cont: HexCont = new HexCont(this); // Hex IS-A Hex0, HAS-A HexCont Container
   readonly radius = TP.hexRad;                // determines width & height
   readonly hexShape = this.makeHexShape();    // shown on this.cont: colored hexagon

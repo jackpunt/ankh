@@ -4,6 +4,7 @@ import { stime } from '@thegraid/easeljs-lib';
 //import { } from 'wicg-file-system-access';
 import { GameSetup } from '../game-setup';
 import { buildURL, TP } from '../table-params';
+import {Title} from "@angular/platform-browser";
 
 @Component({
   selector: 'stage-comp',
@@ -28,7 +29,7 @@ export class StageComponent implements OnInit {
   /** HTML make a \<canvas/> with this ID: */
   mapCanvasId = "mapCanvas" + this.getId(); // argument to new Stage(this.canvasId)
 
-  constructor(private activatedRoute: ActivatedRoute) {}
+  constructor(private activatedRoute: ActivatedRoute, private titleService: Title) { }
   ngOnInit() {
     console.log(stime(this, ".noOnInit---"))
     this.activatedRoute.params.subscribe(params => {
@@ -56,6 +57,8 @@ export class StageComponent implements OnInit {
     TP.ghost = urlParams.get('host') || TP.ghost
     TP.gport = Number.parseInt(urlParams.get('port') || TP.gport.toString(10), 10)
     TP.networkUrl = buildURL(undefined);
+    const {n, gods, scene} = this.qParams;
+    this.titleService.setTitle(`Ankh ${scene?` scene=${scene}`:''}${n?` n=${n}`:''}${gods?` gods=${gods}`:''}`)
     new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
   }
   // see: stream-writer.setButton

@@ -7,7 +7,7 @@ import { KeyBinder } from '@thegraid/easeljs-lib';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  title = `Ankh - User Guide`;
+  linkName = `Ankh - User Guide`;
   timestamp = `${new Date().toLocaleTimeString('en-US')}`;
 
   constructor(@Inject(KeyBinder) private keyBinder: KeyBinder) { }

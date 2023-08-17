@@ -99,13 +99,13 @@ export class AnkhMapSplitter {
 
       let lx = pt.x, ly = pt.y;
       if (hex instanceof AnkhHex) {
-        const xyHexDir = hex.cornerDir(pt), ewDir = xyHexDir.hexDir as EwDir;
-        const onCorner = hex.isNearCorner(xyHexDir, ewDir, r)  // isNearCorner(hex, ewDir, r)
+        const xyHexDir = hex.cornerDir(pt, undefined, 'EW'), ewDir = xyHexDir.hexDir as EwDir;
+        const onCorner = hex.isNearCorner(xyHexDir, ewDir, r);
         const cid = onCorner && cornerId(hex, ewDir);
         if (!H.ewDirRot[ewDir]) {
           noMark();
           doLine(lx, ly);
-          return; // not onTarget
+          return; // not EwDir --> not onTarget
         }
         if (!path[0]) {
           // check legal start:
@@ -224,7 +224,7 @@ export class AnkhMapSplitter {
       this.table.setRegionMarker(newRid);
       hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
       hexMap.update();
-      this.gameState.phase('Swap'); // --> Swap:
+      this.checkRegionSizes('Swap')
     }
 
     const dragSplitter = () => {
@@ -234,6 +234,20 @@ export class AnkhMapSplitter {
     dragger.makeDragable(this.splitShape, this, dragFunc, dropFunc);
     dragger.clickToDrag(this.splitShape);
     dragSplitter();
+  }
+
+  checkRegionSizes(nextPhase: string) {
+    const hexMap = this.gamePlay.hexMap;
+    const [rid1, rid2] = this.newRegionIds;
+    const l1 = hexMap.regions[rid1 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
+    const l2 = hexMap.regions[rid2 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
+    const OhWell = () => this.gameState.phase(nextPhase);
+    const UndoIt = () => this.removeLastSplit();
+    if (l1 < 6 || l2 < 6) {
+      this.gameState.panel.areYouSure(`Region is too small`, OhWell, UndoIt);
+      return;
+    }
+    this.gameState.phase(nextPhase);
   }
 
   removeLastSplit() {
@@ -267,7 +281,7 @@ export class AnkhMapSplitter {
     // now the r2 is in slot ridN; suitable to be pop'd
     const oldR = hexMap.regions.pop();
     if (oldR !== r2) debugger;   // Assert (oldR === r2)
-    const mergedR = r1.concat(r2);
+    const mergedR = r1 ? r1.concat(r2) : r2.concat();
     const regionElt = [r1[0].row, r1[0].col, rid1] as RegionElt;
     const newRs = hexMap.findRegions(mergedR, [regionElt]);      // newRs[0] is (r1 + r2)
     hexMap.regions[rid1 - 1] = newRs[0];

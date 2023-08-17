@@ -1,11 +1,10 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
-import { AnkhHex, RegionId } from "./ankh-map";
+import { AnkhSource, Figure, Monument, Temple, Warrior } from "./ankh-figure";
+import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
 import { Hex2 } from "./hex";
-import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
 import { DragContext, Table } from "./table";
@@ -44,6 +43,8 @@ interface CardSelector extends Container {
   dragFunc0: (hex: Hex2, ctx: DragContext) => void;
   dropFunc0: () => void;
   powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
+  // CardSelector children // CircleShape, qMark, Text, docText
+  cycleCard: CircleShape;
 }
 
 type CardSpec = [name: string, text: string, doc: string, power: number];
@@ -52,24 +53,24 @@ export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
   isPlayerInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.player.god;
-    return !!region.find(hex => (hex.meep instanceof Figure) && god.controlsFigure(hex.meep));
+    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.god;
+    return !!region.find(hex => (hex.meep instanceof Figure) && hex.meep.controller === god);
   }
   templeHexesInRegion(regionNdx: number) {
     const region = this.table.gamePlay.hexMap.regions[regionNdx];
-    return region.filter(hex => hex.meep?.player === this.player && hex.tile instanceof Temple);
+    return region.filter(hex => hex.tile instanceof Temple && hex.tile?.player === this.player);
   }
   nFiguresInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx];
-    return region.filter(hex => hex.meep?.player === this.player && hex.meep instanceof Figure).length;
+    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.god;
+    return region.filter(hex => hex.meep instanceof Figure && hex.meep.controller === god).length;
   }
   nRegionsWithFigures() {
     return this.table.gamePlay.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;
   }
+  /** Figures in Region controled by player.god */
   figuresInRegion(regionId: RegionId, player = this.player) {
     const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
-    const belongsTo = (fig: Figure, player: Player) => { return fig.player === player } // consider Set power.
-    return figuresInRegion.filter(fig => belongsTo(fig, player))
+    return figuresInRegion.filter(fig => fig.controller === player.god);
   }
   hasAnkhPower(power: string) {
     return this.god.ankhPowers.includes(power);
@@ -134,7 +135,7 @@ export class PlayerPanel extends Container {
   }
   // detectObeliskTeleport... oh! this requires a 'Done' indication.
   enableObeliskTeleport(region: number): void {
-    this.activateCardSelector(true);
+    this.activateCardSelector(true, 'Teleport');
   }
   outline: RectShape;
   ankhSource: TileSource<AnkhToken>;
@@ -187,7 +188,7 @@ export class PlayerPanel extends Container {
     return {dir, dydr, wide, high, brad, gap, rowh, colWide, ankhColx, ankhRowy, swidth}
   }
   get objects() {
-    const player = this.player, index = player.index, panel = this, god = this.player.god;
+    const player = this.player, index = player.index, panel = this, god = this.god;
     const table  = this.table, gamePlay = this.player.gamePlay;
     return { panel, player, index, god, table, gamePlay }
   }
@@ -320,7 +321,7 @@ export class PlayerPanel extends Container {
       ankh.sendHome();
     }
     // Maybe get Guardian:
-    if (colCont.guardianSlot === 1 - ankhCol) {
+    if (colCont.guardianSlot === ankhCol) {
       this.takeGuardianIfAble(colCont.rank)
     }
     this.stage.on('drawend', () => this.player.gamePlay.phaseDone(), this, true);
@@ -328,12 +329,12 @@ export class PlayerPanel extends Container {
   };
 
   takeGuardianIfAble(rank: number) {
-    const radius = [TP.ankh1Rad, TP.ankh2Rad, TP.ankh2Rad][rank];
-    const nRank = Meeple.allMeeples.filter(meep => {
-      return (meep instanceof Guardian) && (meep.player === this.player) && (meep.radius === radius);
-    }).length;
-    if (nRank >= 2) return;
-    this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player)?.moveTo(this.stableHexes[rank]);
+    const size = this.stableSizes[rank];
+    const slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
+    if (slot < 0) return;
+    const hex = this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player)?.moveTo(this.stableHexes[slot]) as StableHex;
+    if (!hex) return;
+    hex.size = size;
   }
 
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){
@@ -471,27 +472,30 @@ export class PlayerPanel extends Container {
 
     // Stable:
   stableSources: AnkhSource<Figure>[] = [];
-  stableHexes: AnkhHex[] = [];
+  stableHexes: StableHex[] = [];
+  /** size for each type: Warrior, G1, G2, G3 */
+  stableSizes = [TP.ankh1Rad, TP.ankh1Rad, TP.ankh2Rad, TP.ankh2Rad,]
   makeStable() {
     const { wide, gap, rowh, dir, swidth } = this.metrics
     const { panel, god, player, index, table} = this.objects
     const stableCont = new Container();
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
-    const swide0 = 4 * (srad1 + srad2);
+    const swide0 = 4 * (srad1 + srad2); // 2 * sum(this.stableSizes)
     const sgap = (wide - (gap + swidth + gap + gap + swide0 + 0 * gap)) / 3;
     stableCont.y = 5.5 * rowh;
     panel.addChild(stableCont);
 
-    const sourceInfo = [srad1, srad1, srad2, srad2,]; // size for each type: Warrior, G1, G2, G3
     let x0 = [wide, 0][(1 + dir) / 2] + dir * (1 * gap); // edge of next circle
-    sourceInfo.forEach((radi, i) => {
+    this.stableSizes.forEach((radi, i) => {
       const g0 = new Graphics().ss(2).sd([5, 5]);
       const circle = new CircleShape('', radi - 1, god.color, g0);
       circle.y += (srad2 - radi);
       circle.x = x0 + dir * radi;
       x0 += dir * (2 * radi + sgap);
       stableCont.addChild(circle);
-      const hex = player.stableHexes[i] = table.newHex2(0, 0, `s:${index}-${i}`, AnkhHex) as AnkhHex;
+      const hexC = i==0 ? AnkhHex : StableHex;
+      const hex = table.newHex2(0, 0, `s:${index}-${i}`, hexC) as StableHex;
+      hex.size = radi;
       circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       const source = (i === 0) ? Warrior.makeSource(player, hex) : table.guardSources[i - 1];
       table.sourceOnHex(source, hex);
@@ -541,7 +545,10 @@ export class PlayerPanel extends Container {
     table.dragger.makeDragable(cardSelector, this, dragFunc, dropFunc);
     const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.9)', )
     cardSelector.addChild(bg);
-    this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
+    // add PowerLines:
+    {
+      this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
+    }
     const inHand = PlayerPanel.colorForState['inHand'];
     cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
     // add a Done button:
@@ -556,7 +563,6 @@ export class PlayerPanel extends Container {
           this.blink(doneButton, 80, true);
           return; // you must select a card
         }
-        this.player.god.cardsUsedInBattle = nSelected;
         this.showCardSelector(false);
         this.bidCounter.visible = false;
         doneButton.updateWait(false, () => {
@@ -581,7 +587,7 @@ export class PlayerPanel extends Container {
   bidCounter: BidCounter;
 
   get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
-  activateCardSelector(activate = true) {
+  activateCardSelector(activate = true, done = 'Done') {
     const selector = this.cardSelector;
     selector.powerLines.forEach(pl => {
       const color = pl.button.colorn, inHand = PlayerPanel.colorForState['inHand'];
@@ -590,7 +596,7 @@ export class PlayerPanel extends Container {
       }
       pl.button.mouseEnabled = activate && (color === inHand);
     });
-    this.showCardSelector(activate);
+    this.showCardSelector(activate, done);
   }
 
   showCardSelector(vis = true, done = 'Done') {
@@ -600,16 +606,17 @@ export class PlayerPanel extends Container {
   }
 
   static colorForState = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
-  static dubiusBuildColor = C.nameToRgbaString(PlayerPanel.colorForState['inHand'], .5);
 
   cardsInState(state: keyof typeof PlayerPanel.colorForState) {
     const color = PlayerPanel.colorForState[state];
     return this.cardSelector.powerLines.filter(pl => pl.button.colorn === color);
   }
 
-  get cardsInHand() { return this.cardsInState('inHand'); }
-  get cardsOnTable() { return this.cardsInState('onTable'); }
-  get cardsInBattle() { return this.cardsInState('inBattle'); }
+  get cardsInHand() { return this.cardsInState('inHand'); }     // GREEN
+  get cardsInBattle() { return this.cardsInState('inBattle'); } // YELLOW
+  get cardsOnTable() { return this.cardsInState('onTable'); }   // RED
+
+  get cycleWasPlayed() { return !!this.cardsOnTable.find(pl => pl.button.name === 'Cycle') }
 
   revealCards(vis = true): void {
     const inBattle = this.cardsInBattle.map(pl => pl.name);
@@ -638,7 +645,7 @@ export class PlayerPanel extends Container {
 
   // button.parent is the PowerLine.
   selectForBattle(evt, button: CircleShape) {
-    const max = this.player.god.cardsUsedInBattle;
+    const max = this.god.nCardsAllowedInBattle;
 
     const colorInHand = PlayerPanel.colorForState['inHand']
     const colorInBattle = PlayerPanel.colorForState['inBattle']

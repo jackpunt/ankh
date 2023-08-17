@@ -1,6 +1,6 @@
 import { C, Constructor, XY, className, stime } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhHex, AnkhMap } from "./ankh-map";
+import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { GuardName } from "./ankh-scenario";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
@@ -68,10 +68,6 @@ export class AnkhPiece extends MapTile {
     return (hex.terrain !== 'w');
   }
 
-  isStableHex(hex: Hex1) {
-    return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2))); // Dubious...
-  }
-
   override sendHome(): void {
       super.sendHome()
   }
@@ -125,7 +121,10 @@ export class Monument extends AnkhPiece {
   }
 
   override sendHome(): void {
-    this.setPlayerAndPaint(undefined);
+    if (this.hex?.meep) {
+      this.hex.meep.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
+      this.setPlayerAndPaint(undefined); // un-Claim this Monument
+    }
     super.sendHome();
   }
 }
@@ -194,9 +193,8 @@ export class Portal extends AnkhPiece {
   }
 }
 
-
-// Figure == Meeple: [underlay, [baseShape, bitmapImage?], backSide]
-/** GodFigure, Warrior, Guardian */
+// AnkhMeeple == [underlay, [baseShape, bitmapImage?], backSide]
+/** GodFigure, AnkhToken, Figure: Warrior, Guardian */
 export class AnkhMeeple extends Meeple {
 
   constructor(player: Player, serial: number, Aname?: string) {
@@ -206,7 +204,7 @@ export class AnkhMeeple extends Meeple {
     this.underlay.visible = false;
     this.nameText.text = Aname;
   }
-  underlay: CircleShape;
+  underlay: CircleShape; // highlight when AnkhMeeple is moveable
 
   override get hex() { return super.hex as AnkhHex; }
   override set hex(hex: AnkhHex) { super.hex = hex; }
@@ -222,7 +220,7 @@ export class AnkhMeeple extends Meeple {
     return underlay;
   }
 
-  highlight(show = true, color = C.WHITE, dr = 4) {
+  highlight(show = true, color = C.BLACK, dr = 4) {
     const rad = this.radius + dr;
     if (show) {
       // cgf with color *and* rad:
@@ -263,27 +261,30 @@ export class AnkhMeeple extends Meeple {
   }
 
 }
+
 export class Figure extends AnkhMeeple {
 
   static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) as Figure[] }
-
-  isPhase(name: string) {
-    return this.gamePlay.isPhase(name);
-  }
-
-  isStableHex(hex: Hex1) {
-    return (Player.allPlayers.find(p => p.stableHexes.includes(hex as Hex2)));
-  }
 
   isLegalWater(hex: AnkhHex) {
     return (hex.terrain !== 'w');
   }
 
-  get isOsirisSummon() {
-    return !!this.isStableHex(this.hex) && this.isPhase('Summon') && this.player?.god.Aname === 'Osiris';
+  /** Check for adjacent SetGod durning Conflict. */
+  get controller() {
+    const setGod = God.byName.get('Set');
+    const ownedBySet = !!setGod
+      && !(this instanceof GodFigure)
+      && this.player.gamePlay.isConflictState
+      && !!this.hex.findLinkHex(hex => hex?.meep === setGod.figure);
+    return ownedBySet ? setGod : this.player.god;
+  }
+
+  isOsirisSummon(ctx: DragContext) {
+    return this.hex.isStableHex() && ctx.phase === ('Summon') && this.player?.god.Aname === 'Osiris';
   }
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
-    return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon);
+    return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon(ctx));
   }
 
   override isLegalRecycle(ctx: DragContext): boolean {
@@ -298,6 +299,9 @@ export class Figure extends AnkhMeeple {
     if (!ctx?.lastShift && this.backSide.visible) return false;
     return true;
   }
+
+  get isFromStable() { return false; }
+
   isLegalSummon(hex: AnkhHex, ctx?: DragContext) {
     if (!(hex.findAdjHex(adj => adj.piece?.player === this.player && adj.piece !== this))) return false;
     return true;
@@ -311,14 +315,14 @@ export class Figure extends AnkhMeeple {
     if (!this.isLegalWater(hex)) return false;              // Apep can Summon to water!
 
     // isSummon: adjacent to existing, player-owned Figure or Monument.
-    if (this.isPhase('Summon')) {
-      return this.isStableHex(this.hex) && this.isLegalSummon(hex, ctx);
+    if (this.isFromStable && (ctx.phase === ('Summon') || ctx.lastShift)) {
+      return this.isLegalSummon(hex, ctx);
       // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
     }
-    if (this.isPhase('Move')) {
+    if (ctx.phase === ('Move') || ctx.lastShift) {
       return this.isLegalMove(hex, ctx);
     }
-    if (this.isPhase('ConflictInRegion')) {
+    if (ctx.phase === ('Obelisks')) {
       // apply when teleporting to Temple: if gameState.phase == Battle
       if (this.player?.god.ankhPowers.includes('Obelisk')) {
         const obelisk = (hex.tile instanceof Obelisk) ? hex.tile : undefined;
@@ -388,6 +392,10 @@ export class Warrior extends Figure {
     super(player, serial, `W:${player.index+1}`, );
     // this.nameText.y -= this.radius / 5;
   }
+
+  override get isFromStable(): boolean {
+    return this.hex === this.source.hex;
+  }
 }
 
 export class Guardian extends Figure {
@@ -421,28 +429,44 @@ export class Guardian extends Figure {
     super(player, serial, Aname)
   }
 
+  override get isFromStable(): boolean {
+    return this.hex.isStableHex();
+  }
+
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
     // Coming from global source:
     if (this.hex === this.source.hex) {
-      // allow moveTo a stable if ctx.lastShift
-      const index = this.gamePlay.table.guardSources.findIndex(s => s === this.source) + 1;
-      const toStable =  !!this.gamePlay.allPlayers.find(p => p.stableHexes[index] === hex);
-      if (ctx.lastShift && toStable && !hex.occupied) return true;
+      // allow moveTo a stable (takeGuardianIfAble) if ctx.lastShift:
+      const toStable = hex.isStableHex() && (hex.size === this.radius) && !hex.usedBy;
+      if (ctx.lastShift && toStable) return true;
+      return false;
+    }
+    // if ctx.lastShift: allow move from stable as if phase: 'Summon'
+    if (this.hex.isStableHex() && ctx.lastShift) {
+      return super.isLegalTarget(hex, { ...ctx, phase: 'Summon' });
+    }
+    if (ctx.lastShift && this.hex.isOnMap) {
+      return super.isLegalTarget(hex, { ...ctx, phase: 'Move' });
     }
     return super.isLegalTarget(hex, ctx);
   }
 
-  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-    if (this.isStableHex(targetHex)) {
-      const plyr = this.gamePlay.allPlayers.find(p => p.stableHexes.includes(targetHex))
+  override dropFunc(targetHex: AnkhHex, ctx: DragContext): void {
+    if (targetHex.isStableHex()) {
+      const plyr = this.gamePlay.allPlayers.find(p => p.stableHexes.includes(targetHex as StableHex))
       this.setPlayerAndPaint(plyr);
     }
     super.dropFunc(targetHex, ctx);
   }
 
   override sendHome(): void {
-    this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
-    super.sendHome();
+    const player = this.player;
+    if (!player) {
+      this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
+      super.sendHome();
+      return;
+    }
+    this.moveTo(player.stableHexes.find(hex => hex.usedBy === this));
   }
 }
 class Guardian1 extends Guardian {
@@ -476,10 +500,10 @@ export class Apep extends Guardian2 {
   }
   override isLegalWater(hex: AnkhHex): boolean {
     // can Summon to water; but not move water-to-water!
-    return this.isStableHex(this.hex) ? true : super.isLegalWater(hex);
+    return this.hex.isStableHex() ? true : super.isLegalWater(hex);
   }
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
-    if (this.isStableHex(this.hex) && hex.terrain === 'w') return true;
+    if (this.hex.isStableHex() && hex.terrain === 'w') return true;
     return super.isLegalTarget(hex, ctx);
   }
 }
@@ -534,10 +558,10 @@ export class Scorpion extends Guardian3 {
   diskRotate() {
     this.dirDisk.rotation = 30 + (this.dirRot = ++this.dirRot % 6) * 60;
     this.updateCache();
-    console.log(stime(this, `.Scorpion: attackDirs =`), this.attackDirs);
+    // console.log(stime(this, `.Scorpion: attackDirs =`), this.attackDirs);
   }
 
-  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
+  override dropFunc(targetHex: AnkhHex, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
     if (this.hex !== this.startHex) {
       this.diskRotate();
@@ -548,7 +572,11 @@ export class Scorpion extends Guardian3 {
     const rot2 = (this.dirRot + 1) % 6;
     return [H.nsDirs[rot1], H.nsDirs[rot2]];
   }
-
+  get attackMonuments() {
+    const tiles = this.attackDirs.map(dir => this.hex.links[dir]?.tile);
+    const monts = tiles.filter(tile => tile instanceof Monument) as Monument[];
+    return monts;
+  }
 }
 
 export class Androsphinx extends Guardian3 {

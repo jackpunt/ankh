@@ -1,14 +1,11 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhSource, Figure, GodFigure, Portal } from "./ankh-figure";
-import { Hex2 } from "./hex";
-import type { Meeple } from "./meeple";
+import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal } from "./ankh-figure";
+import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
-import { CenterText, CircleShape } from "./shapes";
+import { CenterText, CircleShape, UtilButton } from "./shapes";
 import { Table } from "./table";
 import { TP } from "./table-params";
-import { Tile } from "./tile";
-import { AnkhHex } from "./ankh-map";
 
 
 /** Looks like AnkhToken, but is just a marker for Actions & Events */
@@ -24,7 +21,7 @@ export class AnkhMarker extends Container {
   }
 }
 export class God {
-  static byName = new Map<string, God>();
+  static byName = new Map<string, God>(); // by god.name, not className(god): 'Set' not 'SetGod'
 
   static get constructors() { return godConstructors } // Global godConstructors at bottom of file;
 
@@ -63,13 +60,11 @@ export class God {
     cont.addChild(tname);
     return cont;
   }
-  get cardsUsedInBattle() { return 1; }
-  set cardsUsedInBattle(n: number) { }
+  doSpecial(...args: any[]) { return; }
+
+  get nCardsAllowedInBattle() { return 1; }
+  set nCardsAllowedInBattle(n: number) { }
   figure: GodFigure;
-  /** SetGod will override */
-  controlsFigure(figure: Figure) {
-    return (figure.player === this.player);
-  }
 }
 class Anubis extends God {
   constructor() { super('Anubis', 'green') }
@@ -94,12 +89,12 @@ class Anubis extends God {
   }
 }
 /** AmunHex scales the Tile or Meep by .8 */
-class AnubisHex extends Hex2 {
+class AnubisHex extends AnkhHex {
   static scale = .8;
 
   override get meep() { return super.meep; }
 
-  override set meep(meep: Meeple) {
+  override set meep(meep: AnkhMeeple) {
     if (meep === undefined && this.meep) {
       this.meep.scaleX = this.meep.scaleY = 1;
       this.meep.updateCache();
@@ -113,7 +108,7 @@ class AnubisHex extends Hex2 {
 
   override get tile() { return super.tile; }
 
-  override set tile(tile: Tile) {
+  override set tile(tile: AnkhPiece) {
     if (tile === undefined && this.tile) {
       this.tile.scaleX = this.tile.scaleY = 1;
       this.tile.updateCache();
@@ -127,14 +122,29 @@ class AnubisHex extends Hex2 {
 }
 
 class Amun extends God {
-  tokenFaceUp = true;
+  _tokenFaceUp = true;
+  get tokenFaceUp() { return this._tokenFaceUp; }
+  set tokenFaceUp(v: boolean) {
+    this._tokenFaceUp = v;
+    this.token.text = v ? 'TWo Cards' : 'face down';
+    this.token.paint(v ? C.legalRed : C.grey );
+  }
   constructor() { super('Amun', 'red') }
 
-  override get cardsUsedInBattle(): number {
+  override get nCardsAllowedInBattle(): number {
     return this.tokenFaceUp ? 2 : 1
   }
-  override set cardsUsedInBattle(n: number) {
-    if (n > 1) this.tokenFaceUp = false;
+  token = new UtilButton(C.legalRed, 'Two Cards', TP.ankh1Rad);
+
+  override doSpecial(faceUp: boolean): void {
+    this.tokenFaceUp = faceUp;
+  }
+  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont, wh, table);
+    const token = this.token;
+    token.x = wh.width / 2; token.y = wh.height * .6;
+    cont.addChild(token);
+    return cont;
   }
 }
 
@@ -157,15 +167,15 @@ class Isis extends God {
 
 class Osiris extends God {
   constructor() { super('Osiris', 'lightgreen') }
-  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
-    super.makeSpecial(cont0, wh, table);
+  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont, wh, table);
     const hex = table.newHex2(0, 0, `portals`, AnubisHex)
-    cont0.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * 1.5;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
-    return cont0;
+    return cont;
   }
 
 }
@@ -176,12 +186,6 @@ class Ra extends God {
 
 class SetGod extends God {
   constructor() { super('Set', C.coinGold) }
-  override controlsFigure(figure: Figure) {
-    const figIsAdjacent = (fig: Figure) => !!fig.hex.findLinkHex(hex => hex === this.figure.hex);
-    if (super.controlsFigure(figure)) return true;
-    if (!this.player.gamePlay.isConflictState) return false;
-    return !(figure instanceof GodFigure) && figIsAdjacent(figure);
-  }
 }
 
 class Toth extends God {

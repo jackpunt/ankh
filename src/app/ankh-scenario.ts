@@ -213,7 +213,7 @@ export class AnkhScenario {
     actions: {"Move":[0,1],"Summon":[],"Gain":[1,1,0],"Ankh":[0],"selected":[]},
     coins: [8,1],
     scores: [4,2],
-    stable: [[],[]],
+    stable: [[],[,,"Scorpion"]],
     ankhs: [["Revered","Omnipresent","Pyramid","Temple","Bountiful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
     places: [[4,7,"MumCat",1],[1,3,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[5,6,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[8,2,"Warrior",1],[3,5,"Warrior",1],[6,6,"Warrior",2],[3,6,"Warrior",2],[5,7,"Warrior",2],[7,5,"GodFigure",1],[2,8,"GodFigure",2]],
   }
@@ -535,11 +535,10 @@ export class ScenarioParser {
   /** debug utility */
   identCells(map: AnkhMap<AnkhHex>) {
     map.forEachHex(hex => {
-      const h2 = (hex as any as Hex2);
-      const hc = h2.cont;
+      const hc = hex.cont;
       hc.mouseEnabled = true;
       hc.on(S.click, () => {
-        h2.isLegal = !h2.isLegal;
+        hex.isLegal = !hex.isLegal;
         map.update();
       });
     });
