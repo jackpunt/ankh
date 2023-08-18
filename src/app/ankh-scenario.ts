@@ -8,7 +8,6 @@ import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ClassByName } from "./class-by-name";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
-import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import type { Player } from "./player";
 import { ActionContainer } from "./table";
@@ -368,6 +367,11 @@ export class ScenarioParser {
       const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure;
       let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
+      if (piece instanceof Guardian) {
+        // put in Stable first, to reserve its slot for future sendHome()
+        const rank = undefined;  // guardSources.indexOf(source) + 1;
+        player.panel.takeGuardianIfAble(rank, piece);
+      }
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
       if (player && (piece instanceof Monument)) {
@@ -440,15 +444,13 @@ export class ScenarioParser {
     });
     stable?.forEach((gNames, pid) => {
       const player = allPlayers[pid], panel = player.panel;
-      console.log(stime(this, `.stable:[${pid}]`), gNames)
+      // console.log(stime(this, `.stable:[${pid}]`), gNames);
       gNames.forEach((gName, ndx) => {
         const source = table.guardSources.find(source => (source.type.name === gName))
-        console.log(stime(this, `.stable:[${pid}] ${gName} source.allUnits=`), source?.allUnitsCopy)
+        const rank = table.guardSources.indexOf(source) + 1;
+        // console.log(stime(this, `.stable:[${pid}] ${gName} source.allUnits=`), source?.allUnitsCopy)
         if (source) {
-          const unit = source.takeUnit();
-          unit.setPlayerAndPaint(player);
-          unit.moveTo(panel.stableHexes[ndx + 1]);
-          source.nextUnit();
+          player.panel.takeGuardianIfAble(rank);
         }
       });
     });

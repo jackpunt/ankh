@@ -22,6 +22,7 @@ interface Phase {
   region?: number,
   panels?: PlayerPanel[],
   players?: Player[],
+  deadFigs?: Figure[], // for Plague
 }
 
 export class GameState {
@@ -496,6 +497,7 @@ export class GameState {
     },
     PlagueResolution:{
       panels: [],
+      deadFigs: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
@@ -505,7 +507,7 @@ export class GameState {
         const isWinner = (b0 > b1);
         const winner = isWinner ? panels[0].player.god : undefined;
         this.table.logText(`Plague[${rid}] ${winner.Aname ?? 'Nobody'} survives! [${b0}]`)
-        this.deadFigs('Plague', winner, rid);
+        this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
         this.phase('ScoreMonuments');
       },
     },
@@ -551,20 +553,35 @@ export class GameState {
           let dev = 0, reasons = '';
           const devReason = (n, reason: string) => {dev += n, reasons = `${reasons} ${reason}:${n}`}
           devReason(1, 'Win');
+          if (winner.hasCardInBattle('Drought')) {
+            const inDesert = winner.figuresInRegion(rid, winPlyr).filter(fig => fig.hex.terrain === 'd').length;
+            devReason(inDesert, 'Drought');
+          }
           if (powers.includes('Glorious') && d >= 3) devReason(3, 'Glorious');
           if (powers.includes('Worshipful') && winPlyr.coins >= 2) (winPlyr.coins -= 2, devReason(1, 'Worshipful')); // assume yes, they want the point.
           this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`); //slice initial SPACE
           this.addDevotion(winPlyr, dev, `Battle[${rid}]:${dev}`);
           panels.splice(0, 1); // remove winner, panels now has all the losers.
         }
-        // TODO: Check dead MumCat
+
+        const deadFigs = this.deadFigs('Battle', winner.player.god, rid, true);
+
+        // ----------- After Battle Resolution --------------
+
         panels.forEach(panel => {
           if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
             this.addDevotion(panel.player, 2, `Magnanimous[${rid}]:2`);
           }
         });
 
-        this.deadFigs('Battle', winner.player.god, rid, true);
+        // Resolve Miracle cards:
+        panels0.filter(panel => panel.hasCardInBattle('Miracle')).forEach(panel => {
+          const player = panel.player, ofPlayer = (fig: Figure) => fig.lastController === player.god;
+          const nPlague = this.states['PlagueResolution'].deadFigs.filter(ofPlayer).length;
+          const nBattle = deadFigs.filter(ofPlayer).length;
+          const nKilled = nPlague + nBattle;
+          if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
+        })
 
         // ASSERT: panels0 is [still] sorted by player rank.
         const worships0 = panels0.filter(panel => panel.hasAnkhPower('Workshipful'));
@@ -577,10 +594,6 @@ export class GameState {
         panels0.forEach(panel => panel.cycleWasPlayed && panel.allCardsToHand());
         this.phase('ConflictNextRegion')
       },
-      // TODO: battle things:
-      // process dead MumCat
-      // assign Devotion (for Miracle)
-      // assign Devotion (for Drought)
     },
     ConflictDone: {
       start: () => {

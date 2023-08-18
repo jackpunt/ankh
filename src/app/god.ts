@@ -1,6 +1,6 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal } from "./ankh-figure";
+import { AnkhMeeple, AnkhPiece, AnkhSource, Figure, GodFigure, Portal } from "./ankh-figure";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
 import { CenterText, CircleShape, UtilButton } from "./shapes";

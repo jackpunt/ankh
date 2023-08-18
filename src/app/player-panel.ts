@@ -1,6 +1,6 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { AnkhSource, Figure, Monument, Temple, Warrior } from "./ankh-figure";
+import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
@@ -328,13 +328,13 @@ export class PlayerPanel extends Container {
     this.stage.update();
   };
 
-  takeGuardianIfAble(rank: number) {
-    const size = this.stableSizes[rank];
+  takeGuardianIfAble(rank: number, guard?: Guardian) {
+    const guardian = guard ?? this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player);
+    if (!guardian) return;    // no Guardian to be picked/placed.
+    const size = guardian.radius;
     const slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
-    if (slot < 0) return;
-    const hex = this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player)?.moveTo(this.stableHexes[slot]) as StableHex;
-    if (!hex) return;
-    hex.size = size;
+    if (slot < 0) return;     // Stable is full! (no rings of the right size)
+    const hex = guardian.moveTo(this.stableHexes[slot]) as StableHex;
   }
 
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){
@@ -590,11 +590,13 @@ export class PlayerPanel extends Container {
   activateCardSelector(activate = true, done = 'Done') {
     const selector = this.cardSelector;
     selector.powerLines.forEach(pl => {
-      const color = pl.button.colorn, inHand = PlayerPanel.colorForState['inHand'];
+      const color = pl.button.colorn;
+      const inHand = PlayerPanel.colorForState['inHand'];
+      const inBattle = PlayerPanel.colorForState['inBattle'];
       if (pl.name === 'Build' && (color === inHand)) {
         pl.text.color = this.canAffordMonument ? C.BLACK : 'rgb(180,0,0)';
       }
-      pl.button.mouseEnabled = activate && (color === inHand);
+      pl.button.mouseEnabled = activate && (color === inHand || color === inBattle);
     });
     this.showCardSelector(activate, done);
   }

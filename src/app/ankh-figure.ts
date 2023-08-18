@@ -272,13 +272,16 @@ export class Figure extends AnkhMeeple {
 
   /** Check for adjacent SetGod durning Conflict. */
   get controller() {
-    const setGod = God.byName.get('Set');
+    const setGod = God.byName.get('Set');  // Special treatment for Set
     const ownedBySet = !!setGod
-      && !(this instanceof GodFigure)
       && this.player.gamePlay.isConflictState
+      && !(this instanceof GodFigure)
       && !!this.hex.findLinkHex(hex => hex?.meep === setGod.figure);
-    return ownedBySet ? setGod : this.player.god;
+    this._lastController = (ownedBySet ? setGod : this.player.god);
+    return this.lastController;
   }
+  _lastController: God;
+  get lastController() { return this._lastController ?? this.player.god; }
 
   isOsirisSummon(ctx: DragContext) {
     return this.hex.isStableHex() && ctx.phase === ('Summon') && this.player?.god.Aname === 'Osiris';
@@ -491,7 +494,13 @@ export class MumCat extends Guardian1 {
   constructor(player: Player, serial: number) {
     super(player, serial, `MCat`);
   }
-
+  override sendHome(): void {
+    const gamePlay = this.player.gamePlay;
+    gamePlay.allPlayers.forEach(player => {
+      if (player !== this.player) gamePlay.gameState.addDevotion(player, -1, `Cat Mummy died!`);
+    })
+    super.sendHome();
+  }
 }
 
 export class Apep extends Guardian2 {

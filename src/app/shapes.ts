@@ -193,21 +193,22 @@ export class InfRays extends Shape {
    * draw 6 rays (around a HexShape)
    * @param inf number of rays to draw (degree of influence)
    * @param infColor color of ray
-   * @param y0 start of ray (ends at .9) X TP.hexRad
+   * @param yIn start ray @ yIn X TP.hexRad
+   * @param yOut end ray @ YOut X TP.hexRad
    * @param xw width of each ray
    */
-  constructor(inf = 1, infColor?: PlayerColor, y0 = .7, xw = 3, g = new Graphics()) {
+  constructor(inf = 1, colorn: string, yIn = .7, yOut = .9, xw = 3, g = new Graphics()) {
     super(g);
-    const color = infColor ? TP.colorScheme[infColor] : C.WHITE;
-    const rad = TP.hexRad, y1 = y0 * rad, y2 = .9 * rad;
+    const rad = TP.hexRad, y1 = yIn * rad, y2 = yOut * rad;
     const xs = [[0], [-.1 * rad, +.1 * rad], [-.1 * rad, 0, +.1 * rad]][Math.abs(inf) - 1];
     const pts = xs.map(x => { return { mt: { x: x, y: y1 }, lt: { x: x, y: y2 } } })
     const rotpt = (rot: number, x: number, y: number) => {
       return { x: Math.cos(rot) * x + Math.sin(rot) * y, y: Math.cos(rot) * y - Math.sin(rot) * x }
     }
-    g.ss(xw).s(color);
-    H.ewDirs.forEach(dir => {
-      const rot = H.ewDirRot[dir] * H.degToRadians;
+    g.ss(xw).s(colorn);
+    const hexDirs = TP.useEwTopo ? H.ewDirs : H.nsDirs;
+    hexDirs.forEach((dir: HexDir) => {
+      const rot = H.dirRot[dir] * H.degToRadians;
       pts.forEach(mtlt => {
         const mt = rotpt(rot, mtlt.mt.x, mtlt.mt.y), lt = rotpt(rot, mtlt.lt.x, mtlt.lt.y);
         g.mt(mt.x, mt.y).lt(lt.x, lt.y);
@@ -217,17 +218,17 @@ export class InfRays extends Shape {
   }
 }
 
-export class InfShape extends Shape implements Paintable {
+export class InfShape extends PaintableShape {
   /** hexagon scaled by TP.hexRad/4 */
   constructor(bgColor = 'grey') {
-    super();
+    super((fillc) => this.iscgf(fillc));
     this.paint(bgColor);
   }
 
-  paint(colorn: string) {
+  iscgf(colorn: string) {
     const g = this.graphics;
     g.c().f(colorn).dp(0, 0, TP.hexRad, 6, 0, 30);
-    new InfRays(1, undefined, .3, 10, g); // short & wide; it gets scaled down
+    new InfRays(1, undefined, .3, .9, 10, g); // short & wide; it gets scaled down
     return this.graphics;
   }
 }

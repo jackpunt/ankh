@@ -193,6 +193,7 @@ export class StableHex extends AnkhHex {
     if (this.usedBy && this.usedBy !== meep) debugger;
     if (this.size !== meep.radius) debugger;
     this.usedBy = meep as Guardian;  // never un-set usedBy.
+    this.size = meep.radius;
   }
 }
 /** row, col, terrain-type, edges(river) */
