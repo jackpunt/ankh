@@ -96,6 +96,6 @@ export class TP {
   static ghost: string = 'cgserver'   // game-setup.network()
   static gdomain: string = 'thegraid.com'
   static gport: number = 8447
-  static networkUrl = buildURL();  // URL to cgserver (wspbserver)
+  static networkUrl = undefined;  // URL to cgserver (wspbserver) set by ngAfterViewInit2
   static networkGroup: string = "hexagon";
 }

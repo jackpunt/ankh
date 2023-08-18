@@ -39,10 +39,11 @@ interface ConfirmCont extends Container {
 interface CardSelector extends Container {
   y0: number;    // drag keep this.y = y0;
   x0: number;    //
-  doneButton: UtilButton;
   dragFunc0: (hex: Hex2, ctx: DragContext) => void;
   dropFunc0: () => void;
+  bground: RectShape;
   powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
+  doneButton: UtilButton;
   // CardSelector children // CircleShape, qMark, Text, docText
   cycleCard: CircleShape;
 }
@@ -134,8 +135,8 @@ export class PlayerPanel extends Container {
     })
   }
   // detectObeliskTeleport... oh! this requires a 'Done' indication.
-  enableObeliskTeleport(region: number): void {
-    this.activateCardSelector(true, 'Teleport');
+  enableObeliskTeleport(regionId: RegionId): void {
+    this.activateCardSelector(false, 'Teleport');
   }
   outline: RectShape;
   ankhSource: TileSource<AnkhToken>;
@@ -296,7 +297,7 @@ export class PlayerPanel extends Container {
       if (powerLine) {
         powerLine.addChild(ankh);
       } else {
-        ankh.sendHome();
+        ankh.sendHome(); // AnkhToken
       }
       powerLine?.stage.update();
     }
@@ -318,7 +319,7 @@ export class PlayerPanel extends Container {
       if (button?.name) this.god.ankhPowers.push(button.name); // 'Commanding', 'Resplendent', etc.
       //console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, button?.name, button?.id);
     } else {
-      ankh.sendHome();
+      ankh.sendHome(); // AnkhToken
     }
     // Maybe get Guardian:
     if (colCont.guardianSlot === ankhCol) {
@@ -543,14 +544,15 @@ export class PlayerPanel extends Container {
     }
     const dropFunc = () => {}
     table.dragger.makeDragable(cardSelector, this, dragFunc, dropFunc);
-    const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.9)', )
-    cardSelector.addChild(bg);
+    const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.8)',)
+    cardSelector.bground = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.4)',)
+    cardSelector.addChild(bg, cardSelector.bground);
     // add PowerLines:
     {
       this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
+      const inHand = PlayerPanel.colorForState['inHand'];
+      cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
     }
-    const inHand = PlayerPanel.colorForState['inHand'];
-    cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
     // add a Done button:
     {
       const doneButton = cardSelector.doneButton = new UtilButton(player.color, 'Done');
@@ -558,10 +560,12 @@ export class PlayerPanel extends Container {
       doneButton.y = 4 * rowh;
       doneButton.x = w - 2 * (brad + gap);
       doneButton.on(S.click, () => {
-        const nSelected = this.cardsInState('inBattle').length;
-        if (nSelected === 0) {
-          this.blink(doneButton, 80, true);
-          return; // you must select a card
+        if (doneButton.text !== 'Teleport') {
+          const nSelected = this.cardsInState('inBattle').length;
+          if (nSelected === 0) {
+            this.blink(doneButton, 80, true);
+            return; // you must select a card
+          }
         }
         this.showCardSelector(false);
         this.bidCounter.visible = false;
@@ -602,9 +606,17 @@ export class PlayerPanel extends Container {
   }
 
   showCardSelector(vis = true, done = 'Done') {
-    this.cardSelector.visible = vis;
-    this.cardSelector.doneButton.text = done;
-    this.cardSelector.powerLines.forEach(pl => pl.showDocText(false));
+    const cs = this.cardSelector;
+    const asTeleport = (done === 'Teleport');
+    if (asTeleport) {
+      cs.visible = true;
+      cs.addChildAt(cs.bground, cs.children.indexOf(cs.doneButton) - 1);
+    } else {
+      cs.visible = vis;
+      cs.addChildAt(cs.bground, 0);
+    }
+    cs.doneButton.text = done;
+    cs.powerLines.forEach(pl => pl.showDocText(false));
   }
 
   static colorForState = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };

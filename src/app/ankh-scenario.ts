@@ -176,14 +176,14 @@ export class AnkhScenario {
     turn: 9,
     regions: [[4, 5, 1], [4, 6, 2], [3, 5, 3]],
     splits: [],
-    guards: ["MumCat", "Apep", "Scorpion"],
+    guards: ["CatMum", "Apep", "Scorpion"],
     events: [0, 1, 0],
     actions: { "Move": [0, 1], "Summon": [0, 0, 0], "Gain": [1], "Ankh": [1, 0], "selected": [] },
     coins: [3, 1],
     scores: [0, 0.1],
     stable: [[], []],
-    ankhs: [["Revered", "Omnipresent", "Pyramid", "Temple"], ["Revered", "Omnipresent", "Pyramid", "Temple"]],
-    places: [[1, 8, "Obelisk", null], [5, 0, "Obelisk", 1], [2, 5, "Pyramid", 1], [8, 1, "Pyramid", 1], [5, 8, "Pyramid", 2], [0, 3, "Temple", null], [6, 5, "Temple", 2], [3, 4, "Warrior", 1], [4, 1, "Warrior", 1], [7, 1, "Warrior", 1], [1, 7, "Warrior", 1], [2, 4, "Warrior", 1], [3, 6, "Warrior", 2], [2, 6, "MumCat", 1], [0, 4, "Apep", 1], [8, 2, "GodFigure", 1], [4, 7, "GodFigure", 2]],
+    ankhs: [["Revered", "Omnipresent", "Pyramid", "Obelisk"], ["Revered", "Omnipresent", "Pyramid", "Obelisk"]],
+    places: [[1, 8, "Obelisk", null], [5, 0, "Obelisk", 1], [2, 5, "Pyramid", 1], [8, 1, "Pyramid", 1], [5, 8, "Pyramid", 2], [0, 3, "Temple", null], [6, 5, "Temple", 2], [3, 4, "Warrior", 1], [4, 1, "Warrior", 1], [7, 1, "Warrior", 1], [1, 7, "Warrior", 1], [2, 4, "Warrior", 1], [3, 6, "Warrior", 2], [2, 6, "CatMum", 1], [0, 4, "Apep", 1], [8, 2, "GodFigure", 1], [4, 7, "GodFigure", 2]],
   };
 
   static preSplit: Scenario = {
@@ -192,14 +192,14 @@ export class AnkhScenario {
     turn: 10,
     regions: [[4,5,1],[4,6,2],[3,5,3]],
     splits: [],
-    guards: ["MumCat","Apep","Scorpion"],
+    guards: ["CatMum","Apep","Scorpion"],
     events: [0,1,0,1],
     actions: {"Move":[0,1],"Summon":[0,0,0],"Gain":[1,1],"Ankh":[1,0],"selected":[]},
     coins: [4,1],
     scores: [4,2],
     stable: [[],[]],
     ankhs: [["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
-    places: [[2,6,"MumCat",1],[0,4,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",null],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
+    places: [[2,6,"CatMum",1],[0,4,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",null],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
   };
   static preClaim = {
     ngods: 2,
@@ -207,14 +207,29 @@ export class AnkhScenario {
     turn: 13,
     regions: [[6,7,1],[7,7,2],[0,1,3],[4,5,4]],
     splits: [[[6,6,4,false],[6,7,"S"],[7,6,"EN"],[6,7,"WN"],[6,6,"EN"],[6,6,"N"]]],
-    guards: ["MumCat","Apep","Scorpion"],
+    guards: ["CatMum","Apep","Scorpion"],
     events: [0,1,0,1,1,0],
     actions: {"Move":[0,1],"Summon":[],"Gain":[1,1,0],"Ankh":[0],"selected":[]},
     coins: [8,1],
     scores: [4,2],
     stable: [[],[,,"Scorpion"]],
     ankhs: [["Revered","Omnipresent","Pyramid","Temple","Bountiful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
-    places: [[4,7,"MumCat",1],[1,3,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[5,6,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[8,2,"Warrior",1],[3,5,"Warrior",1],[6,6,"Warrior",2],[3,6,"Warrior",2],[5,7,"Warrior",2],[7,5,"GodFigure",1],[2,8,"GodFigure",2]],
+    places: [[4,7,"CatMum",1],[1,3,"Apep",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[2,3,"Pyramid",1],[2,7,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[5,6,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[8,2,"Warrior",1],[3,5,"Warrior",1],[6,6,"Warrior",2],[3,6,"Warrior",2],[5,7,"Warrior",2],[7,5,"GodFigure",1],[2,8,"GodFigure",2]],
+  }
+  static battle4 = {
+    ngods: 4,
+    godNames: ["Set","Amun","Hathor","Isis"],
+    turn: 15,
+    regions: [[4,0,1],[3,0,2],[0,1,3],[4,6,4]],
+    splits: [[[3,0,1],[4,0,"N","EN"],[4,1,"N","EN"]]],
+    guards: ["CatMum","Apep","Scorpion"],
+    events: [0,1,2],
+    actions: {"Move":[0,1,2,3],"Summon":[1,0],"Gain":[2,3,1,2],"Ankh":[3,0,1,2],"selected":[]},
+    coins: [1,5,2,2],
+    scores: [0,0.1,0.2,0.3],
+    stable: [["Apep"],[],["CatMum","Apep"],[]],
+    ankhs: [["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid"],["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid"]],
+    places: [[4,1,"Obelisk",null],[3,5,"Obelisk",3],[3,8,"Obelisk",null],[5,5,"Pyramid",2],[7,0,"Pyramid",1],[2,8,"Pyramid",3],[5,7,"Pyramid",4],[4,2,"Temple",1],[8,4,"Temple",2],[1,3,"Temple",null],[8,6,"Temple",null],[2,4,"Warrior",1],[3,3,"Warrior",1],[5,4,"Warrior",2],[4,5,"Warrior",3],[7,5,"Warrior",4],[6,0,"CatMum",1],[7,4,"CatMum",2],[6,1,"GodFigure",1],[7,1,"GodFigure",2],[2,7,"GodFigure",3],[1,7,"GodFigure",4]],
   }
 
   static AltMidKingdom5: Scenario = {
@@ -335,7 +350,7 @@ export class ScenarioParser {
     const map = this.map;
     if (map.splits.length > 3) {
       map.splits = [];
-      map.noRegions();
+      map.oneRegion();
       map.addRiverSplits();
     }
     splits.forEach((splitSpec) => {
@@ -385,7 +400,7 @@ export class ScenarioParser {
     const unit = AnkhToken.source[player.index].takeUnit();
     unit.moveTo(hex);
     unit.setPlayerAndPaint(player);
-    console.log(stime(this, `.claimHex: ${hex}`), player.color);
+    // console.log(stime(this, `.claimHex: ${hex}`), player.color);
   }
 
   // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
@@ -429,7 +444,7 @@ export class ScenarioParser {
     }
     if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
-    this.map.regions.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId));
+    table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId)); // after parseRegions
     guards?.forEach((name, ndx) => {
       if (typeof name !== 'string') name = name.name;
       const source = table.guardSources[ndx];
@@ -458,7 +473,7 @@ export class ScenarioParser {
     this.parsePlaces(places, turnSet);  // turnSet indicates a saved Scenario, vs original.
     // set AnkhPowers in panel:
     ankhs?.forEach((powers: AnkhElt, pid) => {
-      console.log(stime(this, `.ankhs[${pid}]`), powers);
+      // console.log(stime(this, `.ankhs[${pid}]`), powers);
       const player = allPlayers[pid], panel = player.panel;
       const god = player.god;
       // remove existing AnkhPowers & AnkhTokens
@@ -495,7 +510,7 @@ export class ScenarioParser {
     const turn = Math.max(0, gamePlay.turnNumber);
     const coins = gamePlay.allPlayers.map(p => p.coins);
     const scores = table.playerScores;
-    if (!silent) console.log(stime(this, `.saveState: ----------- `), { turn, ngods, godNames })
+    if (!silent) console.log(stime(this, `.saveState: --- `), { turn, ngods, godNames })
 
     const allRegions = gamePlay.hexMap.regions;
     const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as SplitBid);

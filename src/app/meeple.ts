@@ -79,7 +79,7 @@ export class Meeple extends Tile {
   override get radius() { return TP.meepleRad } // 31.578 vs 60*.4 = 24
   override textVis(v: boolean) { super.textVis(true); }
   override makeShape() { return new MeepleShape(this.player, this.radius); }
-  override baseShape: MeepleShape;
+  override baseShape: MeepleShape = this.makeShape();
 
   /** location at start-of-turn; for Meeples.unMove() */
   startHex: Hex1;

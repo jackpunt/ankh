@@ -220,8 +220,8 @@ export class AnkhMapSplitter {
       const splitDirs = splits.slice(1).map(([hex, nsDir]) => [hex.row, hex.col, nsDir] as SplitDir);
       const splitSpec = [splitBid, ...splitDirs] as SplitSpec;
       const [origRid, newRid] = this.newRegionIds = hexMap.addSplit(splitSpec, true);
-      this.table.setRegionMarker(origRid);
-      this.table.setRegionMarker(newRid);
+      this.table.setRegionMarker(origRid);  // runSplitter.finalize
+      this.table.setRegionMarker(newRid);   // runSplitter.finalize
       hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
       hexMap.update();
       this.checkRegionSizes('Swap')

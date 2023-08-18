@@ -14,6 +14,7 @@ import { CenterText, CircleShape, HexShape, PaintableShape, PolyShape, RectShape
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
+import type { GameState } from "./game-state";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -187,7 +188,7 @@ export class RegionMarker extends Tile {
     mb.x = ma.x; mb.y = ma.y;
     // the marker for RegionB ('1') now in same location as marker for RegionA ('4')
     // move ma '4' to its center of regionB
-    table.setRegionMarker(rb);  // move ma to center of rb
+    table.setRegionMarker(rb);  // Swap: move ma to center of rb
     const mb2 = table.regionMarkers[rb];
     mb2.lastXY.x = mb2.x; mb2.lastXY.y = mb2.y; // using srcCont coords!
     hexMap.update();
@@ -211,6 +212,7 @@ export interface DragContext {
   info: MinDragInfo;    // we only use { first, event }
   tile: Tile;           // the DisplayObject being dragged
   nLegal?: number;      // number of legal drop tiles (excluding recycle)
+  gameState?: GameState;// gamePlay.gameState
   phase?: string;       // keysof GameState.states
 }
 
@@ -246,7 +248,7 @@ class TextLog extends Container {
   }
 
   log(line: string, from = '', toConsole = true) {
-    line = line.replace('\n', '-');
+    line = line.replace('/\n/g', '-');
     toConsole && console.log(stime(`${from}:`), line);
     if (line === this.lastLine) {
       this.lines[this.lines.length - 1].text = `[${++this.nReps}] ${line}`;
@@ -467,9 +469,9 @@ export class Table extends EventDispatcher  {
     // position turnLog & turnText
     {
       const parent = this.scaleCont, colx = -15;
-      this.setToRowCol(this.turnLog, 6, colx);
-      this.setToRowCol(this.bagLog, 6, colx);
-      this.setToRowCol(this.textLog, 6, colx);
+      this.setToRowCol(this.bagLog, 4, colx);
+      this.setToRowCol(this.turnLog, 4, colx);
+      this.setToRowCol(this.textLog, 4, colx);
       this.bagLog.y -= this.turnLog.height(1);
       this.textLog.y += this.turnLog.height(Player.allPlayers.length + 1);
 
@@ -856,18 +858,23 @@ export class Table extends EventDispatcher  {
   setRegionMarker(rid = this.regionMarkers.length as RegionId) {
     const marker = this.regionMarkers[rid - 1];
     const hexMap = this.hexMap as AnkhMap<AnkhHex>, regions = hexMap.regions;
-    const region = regions[rid - 1], nHexes = region.length;
-    if (region.length === 0) 'debugger'; // we have injected a intial value, but something is wrong.
-    const txy = (regions[rid - 1].map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
+    const region = regions[rid - 1] ?? [], nHexes = region.length || 1;
+    // if (region.length === 0) 'debugger'; // we have injected a intial value, but something is wrong.
+    const txy = (region.length > 0) ? (region.map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
       return { x: pv.x + cv.x, y: pv.y + cv.y }
-    }, { x: 0, y: 0 })
+    }, { x: 0, y: 0 }) : { x: 0, y: 0 };
     const [cx, cy] = [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
-    // move marker to 'corner' of hex:
+    // move marker to 'corner' of hex (or {0,0} of markCont):
     const hex = hexMap.hexUnderPoint(cx, cy, false);
-    const { hexDir } = hex.cornerDir({ x: cx, y: cy }, undefined, 'NS')
-    const cxy = hex.cornerXY(hexDir);
-    hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker);
-    hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker.lastXY);
+    if (hex) {
+      const cxy = hex.cornerXY(hex.cornerDir({ x: cx, y: cy }, undefined, 'NS').hexDir);
+      hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker);
+      hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker.lastXY);
+    } else {
+      hexMap.mapCont.markCont.localToLocal(0,0,marker.parent, marker)
+      hexMap.mapCont.markCont.localToLocal(0,0,marker.parent, marker.lastXY);
+    }
+
     return;
   }
 
@@ -904,6 +911,7 @@ export class Table extends EventDispatcher  {
     // this.stage.enableMouseOver(10);
     this.scaleCont.addChild(this.overlayCont); // now at top of the list.
     this.gamePlay.setNextPlayer(this.gamePlay.turnNumber > 0 ? this.gamePlay.turnNumber : 0);
+    this.gamePlay.saveState();         // save parsed scenario
     this.gamePlay.gameState.start();   // enable Table.GUI to drive game state.
   }
 
@@ -944,6 +952,7 @@ export class Table extends EventDispatcher  {
         lastCtrl:  event?.ctrlKey,
         info: info,
         nLegal: 0,
+        gameState: this.gamePlay.gameState,
         phase: this.gamePlay.gamePhase.Aname,
       }
       this.dragContext = ctx;

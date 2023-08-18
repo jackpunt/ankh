@@ -19,7 +19,7 @@ export class Player {
     godName: string,
     public readonly gamePlay: GamePlay, // for headless, allow GamePlay0
   ) {
-    const godc = God.constructors.find(g => g.name === godName);
+    const godc = God.constructors.find(g => g.name.replace('God','') === godName); // 'SetGod' --> 'Set'
     this.god =  new godc();
     this.god.player = this;
     Player.allPlayers[index] = this;

@@ -68,7 +68,7 @@ export class AnkhPiece extends MapTile {
     return (hex.terrain !== 'w');
   }
 
-  override sendHome(): void {
+  override sendHome(): void { // AnkhPiece
       super.sendHome()
   }
 }
@@ -120,7 +120,7 @@ export class Monument extends AnkhPiece {
     }
   }
 
-  override sendHome(): void {
+  override sendHome(): void {   // Monument AnkhToken.sendHome()
     if (this.hex?.meep) {
       this.hex.meep.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
       this.setPlayerAndPaint(undefined); // un-Claim this Monument
@@ -290,8 +290,26 @@ export class Figure extends AnkhMeeple {
     return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon(ctx));
   }
 
+  override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
+    // see also Meeple.canBeMovedBy: canAutoUnmove && backside.visible
+    if (ctx.phase === ('Obelisks')) {
+      const oplayer = player.gamePlay.gameState.state.panels[0].player;
+      return (ctx?.lastShift || this.controller === oplayer.god) ? undefined : "Not your Tile";
+    }
+    return super.cantBeMovedBy(player, ctx);
+  }
+
   override isLegalRecycle(ctx: DragContext): boolean {
     return ctx.lastShift;
+  }
+  isObeliskMove(hex: AnkhHex, ctx?: DragContext) {
+    if (ctx.phase !== 'Obelisks') return false;
+    const gameState = ctx.gameState, rNdx = gameState.conflictRegion - 1;
+    const player = gameState.state.panels[0].player;
+    const region = gameState.gamePlay.hexMap.regions[rNdx];
+    if (!region.includes(hex)) return false;
+    const obeliskAdj = !!hex.findAdjHex(hex => (hex.tile instanceof Obelisk) && hex.tile.player === player)
+    return obeliskAdj;
   }
 
   override isLegalTarget0(hex: AnkhHex, ctx?: DragContext) {  // Meeple
@@ -299,7 +317,7 @@ export class Figure extends AnkhMeeple {
     // AnkhToken can moveTo Monument, but that is not a user-drag.
     if (!this.isOccupiedLegal(hex, ctx)) return false;
     if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
-    if (!ctx?.lastShift && this.backSide.visible) return false;
+    if (this.backSide.visible && !ctx?.lastShift) return false;
     return true;
   }
 
@@ -327,10 +345,7 @@ export class Figure extends AnkhMeeple {
     }
     if (ctx.phase === ('Obelisks')) {
       // apply when teleporting to Temple: if gameState.phase == Battle
-      if (this.player?.god.ankhPowers.includes('Obelisk')) {
-        const obelisk = (hex.tile instanceof Obelisk) ? hex.tile : undefined;
-        return (obelisk?.player === this.player);
-      }
+      if (this.isObeliskMove(hex, ctx)) return true;
     }
     return false;
   }
@@ -415,7 +430,7 @@ export class Guardian extends Figure {
     return Array.from(Guardian.constructors).map((guard) => guard.name);
   }
 
-  static namesByRank: GuardName[][] = [['Satet', 'MumCat'], ['Apep', 'Mummy'], ['Scorpion', 'Androsphinx']];
+  static namesByRank: GuardName[][] = [['Satet', 'CatMum'], ['Apep', 'Mummy'], ['Scorpion', 'Androsphinx']];
   static get randomGuards() {
     const guardianC = Guardian.namesByRank.map(ga => ga.map(gn => Guardian.byName.get(gn)));
     return guardianC.map(gs => selectN(gs, 1)[0])
@@ -462,7 +477,7 @@ export class Guardian extends Figure {
     super.dropFunc(targetHex, ctx);
   }
 
-  override sendHome(): void {
+  override sendHome(): void {  // Guardian -> Stable
     const player = this.player;
     if (!player) {
       this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
@@ -485,25 +500,28 @@ class Guardian3 extends Guardian {
 }
 
 export class Satet extends Guardian1 {
+  static source: AnkhSource<Satet> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Satet`);
   }
 }
 
-export class MumCat extends Guardian1 {
+export class CatMum extends Guardian1 {
+  static source: AnkhSource<CatMum> = undefined;
   constructor(player: Player, serial: number) {
-    super(player, serial, `MCat`);
+    super(player, serial, `Cat\nMum`);
   }
-  override sendHome(): void {
+  override sendHome(): void {  // CatMum: addDevotion
     const gamePlay = this.player.gamePlay;
     gamePlay.allPlayers.forEach(player => {
-      if (player !== this.player) gamePlay.gameState.addDevotion(player, -1, `Cat Mummy died!`);
+      if (player !== this.player) gamePlay.gameState.addDevotion(player, -1, `${this} died!`);
     })
     super.sendHome();
   }
 }
 
 export class Apep extends Guardian2 {
+  static source: AnkhSource<Apep> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Apep`);
   }
@@ -518,12 +536,14 @@ export class Apep extends Guardian2 {
 }
 
 export class Mummy extends Guardian2 {
+  static source: AnkhSource<Mummy> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Mummy`);
   }
 }
 
 export class Scorpion extends Guardian3 {
+  static source: AnkhSource<Scorpion>;
   // Constructed from Meeple.makeSource0()
   constructor(player: Player, serial: number) {
     super(player, serial, `Scorpion`);
@@ -582,13 +602,14 @@ export class Scorpion extends Guardian3 {
     return [H.nsDirs[rot1], H.nsDirs[rot2]];
   }
   get attackMonuments() {
-    const tiles = this.attackDirs.map(dir => this.hex.links[dir]?.tile);
+    const tiles = this.attackDirs.map(dir => this.hex?.links[dir]?.tile);
     const monts = tiles.filter(tile => tile instanceof Monument) as Monument[];
     return monts;
   }
 }
 
 export class Androsphinx extends Guardian3 {
+  static source: AnkhSource<Androsphinx> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Andro\nsphinx`, );
     this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
@@ -597,5 +618,5 @@ export class Androsphinx extends Guardian3 {
 }
 
 // List all the God constructors:
-const guardianConstructors: Constructor<Guardian>[] = [Satet, MumCat, Mummy, Apep, Scorpion, Androsphinx];
+const guardianConstructors: Constructor<Guardian>[] = [Satet, CatMum, Mummy, Apep, Scorpion, Androsphinx];
 // godSpecs.forEach(god => new god());

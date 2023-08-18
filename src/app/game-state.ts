@@ -1,5 +1,5 @@
 import { C, stime } from "@thegraid/common-lib";
-import { Figure, GodFigure, Monument, Scorpion } from "./ankh-figure";
+import { Figure, GodFigure, Monument, Obelisk, Scorpion } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
@@ -48,7 +48,8 @@ export class GameState {
   get playerFigures() { const plyr = this.gamePlay.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
 
   highlights: Figure[];
-  conflictRegion = undefined;
+  conflictRegion: RegionId = undefined;
+
   get panelsInConflict() {
     return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion((this.conflictRegion ?? 0) - 1));
   }
@@ -314,7 +315,7 @@ export class GameState {
         const omni = panels.filter(panel => panel.hasAnkhPower('Omnipresent'));
         omni.forEach(panel => this.addFollowers(panel.player, panel.nRegionsWithFigures(), `Omnipresent`));
         // do Scorpions:
-        const scorps = Figure.allFigures.filter(fig => fig instanceof Scorpion) as Scorpion[];
+        const scorps = Scorpion.source.allUnitsCopy.filter(scorp => scorp.hex?.isOnMap);
         scorps.forEach(scorp => {
           const monts = scorp.attackMonuments;
           if (monts.length > 0) {
@@ -366,17 +367,22 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.panelsInConflict.filter(panel => panel.hasAnkhPower('Obelisk'));
+        const panels0 = this.panelsInConflict.filter(panel => panel.hasAnkhPower('Obelisk'));
+        const region = this.gamePlay.hexMap.regions[this.conflictRegion - 1];
+        const panels = panels0.filter(p => region.find(hex => hex.tile instanceof Obelisk && hex.tile.player === p.player))
         // enable on-panel 'Obelisk done' button => phaseDone(panel);
         if (panels.length === 0) { this.phase('Card'); return; }
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}] panels =`), panels);
-        panels.forEach(panel => panel.enableObeliskTeleport(this.conflictRegion));
+        this.state.panels = panels;
+        panels[0].enableObeliskTeleport(this.conflictRegion);
+        //panels.forEach(panel => panel.enableObeliskTeleport(this.conflictRegion));
       },
       done: (p: PlayerPanel) => {
         const panels = this.state.panels;
-        const ndx = panels.indexOf(p);
+        const ndx = panels.indexOf(p); // ndx === 0!
         panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
-        if (panels.length === 0) this.phase('Card');
+        if (panels.length === 0) { this.phase('Card'); return; }
+        panels[0].enableObeliskTeleport(this.conflictRegion);
       }
     },
     Card: {
@@ -469,7 +475,7 @@ export class GameState {
           this.doneButton('', C.grey, () => this.phase('Plague'));
           return;
         }
-        console.log(stime(this, `Build.done: return NOT done...`))
+        // console.log(stime(this, `Build.done: return NOT done...`))
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.doneButton('Build Done', panels[0].player.color);
         // TODO: at ConflictDone, mark yellow cards green, and check reclaimCards (Cycle of Ma`at)
@@ -536,7 +542,7 @@ export class GameState {
         panels.forEach(panel => this.table.logText(`Battle[${rid}] ${json(panel.reasons)}`))
 
         const d = panels[0].strength - (panels[1]?.strength ?? 0) // after Plague, only one Player...
-        let winner = (d > 0) && panels[0];
+        let winner = (d > 0) ? panels[0] : undefined;
         if (d == 0) {          // consider tiebreaker;
           const curPanel = this.gamePlay.curPlayer.panel;
           const contenders = panels.filter(panel => panel.strength === panels[0].strength);
@@ -564,7 +570,7 @@ export class GameState {
           panels.splice(0, 1); // remove winner, panels now has all the losers.
         }
 
-        const deadFigs = this.deadFigs('Battle', winner.player.god, rid, true);
+        const deadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
 
         // ----------- After Battle Resolution --------------
 
@@ -620,8 +626,8 @@ export class GameState {
   setup() {
 
   }
-        // TODO Set adjacency.
-  deadFigs(cause: string, winner: God, rid: RegionId, floodProtects = false) {
+  // if (winner === undefined): all non-GodFigure are at risk.
+  deadFigs(cause: string, winner: God | undefined, rid: RegionId, floodProtects = false) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
     const region = this.gamePlay.hexMap.regions[rid - 1];
     const figsInRegion = region.map(hex => hex?.meep).filter(meep => meep instanceof Figure) as Figure[];
@@ -656,11 +662,13 @@ export class GameState {
   }
 
   addDevotion(player: Player, n: number, reason?: string) {
-    if (player.god.ankhPowers.includes('Bountiful') && player.score <= TP.inRedzone) {
+    const score0 = player.score;
+    if (n > 0 && player.god.ankhPowers.includes('Bountiful') && player.score <= TP.inRedzone) {
       n += 1; reason = `${reason ?? ''} Bountiful:1`
     }
-    player.score += n;
-    this.gamePlay.logText(`${player.god.name} ${n>=0?'gains':'loses'} ${Math.abs(n)} Devotion: ${reason}`);
+    player.score = Math.max(0, score0 + n);
+    const dscore = player.score - score0; // n or 0
+    this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason}`);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];

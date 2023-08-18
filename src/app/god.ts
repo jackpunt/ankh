@@ -126,7 +126,7 @@ class Amun extends God {
   get tokenFaceUp() { return this._tokenFaceUp; }
   set tokenFaceUp(v: boolean) {
     this._tokenFaceUp = v;
-    this.token.text = v ? 'TWo Cards' : 'face down';
+    this.token.text = v ? 'Two Cards' : 'Face Down';
     this.token.paint(v ? C.legalRed : C.grey );
   }
   constructor() { super('Amun', 'red') }
@@ -185,7 +185,7 @@ class Ra extends God {
 }
 
 class SetGod extends God {
-  constructor() { super('Set', C.coinGold) }
+  constructor() { super('Set', '#F1C40F') } // ~ C.coinGold
 }
 
 class Toth extends God {

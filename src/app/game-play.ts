@@ -162,8 +162,13 @@ export class GamePlay0 {
     // console.log(stime(this, `.endGame: Winner = ${winner.Aname}`), scores);
   }
 
+  newTurn() {}
+
   setNextPlayer(turnNumber?: number): void {
-    if (turnNumber === undefined) turnNumber = this.turnNumber + 1;
+    if (turnNumber === undefined) {
+      this.turnNumber = turnNumber = this.turnNumber + 1;
+      this.newTurn()
+    }
     this.turnNumber = turnNumber;
     const index = (turnNumber % this.allPlayers.length);
     this.preGame = false;
@@ -215,7 +220,7 @@ export class GamePlay0 {
     const info = { tile, fromHex, toHex, payCost };
     const verb = this.gamePhase.Aname;
     if (toHex !== fromHex) this.logText(`${verb} ${tile} -> ${toHex}`, `gamePlay.placeEither`)
-    if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
+    // if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {
       this.logText(`Recycle ${tile} from ${fromHex?.Aname || '?'}`, `gamePlay.placeEither`)
@@ -320,7 +325,13 @@ export class GamePlay extends GamePlay0 {
     console.log(stime(this, `.undoSplit`), this.hexMap.regions);
   }
 
+  /** when turnNumber auto-increments. */
+  override newTurn(): void {
+    this.saveState();
+  }
+
   backStates = [];
+  /** setNextPlayer->startTurn (or Key['p']) */
   saveState() {
     if (this.nstate !== 0) {
       this.backStates = this.backStates.slice(this.nstate); // remove ejected states
@@ -330,17 +341,18 @@ export class GamePlay extends GamePlay0 {
     const scenarioParser = new ScenarioParser(this.hexMap, this);
     const state = scenarioParser.saveState(this);
     this.backStates.unshift(state);
-    console.log(stime(this, `.saveState -------- turn=${state.turn}`), state);
+    console.log(stime(this, `.saveState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}`), state);
     scenarioParser.logState(state);
   }
   // TODO: setup undo index to go fwd and back? wire into undoPanel?
   nstate = 0;
-  /** move fwd(older) or backward(newer) in the state vector */
+  /** move nstate to older(back=true, S-P) or newer(back=false, C-P) states in backStates */
   pickState(back = true) {
     this.nstate = back ? Math.min(this.backStates.length - 1, this.nstate + 1) : Math.max(0, this.nstate - 1);
     const state = this.backStates[this.nstate];
-    console.log(stime(this, `.pickState -------- #${this.nstate} turn=${state.turn}:`), state);
+    console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
     this.table.parseScenenario(state); // typically sets gamePlay.turnNumber
+    console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
     this.setNextPlayer(this.turnNumber);
   }
 
@@ -502,7 +514,6 @@ export class GamePlay extends GamePlay0 {
 
   /** After setNextPlayer() */
   startTurn() {
-    this.saveState();
   }
 
   paintForPlayer() {

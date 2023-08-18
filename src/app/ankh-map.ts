@@ -363,8 +363,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     AnkhMap.rspec.forEach(spec => this.addSplit(spec));        // after marking water!
   }
 
-  noRegions(hexAry = this.hexAry) {
-    hexAry.forEach(hex => hex.regionId = undefined);
+  oneRegion(hexAry = this.hexAry, regionId: RegionId = 1) {
+    this.regions = [hexAry];
+    hexAry.forEach(hex => hex.regionId = regionId);
+    // regionMarkers should all sendHome(), but that is fixed later in parseScenario...
   }
   /**
    * split region into [region(hex0), otherRegion]
@@ -412,7 +414,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
       hexAry.forEach(hex => hex.terrain === 'w' && (hex.regionId = undefined)); // water again available!
     });
     regions.forEach(region => region.filter(hex => hex.terrain === 'w').forEach(hex => { hex.district = 0; hex.cont.updateCache() }));
-    console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));
+    // console.log(stime(this, `.findRegions: [${seeds}, ${rids}] found:`), regions.map(r => r.concat()));
     return regions;
   }
 
