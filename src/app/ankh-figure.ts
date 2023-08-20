@@ -44,7 +44,7 @@ export class AnkhSource<T extends Tile> extends TileSource<T> {
 /** Monument, Portal  */
 export class AnkhPiece extends MapTile {
   constructor(player: Player, serial: number, Aname?: string) {
-    super(`${Aname}\n${serial}`, player);
+    super(`${Aname}-${serial}`, player);
     this.name = className(this);         // lookup className and store it.
   }
   override get hex() { return super.hex as AnkhHex; }
@@ -198,20 +198,18 @@ export class Portal extends AnkhPiece {
 export class AnkhMeeple extends Meeple {
 
   constructor(player: Player, serial: number, Aname?: string) {
-    super(`${Aname}\n${serial}`, player);
+    super(`${Aname}-${serial}`, player);
     this.underlay = new CircleShape(); this.underlay.name = 'underlay-highlight';
     this.addChildAt(this.underlay, 0);
     this.underlay.visible = false;
-    this.nameText.text = Aname;
+    this.nameText.text = Aname.replace(/-/g, '\n');
+    const nlines = this.nameText.text.split('\n').length - 1;
+    if (nlines > 0) this.nameText.y -= nlines * this.nameText.getMeasuredHeight() / 4 * nlines;
   }
   underlay: CircleShape; // highlight when AnkhMeeple is moveable
 
   override get hex() { return super.hex as AnkhHex; }
   override set hex(hex: AnkhHex) { super.hex = hex; }
-
-  override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
-    this.paintRings(colorn, colorn, 4, 4); // one fat ring...
-  }
 
   makeUnderlay() {
     const underlay = new CircleShape();
@@ -266,13 +264,18 @@ export class Figure extends AnkhMeeple {
 
   static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) as Figure[] }
 
+  override paint(pColor = this.player?.color, colorn = pColor ?? C1.grey) {
+    this.baseShape.mscgf(colorn, 6, 0);     // [width-2 @ r-1]
+    this.updateCache();
+    return;
+  }
   isLegalWater(hex: AnkhHex) {
     return (hex.terrain !== 'w');
   }
 
-  /** Check for adjacent SetGod durning Conflict. */
+  /** Check for adjacent Set durning Conflict. */
   get controller() {
-    const setGod = God.byName.get('Set');  // Special treatment for Set
+    const setGod = God.byName.get('Set');  // Special treatment when Set is on the table
     const ownedBySet = !!setGod
       && this.player.gamePlay.isConflictState
       && !(this instanceof GodFigure)
@@ -417,6 +420,7 @@ export class Warrior extends Figure {
 }
 
 export class Guardian extends Figure {
+  static source: TileSource<Guardian>;
   static get constructors() { return guardianConstructors } // Global godConstructors at bottom of file;
   static byName = new Map<GuardName, Constructor<Guardian>>();
   static setGuardiansByName() {
@@ -500,16 +504,16 @@ class Guardian3 extends Guardian {
 }
 
 export class Satet extends Guardian1 {
-  static source: AnkhSource<Satet> = undefined;
+  static override source: AnkhSource<Satet> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Satet`);
   }
 }
 
 export class CatMum extends Guardian1 {
-  static source: AnkhSource<CatMum> = undefined;
+  static override source: AnkhSource<CatMum> = undefined;
   constructor(player: Player, serial: number) {
-    super(player, serial, `Cat\nMum`);
+    super(player, serial, `Cat-Mum`);
   }
   override sendHome(): void {  // CatMum: addDevotion
     const gamePlay = this.player.gamePlay;
@@ -521,7 +525,7 @@ export class CatMum extends Guardian1 {
 }
 
 export class Apep extends Guardian2 {
-  static source: AnkhSource<Apep> = undefined;
+  static override source: AnkhSource<Apep> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Apep`);
   }
@@ -536,18 +540,17 @@ export class Apep extends Guardian2 {
 }
 
 export class Mummy extends Guardian2 {
-  static source: AnkhSource<Mummy> = undefined;
+  static override source: AnkhSource<Mummy> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Mummy`);
   }
 }
 
 export class Scorpion extends Guardian3 {
-  static source: AnkhSource<Scorpion>;
+  static override source: AnkhSource<Scorpion>;
   // Constructed from Meeple.makeSource0()
   constructor(player: Player, serial: number) {
     super(player, serial, `Scorpion`);
-    this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
     const { x, y, width, height } = H.hexBounds(TP.hexRad, TP.useEwTopo ? 0 : 30);
     this.setBounds(x, y, width, height);
     this.cache(x, y, width, height);
@@ -609,11 +612,9 @@ export class Scorpion extends Guardian3 {
 }
 
 export class Androsphinx extends Guardian3 {
-  static source: AnkhSource<Androsphinx> = undefined;
+  static override source: AnkhSource<Androsphinx> = undefined;
   constructor(player: Player, serial: number) {
-    super(player, serial, `Andro\nsphinx`, );
-    this.nameText.y -= this.nameText.getMeasuredHeight() / 4; // not clear why 3, rather than 2
-
+    super(player, serial, `Andro-sphinx`, );
   }
 }
 

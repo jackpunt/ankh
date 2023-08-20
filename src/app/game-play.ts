@@ -4,6 +4,7 @@ import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
+import { afterUpdate } from "./functions";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { Hex, Hex1, IHex } from "./hex";
@@ -15,6 +16,7 @@ import { EventName, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
 //import { NC } from "./choosers";
+
 export type NamedObject = { name?: string, Aname?: string };
 
 class HexEvent {}
@@ -254,7 +256,7 @@ export class GamePlay extends GamePlay0 {
     // Players have: civics & meeples & TownSpec
     this.table = table;
     if (this.table.stage.canvas) this.bindKeys();
-    this.guards = Guardian.randomGuards;
+    this.guards = Guardian.randomGuards;  // intially random, until/unless Scenario.parse supplies: guards: [,,]
   }
 
   /** suitable for keybinding */
@@ -283,7 +285,6 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('f', { thisArg: this, func: this.redoMove })
     //KeyBinder.keyBinder.setKey('S', { thisArg: this, func: this.skipMove })
     KeyBinder.keyBinder.setKey('Escape', {thisArg: table, func: table.stopDragging}) // Escape
-    KeyBinder.keyBinder.setKey('C-s', { thisArg: this.gameSetup, func: () => { this.gameSetup.restart() } })// C-s START
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.stopPlayer })// C-c Stop Planner
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
     KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn })
@@ -309,11 +310,24 @@ export class GamePlay extends GamePlay0 {
         player.panel.activateCardSelector(up);
       })
     })
+    KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START
+      const cont = this.hexMap.mapCont.markCont;
+      cont.visible = false;
+      afterUpdate(cont, () => {
+        setTimeout(() => {
+          cont.visible = true;
+          cont.stage.update();
+          this.gameSetup.restart();
+        }, 10)
+      });
+    })
+
     let cardSelectorsUp = false;
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
+
 
   runSplitter() {
     this.gameState.phase('Split');

@@ -110,8 +110,8 @@ export class LogWriter extends FileBase implements ILogWriter {
       let lines = this.backlog; this.backlog = ''  // would prefer a lock on this.backlog...
       await stream.write({ type: 'write', data: lines }); // write to tmp store
       await stream.close().then(() => this.closePromise.fulfill(1))       // flush to real-file
-      while (!this.streamPromise.value) await this.openWriteStream()
-      // ASSERT: openPromise is now fulfilled with a new Writeable Stream
+      while (!this.streamPromise.value) await this.openWriteStream();     // loop until re-opens?
+      // ASSERT: streamPromise is now fulfilled with a new Writeable Stream
     } catch (err) {
       console.warn(stime(this, this.ident('writeBacklog')), `failed:`, err)
       throw err

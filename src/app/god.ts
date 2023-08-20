@@ -23,14 +23,13 @@ export class AnkhMarker extends Container {
 export class God {
   static byName = new Map<string, God>(); // by god.name, not className(god): 'Set' not 'SetGod'
 
-  static get constructors() { return godConstructors } // Global godConstructors at bottom of file;
+  static get godCbyName() { return godCbyName; }
 
+  /** all God instances */
   static get allGods() {
     return Array.from(God.byName).map(([gname, god]) => god);
   }
-  static get allNames() {
-    return Array.from(godConstructors).map((god) => god.name);
-  }
+  static get allNames() { return Object.keys(godCbyName); }
 
   public player: Player;
   public name: string;
@@ -193,5 +192,6 @@ class Toth extends God {
 }
 
 // List all the God constructors:
-const godConstructors: Constructor<God>[] = [Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Ra, SetGod, Toth];
+const godCbyName: {[index: string]: Constructor<God>} = {Anubis: Anubis, Amun: Amun, Bastet: Bastet, Hathor: Hathor, Horus: Horus, Isis: Isis, Osiris: Osiris, Ra: Ra, Set: SetGod, Toth: Toth};
+
 // godSpecs.forEach(god => new god());

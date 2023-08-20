@@ -315,7 +315,7 @@ export class GameState {
         const omni = panels.filter(panel => panel.hasAnkhPower('Omnipresent'));
         omni.forEach(panel => this.addFollowers(panel.player, panel.nRegionsWithFigures(), `Omnipresent`));
         // do Scorpions:
-        const scorps = Scorpion.source.allUnitsCopy.filter(scorp => scorp.hex?.isOnMap);
+        const scorps = Scorpion.source.filterUnits(scorp => scorp.hex?.isOnMap);
         scorps.forEach(scorp => {
           const monts = scorp.attackMonuments;
           if (monts.length > 0) {

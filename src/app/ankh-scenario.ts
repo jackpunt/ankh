@@ -1,18 +1,21 @@
 
 // TODO: namespace or object for GameState names
 
-import { C, Constructor, S, className, stime } from "@thegraid/common-lib";
+import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { AnkhPiece, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
+import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
 import { HexDir } from "./hex-intfs";
+import { Meeple } from "./meeple";
 import type { Player } from "./player";
 import { ActionContainer } from "./table";
+import { Tile } from "./tile";
 import type { TileSource } from "./tile-source";
-import { AnkhToken } from "./ankh-token";
+import { removeEltFromArray } from "./functions";
 
 type GodName = string;
 export type GuardName = string | Constructor<Guardian>;
@@ -235,7 +238,7 @@ export class AnkhScenario {
   static AltMidKingdom5: Scenario = {
     ngods: 5,
     turn: 15,
-    godNames: ['Amun', 'Osiris', 'SetGod', 'Toth', 'Bastet'],
+    godNames: ['Amun', 'Osiris', 'Set', 'Toth', 'Bastet'],
     actions: { Move: [0,1,2,3,4], Summon: [2], Gain: [0,1,3,4], Ankh: [3,4], selected: [] },
     ankhs: [
       ['Inspiring', 'Omnipresent', 'Pyramid'],
@@ -365,7 +368,7 @@ export class ScenarioParser {
     if (unplaceAnkhs) {
       this.gamePlay.allPlayers.forEach(player => {
         const source = player.panel.ankhSource;
-        const units = source.allUnitsCopy.filter(unit => unit.hex !== source.hex);
+        const units = source.filterUnits(unit => unit.hex !== source.hex);
         units.forEach(unit => source.availUnit(unit));
       })
     }
@@ -418,7 +421,8 @@ export class ScenarioParser {
       table.turnLog.log(`turn = ${turn}`, `parseSetup`);
       table.gamePlay.turnNumber = turn;
       table.guardSources.forEach(source => {
-        source.allUnitsCopy.forEach(unit => (unit.moveTo(undefined), source.availUnit(unit)))
+        // retrieve Units from board or stables; return to source:
+        source.filterUnits(u => true).forEach(unit => (unit.moveTo(undefined), source.availUnit(unit)))
         source.nextUnit();
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
@@ -446,27 +450,33 @@ export class ScenarioParser {
     if (regions) this.parseRegions(regions);
     table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId)); // after parseRegions
     guards?.forEach((name, ndx) => {
-      if (typeof name !== 'string') name = name.name;
+      if (typeof name !== 'string') name = name.name; // if Constructor was given in Scenario def'n
+      const guardianConstructor = ClassByName.classByName[name] as Constructor<Guardian>;
       const source = table.guardSources[ndx];
-      const type = ClassByName.classByName[name] as Constructor<Guardian>;
       if (name !== source.type.name) {
-        const n = source.deleteAll();
-        const newSource = Guardian.makeSource(source.hex, type, n);
-        gamePlay.guards[ndx] = type;
+        // replace existing gamePlay.guards[ndx] & install new TileSource:
+        const n = source.deleteAll(unit => {
+          removeEltFromArray(unit, Tile.allTiles);
+          removeEltFromArray(unit, Meeple.allMeeples);
+          removeEltFromArray(unit, Figure.allFigures);
+        });
+        source.hex.cont.updateCache();
+        const newSource = Guardian.makeSource(source.hex, guardianConstructor, n);
+        gamePlay.guards[ndx] = guardianConstructor;
         table.guardSources[ndx] = newSource;
         newSource.nextUnit();
       }
     });
     stable?.forEach((gNames, pid) => {
       const player = allPlayers[pid], panel = player.panel;
-      // console.log(stime(this, `.stable:[${pid}]`), gNames);
-      gNames.forEach((gName, ndx) => {
-        const source = table.guardSources.find(source => (source.type.name === gName))
-        const rank = table.guardSources.indexOf(source) + 1;
-        // console.log(stime(this, `.stable:[${pid}] ${gName} source.allUnits=`), source?.allUnitsCopy)
+      console.log(stime(this, `.stable:[${pid}]`), gNames);
+      gNames.forEach((gName) => {
+        const ndx = table.guardSources.findIndex(source => (source.type.name === gName))
+        const source = table.guardSources[ndx];
         if (source) {
-          player.panel.takeGuardianIfAble(rank);
+          player.panel.takeGuardianIfAble(ndx);
         }
+        console.log(stime(this, `.stable:[${pid}]-${ndx} ${gName} source.allUnits=`), source?.filterUnits(u => true))
       });
     });
     // reset all AnkhTokens, ready for claim some Monument:
@@ -517,7 +527,8 @@ export class ScenarioParser {
     const regions = rawRegions.filter(r => !!r);
     const splits = gamePlay.hexMap.splits.slice(2);
     const events = table.eventCells.slice(0, table.nextEventIndex).map(elt => elt.pid);
-    const guards = gamePlay.guards.map(cog => cog.name) as GuardIdent;
+    // Guardian constructors used to fill table.guardSources:
+    const guards = gamePlay.guards.map(CoG => CoG.name) as GuardIdent;
     const actions: ActionElt = {};
     table.actionRows.forEach(({id}) => {
       const rowCont = table.actionPanels[id] as ActionContainer;

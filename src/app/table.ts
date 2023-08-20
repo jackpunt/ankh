@@ -112,7 +112,7 @@ export class RegionMarker extends Tile {
   }
   hexMap: AnkhMap<AnkhHex>;
   constructor(public regionId = 1 as RegionId, public table: Table) {
-    super(`Region\n${regionId}`);
+    super(`Region-${regionId}`);
     this.hexMap = table.hexMap as AnkhMap<AnkhHex>;
     const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
     this.baseShape.paint();
@@ -304,7 +304,7 @@ export class Table extends EventDispatcher  {
     this.turnLog.log(line, 'table.logTurn'); // in top two lines
   }
   logText(line: string, from = '') {
-    const text = this.textLog.log(`// ${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
+    const text = this.textLog.log(`// ${this.gamePlay.turnNumber}: ${line.replace(/\n/g,'-')}`, from); // scrolling lines below
     this.gamePlay.logWriter.writeLine(text);
 
   }
@@ -567,13 +567,12 @@ export class Table extends EventDispatcher  {
 
   guardSources: AnkhSource<Guardian>[] = [];
   makeGuardSources(row = 7, col = TP.nHexes + 6.8) {
-    const guards = this.gamePlay.guards;
-    guards.forEach((guard, i) => { // .filter((g, i) => i > 0)
+    this.gamePlay.guards.forEach((guard, i) => { // make source for each Guardian
       const rowi = row + i * 1.25;
       const hex = this.newHex2(rowi, col, `gs-${i}`, AnkhHex);
       this.setToRowCol(hex.cont, rowi, col);
-      const np = Player.allPlayers.length;
-      const n = [[0],[1,1,1],[1,1,1],[2,2,2],[3,2,2],[3,2,2],[3,2,2]][np][i];
+      const np = Player.allPlayers.length; // (0,1) 2,3,4,5
+      const n = [[0],[0],[1,1,1],[2,2,2],[3,2,2],[3,2,2]][np][i];
       const source = Guardian.makeSource(hex, guard, n);
       this.guardSources.push(source);
       this.sourceOnHex(source, hex);

@@ -77,8 +77,9 @@ export class PlayerPanel extends Container {
     return this.god.ankhPowers.includes(power);
   }
   get isResplendent() {
-    const hasThreeOfMonu = (typeName: string) => Figure.allFigures.filter(fig => fig.hex?.isOnMap && fig.player == this.player && (fig.name === typeName)).length >= 3;
-    return this.hasAnkhPower('Resplendent') && Monument.typeNames.find(type => hasThreeOfMonu(type));
+    const hasThreeOfMonu = (ndx: number) =>
+      this.table.monumentSources[ndx].filterUnits(mont => mont.player === this.player).length >= 3;
+    return this.hasAnkhPower('Resplendent') && Monument.typeNames.find((type, ndx) => hasThreeOfMonu(ndx));
   }
 
   /** at start of Battle */
@@ -286,6 +287,9 @@ export class PlayerPanel extends Container {
     const ankhSource = this.ankhSource = AnkhToken.makeSource(this.player, ankhHex, AnkhToken, 16);
     ankhSource.counter.x += TP.ankhRad * .6;
     ankhSource.counter.y += TP.ankhRad * .15;
+    const bg = new CircleShape('lightgrey', TP.ankhRad + 2, 'white', new Graphics().ss(4));
+    this.addChild(bg);
+      ankhHex.cont.localToLocal(0, 0, this, bg);
     table.sourceOnHex(ankhSource, ankhHex);
   }
 
@@ -330,8 +334,10 @@ export class PlayerPanel extends Container {
   };
 
   takeGuardianIfAble(rank: number, guard?: Guardian) {
-    const guardian = guard ?? this.stableSources[rank].takeUnit()?.setPlayerAndPaint(this.player);
+    const guardian = guard ?? this.table.guardSources[rank].takeUnit();
     if (!guardian) return;    // no Guardian to be picked/placed.
+    guardian.setPlayerAndPaint(this.player);
+    this.stage.update();
     const size = guardian.radius;
     const slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
     if (slot < 0) return;     // Stable is full! (no rings of the right size)
@@ -372,10 +378,10 @@ export class PlayerPanel extends Container {
       const ankhs = [this.ankhSource.takeUnit(), this.ankhSource.takeUnit(),];
       this.ankhPowerTokens.push(...ankhs);
       ankhs.forEach((ankh, i) => {
-        const mColor = (colCont.guardianSlot === i) ? 'purple' : C.black;
-        const marker = new CircleShape(mColor, brad);
+        const mColor = (colCont.guardianSlot === i) ? 'gold' : 'white';
+        const marker = new CircleShape('lightgrey', brad + 2, mColor, new Graphics().ss(4));
         marker.name = `place-marker`;
-        marker.x = ankh.x = (3 * brad + gap) + i * (2 * brad + gap);
+        marker.x = ankh.x = (3 * brad + gap) + i * (2 * brad + 2 * gap);
         marker.y = ankh.y = ankhRowy;
         marker.mouseEnabled = false;
         colCont.addChild(marker, ankh);
@@ -399,7 +405,7 @@ export class PlayerPanel extends Container {
         colCont.addChild(powerLine);
         colCont.powerLines.push(powerLine);
 
-        const button = new CircleShape(C.white, brad, );
+        const button = new CircleShape(C.white, brad);
         button.name = powerName;
         button.on(S.click, onClick, panel, false, button);
         button.mouseEnabled = false;
@@ -472,7 +478,6 @@ export class PlayerPanel extends Container {
 
 
     // Stable:
-  stableSources: AnkhSource<Figure>[] = [];
   stableHexes: StableHex[] = [];
   /** size for each type: Warrior, G1, G2, G3 */
   stableSizes = [TP.ankh1Rad, TP.ankh1Rad, TP.ankh2Rad, TP.ankh2Rad,]
@@ -500,7 +505,6 @@ export class PlayerPanel extends Container {
       circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       const source = (i === 0) ? Warrior.makeSource(player, hex) : table.guardSources[i - 1];
       table.sourceOnHex(source, hex);
-      this.stableSources.push(source);
       this.stableHexes.push(hex);
     });
     this.makeSpecial(stableCont.y - srad2, srad2 * 2)

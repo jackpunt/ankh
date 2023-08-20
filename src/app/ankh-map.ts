@@ -77,7 +77,7 @@ export class AnkhHex extends Hex2 {
   Avisit: number = undefined;
   terrain: Terrain;
   regionId: RegionId;
-  overlay: HexShape;
+  overlay: HexShape = this.newOverlay();
   get piece() { return this.tile ?? this.meep }
   isStableHex(): this is StableHex { return false; } // must be function/method not a 'get' to use 'is...'
 
@@ -91,11 +91,15 @@ export class AnkhHex extends Hex2 {
     return `${this.piece ?? this.Aname}`;
   }
 
+  newOverlay() {
+    const overlay = new HexShape(); // for showRegion()
+    overlay.paint('rgba(250,250,250,.3)');
+    overlay.visible = false;
+    this.cont.addChild(overlay);
+    return overlay
+  }
+
   override makeHexShape(shape?: Constructor<HexShape>): HexShape {
-    if (!this.overlay) this.overlay = new HexShape(undefined); // for showRegion()
-    this.overlay.paint('rgba(250,250,250,.3)');
-    this.overlay.visible = false;
-    this.cont.addChild(this.overlay);
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
 
@@ -126,13 +130,13 @@ export class AnkhHex extends Hex2 {
     const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
     const n = topo ? 1.5 : 3;
     const ndx  = Math.round(n * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
-    const dirs = topo === 'EW' ? this.ewHexDirs : topo === 'NS' ? this.nsHexDirs : this.anyHexDirs;
+    const dirs = topo === 'EW' ? AnkhHex.ewHexDirs : topo === 'NS' ? AnkhHex.nsHexDirs : AnkhHex.anyHexDirs;
     const hexDir = dirs[ndx] as HexDir;
     return { x, y, hexDir };
   }
-  ewHexDirs = ['W', 'SW', 'SE', 'E', 'NE', 'NW', 'W'];
-  nsHexDirs = ['WS', 'S', 'ES', 'EN', 'N', 'WN', 'WS'];
-  anyHexDirs = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'];
+  static ewHexDirs = ['W', 'SW', 'SE', 'E', 'NE', 'NW', 'W'];
+  static nsHexDirs = ['WS', 'S', 'ES', 'EN', 'N', 'WN', 'WS'];
+  static anyHexDirs = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'];
 
   /**
    * The XY coordinates of the indicated hexDir corner (or would-be corner for the indicated topo).

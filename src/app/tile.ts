@@ -64,7 +64,7 @@ class Tile0 extends Container {
   }
 
   get radius() { return TP.hexRad };
-  readonly baseShape: PaintableShape = this.makeShape();
+  baseShape: PaintableShape = this.makeShape();
 
   /** Default is TileShape; a HexShape with translucent disk.
    * add more graphics with paint(colorn)
@@ -124,7 +124,7 @@ export class Tile extends Tile0 {
     super()
     Tile.allTiles.push(this);
     this.name = className(this);
-    if (!Aname) this.Aname = `${this.name}\n${Tile.allTiles.length}`;
+    if (!Aname) this.Aname = `${this.name}-${Tile.allTiles.length}`;
     const rad = this.radius;
     if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
     this.addChild(this.baseShape);
@@ -166,7 +166,7 @@ export class Tile extends Tile0 {
   }
 
   override toString(): string {
-    return `${this.Aname.replace('\n','-')}@${this.hex?.Aname ?? this.fromHex?.Aname ?? '?'}`;
+    return `${this.Aname}@${this.hex?.Aname ?? this.fromHex?.Aname ?? '?'}`;
   }
 
 
@@ -179,7 +179,7 @@ export class Tile extends Tile0 {
     return bm;
   }
 
-  addTextChild(y0 = this.radius / 2, text = this.Aname, size = Tile.textSize, vis = false) {
+  addTextChild(y0 = this.radius / 2, text = this.Aname.replace(/-/g, '\n'), size = Tile.textSize, vis = false) {
     const nameText = new CenterText(text, size);
     nameText.y = y0;         // Meeple overrides in constructor!
     nameText.visible = vis;
@@ -331,7 +331,7 @@ export class WhiteTile extends Tile {
 /** a half-sized Tile. */
 export class Token extends Tile {
 
-  override makeShape() {
+  override makeShape(): PaintableShape {
     return new HexShape(this.radius * .5);
   }
 

@@ -51,3 +51,8 @@ export function textBounds(t: Text | string, fs?: number, cons: Constructor<Text
 export function json(obj: object): string {
   return JSON.stringify(obj).replace(/"/g, '')
 }
+
+export function afterUpdate(cont: DisplayObject, after: () => void) {
+  cont.stage.on('drawend', after, this, true);
+  cont.stage.update();
+}

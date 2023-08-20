@@ -21,7 +21,7 @@ export class AnkhToken extends AnkhMeeple {
   }
 
   constructor(player: Player, serial: number) {
-    super(player, serial, `Ankh`); // `Ankh:${player?.index}\n${serial}`, player);
+    super(player, serial, `Ankh`); // `Ankh:${player?.index}-${serial}`, player);
     this.name = `Ankh:${player?.index}-${serial}`;
     const r = this.radius;
     const ankhChar = new CenterText(TP.ankhString, r * 2.2, C.black);
@@ -42,8 +42,7 @@ export class AnkhToken extends AnkhMeeple {
 
   atcgf(color: string) {
     const g = new Graphics(), r = this.radius;
-    g.ss(1).s(C.black).dc(0, 0, r - 1);
-    g.f(color).dc(0, 0, r - 1);
+    g.f(color).es().dc(0, 0, r - 0);
     return g;
   }
 

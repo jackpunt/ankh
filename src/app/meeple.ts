@@ -34,10 +34,9 @@ class MeepleShape extends PaintableShape {
   }
 
   /** stroke a ring of colorn, stroke-width = 2, r = radius-2; fill disk with (~WHITE,.7) */
-  mscgf(colorn = this.player?.colorn ?? C1.grey) {
-    const r = this.radius, ss = 2, rs = 1;
-    const g = this.graphics.c().ss(ss).s(colorn).dc(0, 0, r - rs);
-    g.f(MeepleShape.fillColor).dc(0, 0, r - 1);  // disk
+  mscgf(colorn = this.player?.colorn ?? C1.grey, ss = 2, rs = 0) {
+    const r = this.radius;
+    const g = this.graphics.c().ss(ss).s(colorn).f(MeepleShape.fillColor).dc(0, 0, r - rs - ss/2);  // disk & ring
     return g;
   }
 }
@@ -79,7 +78,7 @@ export class Meeple extends Tile {
   override get radius() { return TP.meepleRad } // 31.578 vs 60*.4 = 24
   override textVis(v: boolean) { super.textVis(true); }
   override makeShape() { return new MeepleShape(this.player, this.radius); }
-  override baseShape: MeepleShape = this.makeShape();
+  declare baseShape: MeepleShape;
 
   /** location at start-of-turn; for Meeples.unMove() */
   startHex: Hex1;
@@ -150,7 +149,7 @@ export class Meeple extends Tile {
       this.unMove();          // this.hex = this.startHex;
     }
     super.markLegal(table, setLegal);
-    this.fromHex.isLegal = !!setLegal; // if (this.startHex)
+    if (this.fromHex) this.fromHex.isLegal = !!setLegal; // if (this.startHex) [not all Tiles have a fromHex!]
     return;
   }
 
@@ -184,16 +183,6 @@ export class Meeple extends Tile {
       if (!source.hex.meep) source.nextUnit();
     }
   }
-
-  // from SourcedMeeple:
-  paintRings(colorn: string, rColor = C.BLACK, ss = 4, rs = 4) {
-    const meepleShape = this.baseShape as MeepleShape;
-    const r = meepleShape.radius;
-    const g = meepleShape.paint(colorn);       // [2, 1]
-    g.ss(ss).s(rColor).dc(0, 0, r - rs) // stroke a colored ring inside black ring
-    this.updateCache();
-  }
-
 
   static xmakeSource0<T extends Meeple, TS extends UnitSource<T>>(
     unitSource: new (type: Constructor<Meeple>, p: Player, hex: Hex2) => TS,

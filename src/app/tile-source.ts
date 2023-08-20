@@ -1,8 +1,6 @@
 import { Constructor } from "@thegraid/common-lib";
 import { ValueEvent } from "@thegraid/easeljs-lib";
-import { Figure } from "./ankh-figure";
 import { NumCounter } from "./counters";
-import { removeEltFromArray } from "./functions";
 import type { Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -84,14 +82,12 @@ export class TileSource<T extends Tile> {
    * remove all from available (and allUnits)
    * @return number of units deleted (previous length of allUnits).
    */
-  deleteAll() {
+  deleteAll(doAlso: (unit: T) => void) {
     const n = this.allUnits.length;
     this.allUnits.forEach(unit => {
       unit.moveTo(undefined); // --> this.nextUnit();
       unit.parent?.removeChild(unit);
-      removeEltFromArray(unit, Tile.allTiles);
-      removeEltFromArray(unit, Meeple.allMeeples);
-      removeEltFromArray(unit, Figure.allFigures);
+      doAlso(unit);
     })
     this.allUnits.length = 0;
     this.available.length = 0;
@@ -99,7 +95,7 @@ export class TileSource<T extends Tile> {
     return n;
   }
 
-  get allUnitsCopy() { return this.allUnits.concat(); }
+  filterUnits(pred: (unit: T) => boolean) { return this.allUnits.filter(pred) }
 
   get sourceHexUnit() {
     return (this.hex.tile || this.hex.meep) as T; // moveTo puts it somewhere...
