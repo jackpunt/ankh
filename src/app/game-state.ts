@@ -627,12 +627,14 @@ export class GameState {
 
   }
   // if (winner === undefined): all non-GodFigure are at risk.
-  deadFigs(cause: string, winner: God | undefined, rid: RegionId, floodProtects = false) {
+  deadFigs(cause: string, winner: God | undefined, rid: RegionId, isBattle = true) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
+    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHex(hex => hex.meep && (hex.meep?.player.godName !== 'Isis'));
     const region = this.gamePlay.hexMap.regions[rid - 1];
     const figsInRegion = region.map(hex => hex?.meep).filter(meep => meep instanceof Figure) as Figure[];
     const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !(fig.controller === winner));
-    const deadFigs = floodProtects ? deadFigs0.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs0;
+    const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisProtected(fig)) : deadFigs0;
+    const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
     this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
     deadFigs.forEach(fig => fig.sendHome());
     return deadFigs;

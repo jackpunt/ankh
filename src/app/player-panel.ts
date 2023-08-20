@@ -16,6 +16,7 @@ import { TileSource } from "./tile-source";
 export interface PowerLine extends Container {
   ankhToken: AnkhToken;
   button: CircleShape;
+  power: number;
   qmark: Text;
   text: Text;
   docText: UtilButton;
@@ -97,8 +98,8 @@ export class PlayerPanel extends Container {
     }
     const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionNdx); addStrength(nFigures, 'Figures');
     const cardsInPlay = this.cardsInBattle;
-    const cardSpecsInPlay = cardsInPlay.map(pl => PlayerPanel.cardSpecs.find(([name, text, doc, power]) => name === pl.name));
-    cardSpecsInPlay.forEach(([name, text, doc, power]) => addStrength(power, name));
+    const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.power ?? 0] as [string, number]);
+    namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
       const activeTemples = temples.filter(tmpl => tmpl.filterAdjHex(hex => hex.meep?.player == this.player));
@@ -411,6 +412,7 @@ export class PlayerPanel extends Container {
         button.mouseEnabled = false;
         powerLine.addChild(button);
         powerLine.button = button;
+        powerLine.power = power;
         const qmark = new CenterText('?', brad * 1.4, C.BLACK);
         qmark.visible = qmark.mouseEnabled = false;
         if (!!power) {
