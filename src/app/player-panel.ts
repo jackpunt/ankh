@@ -1,9 +1,10 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
+import { Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
+import { God } from "./god";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
@@ -274,9 +275,13 @@ export class PlayerPanel extends Container {
   }
 
   highlightStable(show = true) {
-    // we want to HIGHLIGHT when 'Move' action is choosen.
+    // we want to HIGHLIGHT when 'Summon' action is choosen.
     // if stable is normally faceDown, then we can face them up when activated !?
-    return this.stableHexes.map(hex => hex.meep?.highlight(show, C.BLACK) as Figure).filter(m => (m !== undefined))
+    const stableFigs = this.stableHexes.map(hex => hex.figure).filter(fig => !!fig);
+    const anubisHexes = (God.byName.get('Anubis')?.doSpecial('occupied') ?? []) as AnkhHex[];
+    const anubisFigs = anubisHexes.map(hex => hex.figure).filter(fig => fig.player === this.player);
+    const summonFigs = stableFigs.concat(anubisFigs);
+    return summonFigs.filter(fig => fig.highlight(show, C.BLACK))
   }
 
   makeAnkhSource() {
@@ -328,7 +333,7 @@ export class PlayerPanel extends Container {
     }
     // Maybe get Guardian:
     if (colCont.guardianSlot === ankhCol) {
-      this.takeGuardianIfAble(colCont.rank)
+      this.takeGuardianIfAble(colCont.rank - 1)
     }
     this.stage.on('drawend', () => this.player.gamePlay.phaseDone(), this, true);
     this.stage.update();

@@ -218,11 +218,12 @@ export class AnkhMeeple extends Meeple {
     return underlay;
   }
 
-  highlight(show = true, color = C.BLACK, dr = 4) {
+  /** draw ring of size dr around the AnkhMeeple */
+  highlight(show = true, color = C.BLACK, dr = 6) {
     const rad = this.radius + dr;
     if (show) {
       // cgf with color *and* rad:
-      this.underlay.cgf = (color) => new Graphics().f(color).dc(0, 0, rad);
+      this.underlay.cgf = (color) => new Graphics().ss(dr).s(color).dc(0, 0, rad-dr/2);
       this.underlay.paint(color);
       this.underlay.visible = true;
       if (this.cacheID) {
@@ -292,6 +293,10 @@ export class Figure extends AnkhMeeple {
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
     return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon(ctx));
   }
+  isAnubisSummon() {
+    const anubis = God.byName.get('Anubis'), anubisHexes = anubis?.doSpecial() as AnkhHex[];
+    return (!!anubisHexes?.includes(this.hex) && this.player.coins > 0);
+  }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
     // see also Meeple.canBeMovedBy: canAutoUnmove && backside.visible
@@ -339,7 +344,7 @@ export class Figure extends AnkhMeeple {
     if (!this.isLegalWater(hex)) return false;              // Apep can Summon to water!
 
     // isSummon: adjacent to existing, player-owned Figure or Monument.
-    if (this.isFromStable && (ctx.phase === ('Summon') || ctx.lastShift)) {
+    if ((this.isFromStable || this.isAnubisSummon() ) && (ctx.phase === ('Summon') || ctx.lastShift)) {
       return this.isLegalSummon(hex, ctx);
       // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
     }
@@ -416,6 +421,14 @@ export class Warrior extends Figure {
 
   override get isFromStable(): boolean {
     return this.hex === this.source.hex;
+  }
+
+  override placeTile(toHex: Hex1, payCost?: boolean): void {
+    const anubisHexes = God.byName.get('Anubis')?.doSpecial('all') as Hex2[];
+    if (anubisHexes?.includes(this.fromHex) && toHex.isOnMap) {
+      this.player.gamePlay.gameState.addFollowers(this.player, -1, `Ransom to Amun for ${this.Aname}`);
+    }
+    super.placeTile(toHex, payCost);
   }
 }
 

@@ -59,34 +59,13 @@ export class God {
     cont.addChild(tname);
     return cont;
   }
-  doSpecial(...args: any[]) { return; }
+  doSpecial(...args: any[]): any { return; }
 
   get nCardsAllowedInBattle() { return 1; }
   set nCardsAllowedInBattle(n: number) { }
   figure: GodFigure;
 }
-class Anubis extends God {
-  constructor() { super('Anubis', 'green') }
 
-  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
-    super.makeSpecial(cont0, wh, table);
-    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AnubisHex.scale;
-    cont0.addChild(cont);
-    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
-    const sgap = (wh.width / sc - 6 * rad) / 4;
-    [rad, rad, rad].forEach((radi, i) => {
-      const circle = new CircleShape('lightgrey', radi, this.color);
-      circle.x = sgap + radi + i * (2 * radi + sgap);
-      circle.y = y;
-      cont.addChild(circle);
-      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex);
-      hex.cont.visible = false;
-      cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
-      hex.legalMark.setOnHex(hex);
-    });
-    return cont0;
-  }
-}
 /** AmunHex scales the Tile or Meep by .8 */
 class AnubisHex extends AnkhHex {
   static scale = .8;
@@ -117,6 +96,43 @@ class AnubisHex extends AnkhHex {
       tile.scaleX = tile.scaleY = AnubisHex.scale;
       tile.updateCache();
     }
+  }
+}
+
+
+class Anubis extends God {
+  constructor() { super('Anubis', 'green') }
+  anubisHexes: AnubisHex[] = [];
+
+  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont0, wh, table);
+    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AnubisHex.scale;
+    cont0.addChild(cont);
+    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
+    const sgap = (wh.width / sc - 6 * rad) / 4;
+    [rad, rad, rad].forEach((radi, i) => {
+      const circle = new CircleShape('lightgrey', radi, this.color);
+      circle.x = sgap + radi + i * (2 * radi + sgap);
+      circle.y = y;
+      cont.addChild(circle);
+      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex) as AnubisHex;
+      this.anubisHexes.push(hex);
+      hex.cont.visible = false;
+      cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      hex.legalMark.setOnHex(hex);
+    });
+    return cont0;
+  }
+  override doSpecial(query: string) {
+    switch (query) {
+      case 'empty': {
+        return this.anubisHexes.find(ah=> ah.figure === undefined);
+      }
+      case 'occupied': {
+        return this.anubisHexes.filter(ah => ah.figure !== undefined);
+      }
+    }
+    return this.anubisHexes;
   }
 }
 

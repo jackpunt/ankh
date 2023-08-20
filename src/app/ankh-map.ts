@@ -1,12 +1,12 @@
 import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
-import { Graphics } from "@thegraid/easeljs-module";
-import type { AnkhMeeple, AnkhPiece, Guardian } from "./ankh-figure";
+import { Graphics, Shape } from "@thegraid/easeljs-module";
+import type { AnkhMeeple, AnkhPiece, Figure, Guardian } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
-import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
+import { Hex, Hex2, HexConstructor, HexMap, HexMark } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { EdgeShape, HexShape } from "./shapes";
+import { CircleShape, EdgeShape, HexShape, RectShape } from "./shapes";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 
@@ -86,6 +86,8 @@ export class AnkhHex extends Hex2 {
 
   override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
   override set tile(tile: Tile) { super.tile = tile; }
+
+  get figure(): Figure { return this.meep as Figure }
 
   override toString(sc?: string): string {
     return `${this.piece ?? this.Aname}`;

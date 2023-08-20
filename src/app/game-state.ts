@@ -1,5 +1,5 @@
 import { C, stime } from "@thegraid/common-lib";
-import { Figure, GodFigure, Monument, Obelisk, Scorpion } from "./ankh-figure";
+import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
@@ -636,7 +636,18 @@ export class GameState {
     const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisProtected(fig)) : deadFigs0;
     const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
     this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
-    deadFigs.forEach(fig => fig.sendHome());
+    const anubis = God.byName.get('Anubis');
+    const anubisFigs = [], deadFigs2 = deadFigs.concat();
+    deadFigs2.forEach(fig => {
+      const slot = anubis?.doSpecial('empty') as AnkhHex;
+      if (!!slot && (fig instanceof Warrior) && !anubisFigs.find(af => af.player === fig.player)) {
+        this.table.logText(`Anubis traps ${fig} of ${fig.player.godName}`);
+        anubisFigs.push(fig);              // prevent 2nd figure from same player.
+        fig.moveTo(slot);
+      } else {
+        fig.sendHome();
+      }
+    });
     return deadFigs;
   }
 
