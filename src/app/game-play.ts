@@ -2,7 +2,7 @@ import { Constructor, json } from "@thegraid/common-lib";
 import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
-import { AnkhHex, AnkhMap } from "./ankh-map";
+import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { afterUpdate } from "./functions";
 import type { GameSetup } from "./game-setup";
@@ -302,6 +302,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
+    KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     KeyBinder.keyBinder.setKey('C', () => {

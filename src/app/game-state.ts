@@ -1,5 +1,5 @@
 import { C, stime } from "@thegraid/common-lib";
-import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
+import { Figure, GodFigure, Monument, Obelisk, Portal, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
@@ -85,6 +85,7 @@ export class GameState {
    */
   doneButton(label?: string, color = this.gamePlay.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
     const doneButton = this.table.doneButton;
+    doneButton.visible = true;
     doneButton.label.text = label;
     doneButton.paint(color, true);
     doneButton.updateWait(false, afterUpdate);
@@ -523,10 +524,10 @@ export class GameState {
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         this.scoreMonuments(false);
-        this.phase('BattleResolution')
+        this.phase('Battle')
       },
     },
-    BattleResolution: {
+    Battle: {
       panels: [],
       start: () => {
         const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
@@ -598,14 +599,30 @@ export class GameState {
         });
         panels0.forEach(panel => panel.battleCardsToTable());
         panels0.forEach(panel => panel.cycleWasPlayed && panel.allCardsToHand());
-        this.phase('ConflictNextRegion')
+        // resolve Mummy in deadFigs;
+        // resolve Osiris:
+        const nextState = panels.find(panel => panel.player.godName === 'Osiris') ? 'Osiris' : 'ConflictNextRegion';
+        this.phase(nextState);
       },
+    },
+    Osiris: {
+      start: () => {
+        const osiris = God.byName.get('Osiris'); Portal
+        // highlight empty cells of conflictRegion
+        osiris.doSpecial(true);// highlight Portal tiles.
+        this.doneButton('Place Portal', osiris.color);
+      },
+      done: () => {
+        const osiris = God.byName.get('Osiris');
+        osiris.doSpecial(false);  // un-highlight Portal tiles.
+        this.phase('ConflictNextRegion');
+      }
     },
     ConflictDone: {
       start: () => {
         this.conflictRegion = undefined;
         this.highlightRegions(false);
-        God.byName.get('Amun')?.doSpecial(true);
+        God.byName.get('Amun')?.doSpecial(true); // reset 'Two Cards' token.
         this.phase('EventDone');
       },
       // coins from Scales to Toth, add Devotion(Scales)
@@ -640,7 +657,7 @@ export class GameState {
     const anubisFigs = [], deadFigs2 = deadFigs.concat();
     deadFigs2.forEach(fig => {
       const slot = anubis?.doSpecial('empty') as AnkhHex;
-      if (!!slot && (fig instanceof Warrior) && !anubisFigs.find(af => af.player === fig.player)) {
+      if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !anubisFigs.find(af => af.player === fig.player)) {
         this.table.logText(`Anubis traps ${fig} of ${fig.player.godName}`);
         anubisFigs.push(fig);              // prevent 2nd figure from same player.
         fig.moveTo(slot);

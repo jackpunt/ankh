@@ -1,4 +1,3 @@
-import type { Constructor } from "@thegraid/common-lib"
 
 export const playerColors = ['b', 'w'] as const // Player Colors!
 export const playerColorsC = ['b', 'w', 'c'] as const // Player Colors + Criminal!
@@ -24,7 +23,10 @@ export class TP {
   static useEwTopo = false;
   static ankhRad = 20;
   static ankh1Rad = 36;
-  static ankh2Rad = 48;
+  static ankh2Rad = 45;
+  static hexRad = 60;
+  static meepleRad = TP.hexRad * .4;
+  static meepleY0 = 0;//TP.hexRad * .25;
   static warriorPerPlayer = 6;
   static textLogLines = 13;
   static placeAdjacent = true;
@@ -58,9 +60,6 @@ export class TP {
   static nDistricts = 1;
   static nVictory = 3  // number of Colony to win
   static tHexes = TP.ftHexes(this.mHexes) * TP.ftHexes(this.nHexes)
-  static hexRad = 60;
-  static meepleRad = TP.hexRad * .4;
-  static meepleY0 = 0;//TP.hexRad * .25;
   static log = 0
   static riverColor = '#90b2f4';
   static borderColor = '#4D5656'; // darker than riverColor

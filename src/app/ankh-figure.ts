@@ -1,19 +1,19 @@
-import { C, Constructor, XY, className, stime } from "@thegraid/common-lib";
+import { C, Constructor, XY, className } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { GuardName } from "./ankh-scenario";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
+import { God } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { H } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { C1, CenterText, CircleShape, HexShape, PaintableShape } from "./shapes";
+import { C1, CircleShape, HexShape, PaintableShape } from "./shapes";
 import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import { God } from "./god";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -162,8 +162,9 @@ export class Portal extends AnkhPiece {
   static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
     return AnkhPiece.makeSource0(AnkhSource<Portal>, Portal, player, hex, n);
   }
-  static radius0 = TP.ankh2Rad;
+  static color = 'rgba(80,80,80,.8)';
   static dr = 3;
+  static radius0 = TP.hexRad - Portal.dr - 1;
   override get radius() { return Portal.radius0 + Portal.dr };
 
   constructor(player: Player, serial?: number) {
@@ -172,24 +173,34 @@ export class Portal extends AnkhPiece {
     const hscgf = base.cgf;
     base.cgf = (color) => {
       base.graphics.c().f(color).dp(0, 0, this.radius, 6, 0, 0);
-      return hscgf('rgba(80,80,80,.8)');
+      return hscgf(Portal.color);
     }
    }
 
-   override makeShape(): PaintableShape {
+  override makeShape(): PaintableShape {
     return new HexShape(Portal.radius0); // hexgon properly oriented...
-   }
+  }
 
+  highlight(vis = true) {
+    this.paint(vis ? 'black' : this.player.color);
+  }
+
+  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
+    super.dropFunc(targetHex, ctx);
+    this.parent.addChildAt(this, 0); // under any Figure
+  }
+
+  override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
+    return (ctx.phase === 'Osiris') ? undefined : 'Only after losing in Battle';
+  }
+   // at end of Battle: Osiris Special:
+   // enable move Portal to any empty non-Water space in the conflictRegion.
+   // any figure that was on the Portal remains where it was.
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-    if (this.isPhase('Summon')) {
-      if (this.hex === this.source.hex) { // assert: one of those is true...
-        // TODO: isOnMap && isOccupiedLegal
-        return super.isLegalTarget(toHex, ctx);
-      } else if (this.isPhase('Battle')) {
-        if (this.gamePlay.gameState.battleResults) return true;
-      }
-    }
-    return false;
+    return (ctx.phase === 'Osiris')
+      && (toHex instanceof AnkhHex)
+      && !toHex.occupied
+      && (toHex.regionId === ctx.regionId)
   }
 }
 
@@ -287,11 +298,17 @@ export class Figure extends AnkhMeeple {
   _lastController: God;
   get lastController() { return this._lastController ?? this.player.god; }
 
-  isOsirisSummon(ctx: DragContext) {
-    return this.hex.isStableHex() && ctx.phase === ('Summon') && this.player?.god.Aname === 'Osiris';
+  /** summon from Stable to Portal on map */
+  isOsirisSummon(hex: AnkhHex, ctx: DragContext) {
+    return hex.isOnMap
+      && (hex.figure === undefined)
+      && this.isFromStable
+      && (ctx.phase === 'Summon')
+      && (this.player?.godName === 'Osiris')
+      && (hex.tile instanceof Portal);
   }
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
-    return !hex.piece || ((hex.piece instanceof Portal) && this.isOsirisSummon(ctx));
+    return !hex.piece;
   }
   isAnubisSummon() {
     const anubis = God.byName.get('Anubis'), anubisHexes = anubis?.doSpecial() as AnkhHex[];
@@ -323,8 +340,8 @@ export class Figure extends AnkhMeeple {
   override isLegalTarget0(hex: AnkhHex, ctx?: DragContext) {  // Meeple
     if (!hex) return false;
     // AnkhToken can moveTo Monument, but that is not a user-drag.
-    if (!this.isOccupiedLegal(hex, ctx)) return false;
     if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
+    if (!!hex.occupied && !(this.player.godName === 'Osiris' && hex.tile?.name === 'Portal') ) return false;
     if (this.backSide.visible && !ctx?.lastShift) return false;
     return true;
   }
@@ -332,14 +349,17 @@ export class Figure extends AnkhMeeple {
   get isFromStable() { return false; }
 
   isLegalSummon(hex: AnkhHex, ctx?: DragContext) {
-    if (!(hex.findAdjHex(adj => adj.piece?.player === this.player && adj.piece !== this))) return false;
-    return true;
+    // can Summon -on- Portal, but it does not confer Monument adjacency
+    return hex.findAdjHex(adj =>
+      !hex.occupied && (adj.tile instanceof Monument) ? (adj.tile.player === this.player) : (adj.figure?.player === this.player));
   }
+
   isLegalMove(hex: AnkhHex, ctx?: DragContext) {
     return (hex.isOnMap && this.distWithin(hex, this.hex, 3));
   }
 
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext) { // Police
+    if (this.isOsirisSummon(hex, ctx)) return true;         // is Summon from Stable to Portal hex on map.
     if (!this.isLegalTarget0(hex, ctx)) return false;
     if (!this.isLegalWater(hex)) return false;              // Apep can Summon to water!
 
@@ -433,7 +453,7 @@ export class Warrior extends Figure {
 }
 
 export class Guardian extends Figure {
-  static source: TileSource<Guardian>;
+  static source: AnkhSource<Guardian>;
   static get constructors() { return guardianConstructors } // Global godConstructors at bottom of file;
   static byName = new Map<GuardName, Constructor<Guardian>>();
   static setGuardiansByName() {

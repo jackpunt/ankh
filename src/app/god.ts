@@ -1,6 +1,6 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhPiece, AnkhSource, Figure, GodFigure, Portal } from "./ankh-figure";
+import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal } from "./ankh-figure";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
 import { CenterText, CircleShape, UtilButton } from "./shapes";
@@ -66,9 +66,10 @@ export class God {
   figure: GodFigure;
 }
 
-/** AmunHex scales the Tile or Meep by .8 */
-class AnubisHex extends AnkhHex {
+/** SpecialHex scales the Tile or Meep by .8 */
+class SpecialHex extends AnkhHex {
   static scale = .8;
+  scale = SpecialHex.scale;
 
   override get meep() { return super.meep; }
 
@@ -79,7 +80,7 @@ class AnubisHex extends AnkhHex {
     }
     super.meep = meep;
     if (meep !== undefined) {
-      meep.scaleX = meep.scaleY = AnubisHex.scale;
+      meep.scaleX = meep.scaleY = SpecialHex.scale;
       meep.updateCache();
     }
   }
@@ -93,7 +94,7 @@ class AnubisHex extends AnkhHex {
     }
     super.tile = tile;
     if (tile !== undefined) {
-      tile.scaleX = tile.scaleY = AnubisHex.scale;
+      tile.scaleX = tile.scaleY = this.scale;
       tile.updateCache();
     }
   }
@@ -102,11 +103,12 @@ class AnubisHex extends AnkhHex {
 
 class Anubis extends God {
   constructor() { super('Anubis', 'green') }
-  anubisHexes: AnubisHex[] = [];
+  anubisHexes: SpecialHex[] = [];
 
   override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
     super.makeSpecial(cont0, wh, table);
-    const cont = new Container(), sc = cont.scaleX = cont.scaleY = AnubisHex.scale;
+    const cont = new Container(), sc = cont.scaleX = cont.scaleY = SpecialHex.scale;
+    cont.name = 'AnubisCont';
     cont0.addChild(cont);
     const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
     const sgap = (wh.width / sc - 6 * rad) / 4;
@@ -115,7 +117,7 @@ class Anubis extends God {
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont.addChild(circle);
-      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex) as AnubisHex;
+      const hex = table.newHex2(0, 0, `amun-${i}`, SpecialHex) as SpecialHex;
       this.anubisHexes.push(hex);
       hex.cont.visible = false;
       cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
@@ -182,17 +184,22 @@ class Isis extends God {
 
 class Osiris extends God {
   constructor() { super('Osiris', 'lightgreen') }
+  osirisHex: SpecialHex;
+  osirisSource: AnkhSource<Portal>;
   override makeSpecial(cont: Container, wh: WH, table: Table): Container {
     super.makeSpecial(cont, wh, table);
-    const hex = table.newHex2(0, 0, `portals`, AnubisHex)
+    const hex = this.osirisHex = table.newHex2(0, 0, `portals`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
-    const source = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
+    const source = this.osirisSource = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * 1.5;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
     return cont;
   }
 
+  override doSpecial(vis = true) {
+    this.osirisSource.filterUnits(unit => (unit.highlight(vis), false));
+  }
 }
 
 class Ra extends God {

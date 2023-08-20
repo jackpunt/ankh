@@ -1,6 +1,6 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
+import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
@@ -10,7 +10,6 @@ import { Player } from "./player";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
-import { TileSource } from "./tile-source";
 
 
 /** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */
@@ -88,7 +87,7 @@ export class PlayerPanel extends Container {
   nFigsInBattle: number;
   strength = 0;
   reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
-  /** BattleResolution phase */
+  /** Battle phase */
   strengthInRegion(regionNdx: number) {
     this.reasons = { name: this.name, total: 0 };
     this.strength = 0;
@@ -142,7 +141,7 @@ export class PlayerPanel extends Container {
     this.activateCardSelector(false, 'Teleport');
   }
   outline: RectShape;
-  ankhSource: TileSource<AnkhToken>;
+  ankhSource: AnkhSource<AnkhToken>;
   get god() { return this.player.god; }
 
   constructor(

@@ -1,5 +1,5 @@
 import { Constructor } from "@thegraid/common-lib";
-import { Androsphinx, Apep, Figure, GodFigure, Monument, CatMum, Mummy, Obelisk, Pyramid, Satet, Scorpion, Temple, Warrior } from "./ankh-figure";
+import { Androsphinx, Apep, Figure, GodFigure, Monument, CatMum, Mummy, Obelisk, Pyramid, Satet, Scorpion, Temple, Warrior, Portal } from "./ankh-figure";
 import { AnkhToken } from "./ankh-token";
 
 export class ClassByName {
@@ -10,6 +10,7 @@ export class ClassByName {
       'Apep': Apep, 'Mummy': Mummy,
       'Androsphinx': Androsphinx, 'Scorpion': Scorpion,
       'AnkhToken': AnkhToken,
+      "Portal": Portal,
     }
 
 }

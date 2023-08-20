@@ -47,6 +47,9 @@ export class AnkhToken extends AnkhMeeple {
   }
 
   override moveTo(hex: Hex1): Hex1 {
+    if (hex?.meep instanceof AnkhToken) {
+      hex.meep.sendHome();  // Assert: (phase === 'Claim') && no unclaimed Monuments.
+    }
     const rv = super.moveTo(hex);
     if (hex?.isOnMap) {
       this.y += TP.ankh2Rad - this.radius;

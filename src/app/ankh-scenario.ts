@@ -3,10 +3,11 @@
 
 import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
-import { AnkhPiece, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
+import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
+import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
 import { HexDir } from "./hex-intfs";
@@ -14,8 +15,6 @@ import { Meeple } from "./meeple";
 import type { Player } from "./player";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
-import type { TileSource } from "./tile-source";
-import { removeEltFromArray } from "./functions";
 
 type GodName = string;
 export type GuardName = string | Constructor<Guardian>;
@@ -234,6 +233,21 @@ export class AnkhScenario {
     ankhs: [["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid"],["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid"]],
     places: [[4,1,"Obelisk",null],[3,5,"Obelisk",3],[3,8,"Obelisk",null],[5,5,"Pyramid",2],[7,0,"Pyramid",1],[2,8,"Pyramid",3],[5,7,"Pyramid",4],[4,2,"Temple",1],[8,4,"Temple",2],[1,3,"Temple",null],[8,6,"Temple",null],[2,4,"Warrior",1],[3,3,"Warrior",1],[5,4,"Warrior",2],[4,5,"Warrior",3],[7,5,"Warrior",4],[6,0,"CatMum",1],[7,4,"CatMum",2],[6,1,"GodFigure",1],[7,1,"GodFigure",2],[2,7,"GodFigure",3],[1,7,"GodFigure",4]],
   }
+  static withPortal = {
+    ngods: 2,
+    godNames: ["Anubis","Osiris"],
+    turn: 13,
+    regions: [[1,5,1],[4,6,2],[4,5,3],[1,6,4]],
+    splits: [[[3,5,4,false],[1,5,"EN"],[2,6,"WN"],[2,6,"WS"],[3,6,"WN"],[2,5,"S"],[3,5,"WN"]]],
+    guards: ["CatMum","Apep","Scorpion"],
+    events: [0,1,0,1,1,0],
+    actions: {"Move":[0,1],"Summon":[0],"Gain":[1,1,0],"Ankh":[0],"selected":[]},
+    coins: [14,2],
+    scores: [5,7],
+    stable: [[],[]],
+    ankhs: [["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"],["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"]],
+    places: [[2,6,"CatMum",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[1,3,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[1,4,"Warrior",2],[1,5,"Portal",2],[0,4,"Apep",1],[1,5,"Scorpion",2],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
+  }
 
   static AltMidKingdom5: Scenario = {
     ngods: 5,
@@ -381,9 +395,9 @@ export class ScenarioParser {
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
-      const source = ((source0 instanceof Array) ? source0[player?.index] : source0) as TileSource<AnkhPiece>;
+      const source = ((source0 instanceof Array) ? source0[pid - 1] : source0) as AnkhSource<AnkhPiece>;
       const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure;
-      let piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
+      const piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       if (piece instanceof Guardian) {
         // put in Stable first, to reserve its slot for future sendHome()

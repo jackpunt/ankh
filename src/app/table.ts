@@ -5,6 +5,7 @@ import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { ClassByName } from "./class-by-name";
 import { type GamePlay } from "./game-play";
+import type { GameState } from "./game-state";
 import { AnkhMarker } from "./god";
 import { Hex, Hex2, HexMap, IHex } from "./hex";
 import { H, XYWH } from "./hex-intfs";
@@ -14,7 +15,6 @@ import { CenterText, CircleShape, HexShape, PaintableShape, PolyShape, RectShape
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import type { GameState } from "./game-state";
 //import { TablePlanner } from "./planner";
 
 function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpperCase() : s.substring(0, 1) };
@@ -214,6 +214,7 @@ export interface DragContext {
   nLegal?: number;      // number of legal drop tiles (excluding recycle)
   gameState?: GameState;// gamePlay.gameState
   phase?: string;       // keysof GameState.states
+  regionId?: RegionId;  // during Battle
 }
 
 class TextLog extends Container {
@@ -703,6 +704,7 @@ export class Table extends EventDispatcher  {
   doneButton: UtilButton;
   doneClicked = (evt?) => {
     this.activateActionSelect(false); // deactivate all
+    this.doneButton.visible = false;
     this.gamePlay.phaseDone();   // <--- main doneButton does not supply 'panel'
   }
   addDoneButton(actionCont: Container, rh: number) {
@@ -953,6 +955,7 @@ export class Table extends EventDispatcher  {
         nLegal: 0,
         gameState: this.gamePlay.gameState,
         phase: this.gamePlay.gamePhase.Aname,
+        regionId: this.gamePlay.gameState.conflictRegion,
       }
       this.dragContext = ctx;
       if (!tile.isDragable(ctx)) {
