@@ -1,6 +1,6 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal } from "./ankh-figure";
+import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
 import { AnkhHex } from "./ankh-map";
 import { Player } from "./player";
 import { CenterText, CircleShape, UtilButton } from "./shapes";
@@ -98,6 +98,20 @@ class SpecialHex extends AnkhHex {
       tile.updateCache();
     }
   }
+  // override setUnit(unit: Tile, meep?: boolean): void {
+  //   if (unit === undefined) {
+  //     const unit0 = meep ? this.meep : this.tile;
+  //     unit0.scaleX = unit0.scaleY = 1;
+  //     unit0.updateCache();
+  //   }
+  //   super.setUnit(unit, meep);
+  //   const unit0 = meep ? this.meep : this.tile;
+  //   if (unit0 !== undefined) {
+  //     unit0.scaleX = unit0.scaleY = SpecialHex.scale;
+  //     unit0.updateCache();
+  //   }
+  // }
+
 }
 
 
@@ -184,13 +198,15 @@ class Isis extends God {
 
 class Osiris extends God {
   constructor() { super('Osiris', 'lightgreen') }
-  osirisHex: SpecialHex;
-  osirisSource: AnkhSource<Portal>;
+  specialHex: SpecialHex;
+  specialSource: AnkhSource<Portal>;
+
   override makeSpecial(cont: Container, wh: WH, table: Table): Container {
     super.makeSpecial(cont, wh, table);
-    const hex = this.osirisHex = table.newHex2(0, 0, `portals`, SpecialHex) as SpecialHex; hex.scale = .6;
+    cont.name = 'Osiris-Special'
+    const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
-    const source = this.osirisSource = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
+    const source = this.specialSource = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * 1.5;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
@@ -198,12 +214,28 @@ class Osiris extends God {
   }
 
   override doSpecial(vis = true) {
-    this.osirisSource.filterUnits(unit => (unit.highlight(vis), false));
+    this.specialSource.filterUnits(unit => (unit.highlight(vis), false));
   }
 }
 
 class Ra extends God {
   constructor() { super('Ra', 'yellow') }
+
+  specialCont: Container;
+  specialSource: AnkhSource<RadianceMarker>;
+  specialHex: SpecialHex;
+
+  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+    super.makeSpecial(cont, wh, table);
+    cont.name = `Ra-Special`;
+    const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
+    cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    const source = this.specialSource = RadianceMarker.makeSource0(AnkhSource<RadianceMarker>, RadianceMarker, this.player, hex, 3);
+    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.x += TP.ankh2Rad * .5;
+    table.sourceOnHex(source, hex);
+    return cont;
+  }
 }
 
 class SetGod extends God {

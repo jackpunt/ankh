@@ -350,11 +350,10 @@ export class GameState {
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
         this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel=>panel.player.godName)}`);
 
-        if (panels.length > 1) this.phase('Obelisks'); // do battle, check for Obelisk
+        if (panels.length > 1) this.phase('Obelisks'); // begin 'Battle': check for Obelisk
         else if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
         else if (panels.length === 1) this.phase('Dominate', panels[0]);   // no battle
       }
-      // process TeleportToTemple (for each player!)
     },
     Dominate: {
       start: (panel: PlayerPanel) => {
@@ -524,20 +523,22 @@ export class GameState {
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         this.scoreMonuments(false);
-        this.phase('Battle')
+        this.phase('BattleResolution')
       },
     },
-    Battle: {
+    BattleResolution: {
       panels: [],
       start: () => {
-        const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
+        const rid = this.conflictRegion;
+        // all those who have played a Battle card for this region:
+        const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
+        const panels = panels0.concat();
         this.table.logText(`${this.state.Aname}[${rid}]`);
         if (panels.length === 0) {
           // wtf? plague killed the all?
           this.table.logText(`Battle[${rid}]: no Figures in Battle[${rid}]`);
           this.phase('ConflictNextRegion'); return;
         }
-        const panels0 = panels.concat();
         panels.forEach(panel => panel.strength = panel.strengthInRegion(rid - 1));
         panels.sort((a, b) => b.strength - a.strength);
         panels.forEach(panel => this.table.logText(`Battle[${rid}] ${json(panel.reasons)}`))
@@ -573,7 +574,7 @@ export class GameState {
 
         const deadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
 
-        // ----------- After Battle Resolution --------------
+        // ----------- After Battle Resolution: panels contains losers --------------
 
         panels.forEach(panel => {
           if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
@@ -747,7 +748,6 @@ export class SplitterShape extends Tile {
 
   /** return true if within radius/3 of corner. */
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-
     return false;
   }
 }

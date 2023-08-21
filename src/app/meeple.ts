@@ -1,13 +1,11 @@
-import { C, Constructor } from "@thegraid/common-lib";
 import { Shape } from "@thegraid/easeljs-module";
 import type { NamedObject } from "./game-play";
-import type { Hex, Hex1, Hex2 } from "./hex";
+import type { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, PaintableShape } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { UnitSource } from "./tile-source";
 
 class MeepleShape extends PaintableShape {
   static fillColor = 'rgba(225,225,225,.7)';
@@ -105,7 +103,7 @@ export class Meeple extends Tile {
     if (this.hex?.isOnMap) this.gamePlay.hexMap.update();
   }
 
-  moveTo0(hex: Hex1) {
+  override moveTo(hex: Hex1) {
     const destMeep = hex?.meep;
     if (destMeep && destMeep !== this) {
       destMeep.x += 10; // make double occupancy apparent [until this.unMove()]
@@ -114,18 +112,8 @@ export class Meeple extends Tile {
     const fromHex = this.fromHex;
     super.moveTo(hex); // hex.set(meep) = this; this.x/y = hex.x/y
     this.faceUp(!(hex?.isOnMap && fromHex?.isOnMap && hex !== this.startHex));
-    return hex;
   }
 
-  override moveTo(hex: Hex1) {
-    const source = this.source;
-    const fromHex = this.hex;
-    const toHex = this.moveTo0(hex);  // may collide with source.hex.meep
-    if (source && fromHex === this.source.hex && fromHex !== toHex) {
-      source.nextUnit()   // shift; moveTo(source.hex); update source counter
-    }
-    return hex;
-  }
 
   override cantBeMovedBy(player: Player, ctx: DragContext) {
     const reason1 = super.cantBeMovedBy(player, ctx);
@@ -182,27 +170,5 @@ export class Meeple extends Tile {
       source.availUnit(this);
       if (!source.hex.meep) source.nextUnit();
     }
-  }
-
-  static xmakeSource0<T extends Meeple, TS extends UnitSource<T>>(
-    unitSource: new (type: Constructor<Meeple>, p: Player, hex: Hex2) => TS,
-    type: Constructor<T>,
-    player: Player,
-    hex: Hex2,
-    n = 0,
-  ) {
-    const source = new unitSource(type, player, hex);
-    // static source: TS = [];
-    if (player) {
-      type['source'][player.index] = source;
-    } else {
-      type['source'] = source;
-    }
-    for (let i = 0; i < n; i++) {
-      const unit = new type(player, i + 1);
-      source.availUnit(unit);
-    }
-    source.nextUnit();  // unit.moveTo(source.hex)
-    return source as TS;
   }
 }

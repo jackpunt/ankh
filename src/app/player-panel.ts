@@ -87,7 +87,7 @@ export class PlayerPanel extends Container {
   nFigsInBattle: number;
   strength = 0;
   reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
-  /** Battle phase */
+  /** BattleResolution phase */
   strengthInRegion(regionNdx: number) {
     this.reasons = { name: this.name, total: 0 };
     this.strength = 0;
@@ -346,7 +346,7 @@ export class PlayerPanel extends Container {
     const size = guardian.radius;
     const slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
     if (slot < 0) return;     // Stable is full! (no rings of the right size)
-    const hex = guardian.moveTo(this.stableHexes[slot]) as StableHex;
+    guardian.moveTo(this.stableHexes[slot]);
   }
 
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){

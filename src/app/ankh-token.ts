@@ -46,11 +46,11 @@ export class AnkhToken extends AnkhMeeple {
     return g;
   }
 
-  override moveTo(hex: Hex1): Hex1 {
+  override moveTo(hex: Hex1) {
     if (hex?.meep instanceof AnkhToken) {
       hex.meep.sendHome();  // Assert: (phase === 'Claim') && no unclaimed Monuments.
     }
-    const rv = super.moveTo(hex);
+    super.moveTo(hex);
     if (hex?.isOnMap) {
       this.y += TP.ankh2Rad - this.radius;
       if (hex.tile) {
@@ -59,7 +59,6 @@ export class AnkhToken extends AnkhMeeple {
         if (this.gamePlay.isPhase('Claim')) this.gamePlay.phaseDone(hex); // Claim done
       }
     }
-    return rv;
   }
 
   nClaimableMonuments(player = this.player) {

@@ -50,16 +50,6 @@ export class AnkhPiece extends MapTile {
   override get hex() { return super.hex as AnkhHex; }
   override set hex(hex: AnkhHex) { super.hex = hex; }
 
-  // TODO: can we put this in Tile? as common code with Meeple.moveTo override.
-  override moveTo(hex: Hex1) {
-    const source = this.source;
-    const fromHex = this.hex;
-    const toHex = super.moveTo(hex);  // may collide with source.hex.meep
-    if (source && fromHex === this.source.hex && fromHex !== toHex) {
-      source.nextUnit()   // shift; moveTo(source.hex); update source counter
-    }
-    return hex;
-  }
   isPhase(name: string) {
     return this.gamePlay.isPhase(name);
   }
@@ -159,9 +149,6 @@ export class Temple extends Monument {
 
 export class Portal extends AnkhPiece {
   static source = [[]]; // per-player source, although only 1 Osiris player...
-  static makeSource(player: Player, hex: Hex2, n = TP.warriorPerPlayer) {
-    return AnkhPiece.makeSource0(AnkhSource<Portal>, Portal, player, hex, n);
-  }
   static color = 'rgba(80,80,80,.8)';
   static dr = 3;
   static radius0 = TP.hexRad - Portal.dr - 1;
@@ -254,11 +241,10 @@ export class AnkhMeeple extends Meeple {
 
   override moveTo(hex: Hex1) {
     const startHex = this.startHex;
-    const rv = super.moveTo(hex);
+    super.moveTo(hex);
     if (this.gamePlay.isPhase('Summon') && startHex) {
       this.startHex = startHex;
     }
-    return rv;
   }
 
   override dragStart(ctx: DragContext): void {
@@ -270,6 +256,54 @@ export class AnkhMeeple extends Meeple {
     super.dropFunc(targetHex, ctx);
   }
 
+}
+
+export class RadianceMarker extends Tile {
+  static source = [[]]; // per-player source, although only 1 Ra player...
+
+  override get radius(): number { return TP.hexRad; }
+  constructor(player: Player, serial: number, Aname: string ) {
+    super(`RaMark=${serial}`, player);
+
+  }
+  override makeShape(): PaintableShape {
+    const rad = this.radius;
+    const shape = new PaintableShape((color) => {
+      return new Graphics().c().f(color).dp(0, 0, rad, 24, .5, 0)
+    });
+    this.setBounds(-rad, -rad, rad * 2, rad * 2)
+    return shape;
+  }
+
+  override moveTo(hex: AnkhHex) {
+    if (hex === this.source.hex) {
+      super.moveTo(hex);
+      return;
+    }
+    const figure = hex?.figure;
+    if (figure instanceof Figure) {
+      figure.raMarker = this;
+      const at = figure.children.indexOf(figure.baseShape);
+      figure.addChildAt(this, at);     // below baseShape
+      this.x = 0; this.y = 0;
+      const { x, y, width, height } = this.getBounds()
+      figure.setBounds(x, y, width, height)
+      figure.cache(x, y, width, height);
+      this.hex = undefined;            // take it off the source.hex
+    } else if (this.parent instanceof Figure) {
+      this.parent.raMarker = undefined;
+      this.parent?.removeChild(this);
+    }
+  }
+
+  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
+    // TODO: during Summon!
+    return (toHex instanceof AnkhHex)
+      && toHex.isOnMap
+      && toHex.figure?.player === this.player
+      && (toHex.figure instanceof Warrior || toHex.figure instanceof Guardian)
+      && toHex.figure.raMarker === undefined;
+  }
 }
 
 export class Figure extends AnkhMeeple {
@@ -296,7 +330,9 @@ export class Figure extends AnkhMeeple {
     return this.lastController;
   }
   _lastController: God;
-  get lastController() { return this._lastController ?? this.player.god; }
+  get lastController() { return this._lastController ?? this.player.god; } // for Set
+
+  raMarker: RadianceMarker;  // for Ra
 
   /** summon from Stable to Portal on map */
   isOsirisSummon(hex: AnkhHex, ctx: DragContext) {
@@ -372,7 +408,6 @@ export class Figure extends AnkhMeeple {
       return this.isLegalMove(hex, ctx);
     }
     if (ctx.phase === ('Obelisks')) {
-      // apply when teleporting to Temple: if gameState.phase == Battle
       if (this.isObeliskMove(hex, ctx)) return true;
     }
     return false;

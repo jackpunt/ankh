@@ -24,6 +24,11 @@ export interface ActionButton extends Container { isEvent: boolean, pid: number,
 interface EventIcon extends Container { eventName: EventName, pid: number; }
 interface ScoreMark extends RectShape { score: number, rank: number }
 
+export interface Dragable {
+  dragFunc0(hex: Hex2, ctx: DragContext): void;
+  dropFunc0(hex: Hex2, ctx: DragContext): void;
+}
+
 /** rowCont is an ActionContainer; children are EventButton. */
 export class ActionContainer extends Container {
   constructor(public rad = 30, public table: Table) {

@@ -4,7 +4,7 @@ import type { GamePlay } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
-import type { DragContext, Table } from "./table";
+import type { DragContext, Dragable, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
 import { removeChildType } from "./functions";
@@ -86,7 +86,7 @@ class Tile0 extends Container {
 }
 
 /** all the [Hexagonal] game pieces that appear; can be dragged/dropped. */
-export class Tile extends Tile0 {
+export class Tile extends Tile0 implements Dragable {
   static allTiles: Tile[] = [];
   static textSize = 20;
 
@@ -214,10 +214,16 @@ export class Tile extends Tile0 {
   }
 
   // Tile
-  /** Post-condition: tile.hex == hex; low-level, physical move */
+  /** Post-condition: tile.hex == hex; low-level, physical move.
+   *
+   * calls this.source.nextUnit() if tile was dragged from this.source.
+   */
   moveTo(hex: Hex1) {
-    this.hex = hex;     // INCLUDES: hex.tile = tile
-    return hex;
+    const fromHex = this.fromHex;
+    this.hex = hex;       // may collide with source.hex.meep, setUnit, overSet?
+    if (this.source && fromHex === this.source.hex && fromHex !== hex) {
+      this.source.nextUnit()   // shift; moveTo(source.hex); update source counter
+    }
   }
 
   /** Tile.dropFunc() --> placeTile (to Map, reserve, ~>auction; not Recycle); semantic move/action. */

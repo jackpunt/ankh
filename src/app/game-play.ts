@@ -219,7 +219,6 @@ export class GamePlay0 {
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.fromHex;
-    const info = { tile, fromHex, toHex, payCost };
     const verb = this.gamePhase.Aname;
     if (toHex !== fromHex) this.logText(`${verb} ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     // if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
