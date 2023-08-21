@@ -357,9 +357,13 @@ export class GameState {
     },
     Dominate: {
       start: (panel: PlayerPanel) => {
+        let dev = 0, reasons = '';
+        const devReason = (n, reason: string) => { dev += n, reasons = `${reasons} ${reason}:${n}` }
         this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] Player-${panel.player.index}`);
-        this.scoreMonuments(true); // monunent majorities (for sole player in region)
-        this.addDevotion(panel.player, 1, `Dominate[${this.conflictRegion}]:1`)
+        this.scoreMonuments(true); // Monument majorities (for sole player in region)
+        devReason(1, `Dominate[${this.conflictRegion}]`)
+        if (this.hasRadiance(panel)) devReason(1, 'Radiance');
+        this.addDevotion(panel.player, dev, reasons);
         this.phase('ConflictNextRegion');
       }
     },
@@ -567,6 +571,7 @@ export class GameState {
           }
           if (powers.includes('Glorious') && d >= 3) devReason(3, 'Glorious');
           if (powers.includes('Worshipful') && winPlyr.coins >= 2) (winPlyr.coins -= 2, devReason(1, 'Worshipful')); // assume yes, they want the point.
+          if (this.hasRadiance(winner)) devReason(1, `Radiance`);
           this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`); //slice initial SPACE
           this.addDevotion(winPlyr, dev, `Battle[${rid}]:${dev}`);
           panels.splice(0, 1); // remove winner, panels now has all the losers.
@@ -700,6 +705,11 @@ export class GameState {
     player.score = Math.max(0, score0 + n);
     const dscore = player.score - score0; // n or 0
     this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason}`);
+  }
+
+  hasRadiance(panel: PlayerPanel) {
+    const playerFigs = panel.figuresInRegion(this.conflictRegion, panel.player);
+    return playerFigs.find(fig => fig.raMarker !== undefined);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
