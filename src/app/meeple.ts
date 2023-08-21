@@ -162,13 +162,4 @@ export class Meeple extends Tile {
     this.faceUp();
     this.startHex = undefined;
   }
-
-  override sendHome(): void { // Criminal
-    super.sendHome();         // this.resetTile(); moveTo(this.homeHex = undefined)
-    const source = this.source;
-    if (source) {
-      source.availUnit(this);
-      if (!source.hex.meep) source.nextUnit();
-    }
-  }
 }

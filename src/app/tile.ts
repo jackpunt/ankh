@@ -239,7 +239,7 @@ export class Tile extends Tile0 implements Dragable {
    * After Capture or Recycle/Replace.
    * Post-condition: !tile.hex.isOnMap; tile.hex = this.homeHex may be undefined [UnitSource, AuctionTile, BonusTile]
    */
-  sendHome() {
+  sendHome() {  // Tile
     this.resetTile();
     this.moveTo(this.homeHex) // override for AuctionTile.tileBag & UnitSource<Meeple>
     if (!this.homeHex) this.parent?.removeChild(this);

@@ -340,6 +340,14 @@ export class Figure extends AnkhMeeple {
 
   raMarker: RadianceMarker;  // for Ra
 
+  override sendHome(): void { // Figure
+    if (this.raMarker) {
+      this.raMarker.sendHome();
+      this.raMarker = undefined;
+    }
+    super.sendHome();
+  }
+
   /** summon from Stable to Portal on map */
   isOsirisSummon(hex: AnkhHex, ctx: DragContext) {
     return hex.isOnMap
