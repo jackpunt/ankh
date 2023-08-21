@@ -626,6 +626,29 @@ export class Mummy extends Guardian2 {
   constructor(player: Player, serial: number) {
     super(player, serial, `Mummy`);
   }
+
+  override sendHome(): void {
+    const god = this.player.god, godFig = god.figure;
+    // const ctx = {
+    //   lastShift: false,
+    //   lastCtrl: false,
+    //   info: { first: false, event: undefined},
+    //   tile: this,
+    //   phase: 'Summon',
+    //   gameState: this.player.gamePlay.gameState,
+    //   targetHex: this.hex,
+    // } as DragContext;
+    // if (godFig.hex.findAdjHex(hex => this.isLegalTarget(hex, { ...ctx, targetHex: hex }))) {}
+    // need empty hex (or Portal if Osiris)
+    const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
+    const dir = godFig.hex.findAdjHex(hex => isLegal(hex));
+    if (dir) {
+      const toHex = godFig.hex.links[dir];
+      this.moveTo(toHex);
+    } else {
+      super.sendHome();
+    }
+  }
 }
 
 export class Scorpion extends Guardian3 {
