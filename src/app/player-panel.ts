@@ -1,6 +1,6 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
+import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
@@ -62,9 +62,11 @@ export class PlayerPanel extends Container {
     const region = this.table.gamePlay.hexMap.regions[regionNdx];
     return region.filter(hex => hex.tile instanceof Temple && hex.tile?.player === this.player);
   }
+  /** strength from Figures in Region controlled by this.god */
   nFiguresInRegion(regionNdx: number) {
     const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.god;
-    return region.filter(hex => hex.meep instanceof Figure && hex.meep.controller === god).length;
+    const figs = region.filter(hex => hex.meep instanceof Figure && hex.meep.controller === god);
+    return figs.filter(fig => !fig.findAdjHex(hex => hex.meep instanceof Androsphinx && hex.meep.controller !== god)).length;
   }
   nRegionsWithFigures() {
     return this.table.gamePlay.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;

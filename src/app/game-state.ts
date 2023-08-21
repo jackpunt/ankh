@@ -316,8 +316,8 @@ export class GameState {
         const omni = panels.filter(panel => panel.hasAnkhPower('Omnipresent'));
         omni.forEach(panel => this.addFollowers(panel.player, panel.nRegionsWithFigures(), `Omnipresent`));
         // do Scorpions:
-        const scorps = Scorpion.source.filterUnits(scorp => scorp.hex?.isOnMap);
-        scorps.forEach(scorp => {
+        const scorps = Scorpion.source?.filterUnits(scorp => scorp.hex?.isOnMap);
+        scorps?.forEach(scorp => {
           const monts = scorp.attackMonuments;
           if (monts.length > 0) {
             this.table.logText(`${scorp.Aname} kills ${monts}`); // show Aname@Hex[...] before sendHome()
@@ -435,9 +435,6 @@ export class GameState {
         //setTimeout(() => { state.done(); }, 8000);
       },
       done: () => {
-        // "reveal" all cards; (YELLOW)
-        // record Figures for Miracle & Flood
-        // trigger Flood
         const gamePlay = this.gamePlay, state = this.state;
         this.state.panels.forEach(panel => panel.revealCards(false));
         gamePlay.cardShowing = false;
