@@ -87,7 +87,7 @@ export class AnkhHex extends Hex2 {
   override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
   override set tile(tile: Tile) { super.tile = tile; }
 
-  get figure(): Figure { return this.meep as Figure }
+  get figure(): Figure { return this.meep as Figure } // !!! what about AnkhToken on Monument!!???
 
   override toString(sc?: string): string {
     return `${this.piece ?? this.Aname}`;
@@ -105,10 +105,11 @@ export class AnkhHex extends Hex2 {
     return super.makeHexShape(shape ?? AnkhHexShape);
   }
 
-  /** find first [Border-adjacent] Hex linked to this that statifies predicate. */
+  /** find hexDir of a [Border-adjacent] Hex that statifies predicate. */
   findAdjHex(pred: (hex: this, dir: HexDir, hex0: this) => boolean = () => true) {
     return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
   }
+
   /** select each [Border-adjacent] Hex linked to this that satisfies predicate */
   filterAdjHex(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
     return this.linkDirs.filter(dir => !!this.links[dir] && !this.borders[dir]).filter(dir => pred(this.links[dir], dir, this), this);
@@ -122,23 +123,29 @@ export class AnkhHex extends Hex2 {
   /**
    * return XY of the corner nearest the given point.
    *
-   * The perimeter is partitioned into 12 sectors cooresponding corners at each HexDir.
+   * The perimeter is partitioned into sectors centered on the given HexDirs.
    * @param xy {x,y}
    * @param basis DisplayObject basis for xy coordinates (this.cont.parent --> hexMap.hexCont).
-   * @return XY and HexDir for the nearest of 12 'corners' (ewDirs and nwDirs)
+   * @param hexDirs any selection of HexDirs
+   * @return [hexDir to nearest corner, xy in this.cont]
    */
-  cornerDir(xy: XY, basis = this.cont.parent, topo? : 'EW' | 'NS' ) {
-    const { x: x, y: y } = basis.localToLocal(xy.x, xy.y, this.cont); // on hex
-    const atan = Math.atan(x / y); // [-PI/2 ... 0 ... +PI/2]; * WtoNtoE => [-1 .. 0 .. 1]
-    const n = topo ? 1.5 : 3;
-    const ndx  = Math.round(n * (atan * (2 / Math.PI) + ((y < 0) ? 3 : 1)))
-    const dirs = topo === 'EW' ? AnkhHex.ewHexDirs : topo === 'NS' ? AnkhHex.nsHexDirs : AnkhHex.anyHexDirs;
-    const hexDir = dirs[ndx] as HexDir;
-    return { x, y, hexDir };
+  cornerDir(xy: XY, basis = this.cont.parent, hexDirs = H.hexDirs ) {
+    const { x, y } = basis.localToLocal(xy.x, xy.y, this.cont); // on hex
+    const deg = ((Math.atan2(y, x) * 180 / Math.PI) + 90 + 360) % 360;
+    const rots = hexDirs.map(dir => H.dirRot[dir] as number).sort((a, b) => a - b); // ascending
+    const n = rots.length;
+    rots.push(rots[0] + 360);    // rots[n]
+    let rotLow = ((rots[0] + rots[n - 1] - 360) / 2);
+    // find ndx:: rot[ndx-1]<rot[ndx]<rot[ndx+1]  indicies modulo (dirs.length-1)
+    const rot = rots.find((rot: number, ndx: number) => {
+      const rotHi = (rot + rots[ndx + 1]) / 2;
+      if (deg >= rotLow && deg <= rotHi) return true;
+      rotLow = rotHi;
+      return false;
+    });
+    const hexDir = H.rotDir[rot % 360] as HexDir; // ASSERT: rot > 0;
+    return [hexDir, { x, y }] as [HexDir, XY];
   }
-  static ewHexDirs = ['W', 'SW', 'SE', 'E', 'NE', 'NW', 'W'];
-  static nsHexDirs = ['WS', 'S', 'ES', 'EN', 'N', 'WN', 'WS'];
-  static anyHexDirs = ['W', 'WS', 'SW', 'S', 'SE', 'ES', 'E', 'EN', 'NE', 'N', 'NW', 'WN', 'W'];
 
   /**
    * The XY coordinates of the indicated hexDir corner (or would-be corner for the indicated topo).
@@ -357,11 +364,10 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     AnkhMap.fspec.forEach(spec => this.setTerrain(spec, 'f'));
     AnkhMap.dspec.forEach(spec => this.setTerrain(spec, 'd'));
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
-    AnkhMap.wspec.forEach(spec => ([r, c]: hexSpec) => {
+    AnkhMap.wspec.forEach(([r, c]: hexSpec) => {
       const whex = this[r][c];
-      whex.forEachHexDir((ohex, dir) => {
-        if (ohex?.terrain !== 'w') this.addBorder(ohex, H.dirRev[dir], false); // one-way border: Apep can exit
-      })
+      whex.filterAdjHex(ohex => ohex && ohex.terrain !== 'w')
+        .forEach(dir => this.addBorder(whex.links[dir], H.dirRev[dir], false));
     });
   }
 

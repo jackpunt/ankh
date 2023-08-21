@@ -99,8 +99,8 @@ export class AnkhMapSplitter {
 
       let lx = pt.x, ly = pt.y;
       if (hex instanceof AnkhHex) {
-        const xyHexDir = hex.cornerDir(pt, undefined, 'EW'), ewDir = xyHexDir.hexDir as EwDir;
-        const onCorner = hex.isNearCorner(xyHexDir, ewDir, r);
+        const [hexDir, xy] = hex.cornerDir(pt, undefined, H.ewDirs), ewDir = hexDir as EwDir;
+        const onCorner = hex.isNearCorner(xy, ewDir, r);
         const cid = onCorner && cornerId(hex, ewDir);
         if (!H.ewDirRot[ewDir]) {
           noMark();

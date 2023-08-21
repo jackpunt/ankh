@@ -872,16 +872,16 @@ export class Table extends EventDispatcher  {
     const txy = (region.length > 0) ? (region.map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
       return { x: pv.x + cv.x, y: pv.y + cv.y }
     }, { x: 0, y: 0 }) : { x: 0, y: 0 };
-    const [cx, cy] = [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
+    const [x, y] = [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
     // move marker to 'corner' of hex (or {0,0} of markCont):
-    const hex = hexMap.hexUnderPoint(cx, cy, false);
+    const hex = hexMap.hexUnderPoint(x, y, false);
     if (hex) {
-      const cxy = hex.cornerXY(hex.cornerDir({ x: cx, y: cy }, undefined, 'NS').hexDir);
+      const cxy = hex.cornerXY(hex.cornerDir({ x, y }, undefined, H.nsDirs)[0]);
       hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker);
       hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker.lastXY);
     } else {
-      hexMap.mapCont.markCont.localToLocal(0,0,marker.parent, marker)
-      hexMap.mapCont.markCont.localToLocal(0,0,marker.parent, marker.lastXY);
+      hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker)
+      hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker.lastXY);
     }
 
     return;
@@ -940,7 +940,11 @@ export class Table extends EventDispatcher  {
     this.dragFunc0(tile, info, hex);
   }
 
-  /** interpose inject drag/start actions programatically */
+  /** Table.dragFunc0 (Table.dragFunc to inject drag/start actions programatically)
+   * @param tile is being dragged
+   * @param info { first: boolean, mouse: MouseEvent }
+   * @param hex the Hex that tile is currently over (may be undefined or off map)
+   */
   dragFunc0(tile: Tile, info: MinDragInfo, hex = this.hexUnderObj(tile)) {
     let ctx = this.dragContext;
     if (info?.first) {
@@ -953,7 +957,7 @@ export class Table extends EventDispatcher  {
         return;
       }
       const event = info.event?.nativeEvent;
-      tile.fromHex = tile.hex as Hex2;  // dragStart: set tile.fromHex
+      tile.fromHex = tile.hex as Hex2;  // dragStart: set tile.fromHex when first move!
       ctx = {
         tile: tile,                  // ASSERT: hex === tile.hex
         targetHex: tile.fromHex,     // last isLegalTarget() or fromHex

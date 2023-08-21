@@ -546,7 +546,7 @@ export class Guardian extends Figure {
       return false;
     }
     // if ctx.lastShift: allow move from stable as if phase: 'Summon'
-    if (this.hex.isStableHex() && ctx.lastShift) {
+    if (ctx.lastShift && this.hex.isStableHex()) {
       return super.isLegalTarget(hex, { ...ctx, phase: 'Summon' });
     }
     if (ctx.lastShift && this.hex.isOnMap) {
@@ -589,6 +589,49 @@ export class Satet extends Guardian1 {
   static override source: AnkhSource<Satet> = undefined;
   constructor(player: Player, serial: number) {
     super(player, serial, `Satet`);
+  }
+  noMont(hex: AnkhHex) {
+    return hex?.isOnMap && !(hex.tile instanceof Monument); // avoid AnkhToken
+  }
+  openHex(hex: AnkhHex, player: Player) {
+    return hex && (!hex.occupied || (!hex.meep && hex.tile instanceof Portal && player.godName === 'Osiris'));
+  }
+  override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
+    if (ctx.phase === 'Move' && this.noMont(hex) && hex?.figure?.player && hex.figure.player !== this.player) {
+      const aPlayer = hex.figure.player;
+      if (hex.findAdjHex(ahex => this.openHex(ahex, aPlayer)) && this.distWithin(hex, this.hex, 3)) return true;
+    }
+    return super.isLegalTarget(hex, ctx);
+  }
+
+  override dragStart(ctx: DragContext): void {
+    this.lastTarget = undefined;
+    this.movedFigure = undefined;
+  }
+  lastTarget: Hex2;
+  movedFigure: Meeple;
+  // 'this' is over 'hex'; the previous legal target is ctx.lastTarget:
+  override dragFunc0(hex: AnkhHex, ctx: DragContext): void {
+    // move enemy to adj hex
+    // super.dragFunc0 to set target & mark
+    if (hex !== this.lastTarget && this.movedFigure) {
+      this.movedFigure.moveTo(this.lastTarget)
+      this.movedFigure = undefined;
+      this.lastTarget = undefined;
+    }
+    if (hex && hex.meep && this.noMont(hex as AnkhHex)) {
+      // find the right empty hex... opposite direction from which Satet entered hex
+      const pt = this.parent.localToLocal(this.x, this.y, hex.cont); // from DragC --> targetHex coordinates
+      const outDir = H.dirRev[hex.cornerDir(pt, hex.cont, H.nsDirs)[0]];
+      const mHex = !hex.borders[outDir] && hex.links[outDir]; // may be false
+      if (this.openHex(mHex, hex.figure.player)) {
+        this.lastTarget = hex;
+        this.movedFigure = hex.meep;
+        this.movedFigure.moveTo(mHex);
+        // now: hex is empty, will be isLegalTarget(), will be available for drop of Satet;
+      }
+    }
+    super.dragFunc0(hex, ctx);
   }
 }
 

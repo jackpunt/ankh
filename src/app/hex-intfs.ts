@@ -65,12 +65,12 @@ export namespace H {
   export function nsTopo(rc: RC): TopoNS { return (rc.col % 2 == 0) ? H.nsEvenCol : H.nsOddCol };
   export function ewTopo(rc: RC): TopoEW { return (rc.row % 2 == 0) ? H.ewEvenRow : H.ewOddRow };
 
-  /** EW topo dirs! */
-  export const dirs: HexDir[] = [NE, E, SE, SW, W, NW]; // standard direction signifiers () ClockWise
-  /** includes E,W, suitable for EwTopo */
+  /** includes E & W, suitable for EwTopo */
   export const ewDirs: EwDir[] = [NE, E, SE, SW, W, NW]; // directions for EwTOPO
-  /** includes N,W, suitable for NsTopo */
+  /** includes N & S, suitable for NsTopo */
   export const nsDirs: NsDir[] = [N, EN, ES, S, WS, WN]; // directions for NsTOPO
+  /** all hexDirs */
+  export const hexDirs: HexDir[] = (H.ewDirs as HexDir[]).concat(H.nsDirs); // standard direction signifiers () ClockWise
 
   // angles for ewTopo!
   export const ewDirRot: {[key in EwDir] : number} = { NE: 30, E: 90, SE: 150, SW: 210, W: 270, NW: 330 }
@@ -81,6 +81,7 @@ export namespace H {
   export const dirRev: {[key in HexDir] : HexDir} = { N: S, S: N, E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE, ES: WN, EN: WS, WS: EN, WN: ES }
   export const dirRevEW: {[key in EwDir] : EwDir} = { E: W, W: E, NE: SW, SE: NW, SW: NE, NW: SE }
   export const dirRevNS: {[key in NsDir] : NsDir} = { N: S, S: N, EN: WS, ES: WN, WS: EN, WN: ES }
+  export const rotDir: { [key: number]: HexDir } = { 0: 'N', 30: 'NE', 60: 'EN', 90: 'E', 120: 'ES', 150: 'SE', 180: 'S', 210: 'SW', 240: 'WS', 270: 'W', 300: 'WN', 330: 'NW', 360: 'N' }
 
   export const capColor1:   string = "rgba(150,  0,   0, .8)"  // unplayable: captured last turn
   export const capColor2:   string = "rgba(128,  80, 80, .8)"  // protoMove would capture
