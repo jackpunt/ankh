@@ -304,6 +304,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
+    KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('C', () => {
       const up = (cardSelectorsUp = !cardSelectorsUp);
       this.allPlayers.forEach(player => {

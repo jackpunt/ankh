@@ -345,13 +345,12 @@ export class GameState {
       },
     },
     ConflictInRegion: {
-      panels: [],
       start: () => {
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
-        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel=>panel.player.godName)}`);
+        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
 
         if (panels.length > 1) this.phase('Obelisks'); // begin 'Battle': check for Obelisk
-        else if (panels.length === 0) this.phase('ConflictNextRegion'); // no points for anyone.
+        else if (panels.length === 0) this.phase('ConflictRegionDone'); // no points for anyone.
         else if (panels.length === 1) this.phase('Dominate', panels[0]);   // no battle
       }
     },
@@ -364,7 +363,7 @@ export class GameState {
         devReason(1, `Dominate[${this.conflictRegion}]`)
         if (this.hasRadiance(panel)) devReason(1, 'Radiance');
         this.addDevotion(panel.player, dev, reasons);
-        this.phase('ConflictNextRegion');
+        this.phase('ConflictRegionDone');
       }
     },
     Obelisks: {
@@ -373,18 +372,16 @@ export class GameState {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels0 = this.panelsInConflict.filter(panel => panel.hasAnkhPower('Obelisk'));
         const region = this.gamePlay.hexMap.regions[this.conflictRegion - 1];
-        const panels = panels0.filter(p => region.find(hex => hex.tile instanceof Obelisk && hex.tile.player === p.player))
-        // enable on-panel 'Obelisk done' button => phaseDone(panel);
-        if (panels.length === 0) { this.phase('Card'); return; }
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}] panels =`), panels);
-        this.state.panels = panels;
-        panels[0].enableObeliskTeleport(this.conflictRegion);
-        //panels.forEach(panel => panel.enableObeliskTeleport(this.conflictRegion));
+        this.state.panels = panels0.filter(p => region.find(hex => hex.tile instanceof Obelisk && hex.tile.player === p.player))
+        this.state.done();
       },
-      done: (p: PlayerPanel) => {
+      done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
-        const ndx = panels.indexOf(p); // ndx === 0!
-        panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
+        if (panel) {
+          const ndx = panels.indexOf(panel); // ndx === 0!
+          if (ndx < 0) return;    // ignore extra doneification.
+          panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
+        }
         if (panels.length === 0) { this.phase('Card'); return; }
         panels[0].enableObeliskTeleport(this.conflictRegion);
       }
@@ -396,7 +393,6 @@ export class GameState {
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) { this.phase('Reveal'); return; }
         panels.forEach(panel => panel.activateCardSelector());
-        this.table.hexMap.update();
       },
       done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
@@ -404,9 +400,9 @@ export class GameState {
         if (ndx < 0) return;    // ignore extra doneification.
         if (panel.cardsInBattle.length === 0) return; // must select a Card.
         panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}].done(panel=${panel?.player.color})`));
+        // console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}].done(panel=${panel?.player.color})`));
         if (panels.length > 0) return; // wait for more panels to signal done
-        this.phase('Reveal')
+        this.phase('Reveal');
       }
       // if (Horus) mark excluded card (GREEN to GREY)
       // if Amun-power unused: allow click second card (set Amun-Power used)
@@ -428,14 +424,19 @@ export class GameState {
         const panels = this.state.panels = this.panelsInConflict;
         panels.forEach(panel => {
           panel.revealCards(true);
+          if (panel.hasCardInBattle('Flood')) {
+            const inRegion = panel.figuresInRegion(this.conflictRegion, panel.player);
+            const nFlood = inRegion.filter(fig => fig.hex.terrain === 'f').length;
+            this.addFollowers(panel.player, nFlood, 'Flood');
+          }
           if (panel.cardsInBattle.length === 2) panel.player.god.doSpecial(false); // must be Amun
         });
         this.gamePlay.hexMap.update();
         this.doneButton('Reveal Done', C.grey);
-        //setTimeout(() => { state.done(); }, 8000);
+        if (TP.autoRevealDone > 0) setTimeout(() => { this.state.done(); }, TP.autoRevealDone);
       },
       done: () => {
-        const gamePlay = this.gamePlay, state = this.state;
+        const gamePlay = this.gamePlay;
         this.state.panels.forEach(panel => panel.revealCards(false));
         gamePlay.cardShowing = false;
         gamePlay.hexMap.update();
@@ -454,15 +455,13 @@ export class GameState {
           this.phase('Plague');
           return;
         }
-        panels.forEach(panel => {
-          panel.enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
-        });
+        panels[0].enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.doneButton('Build Done', panels[0].player.color);
       },
       // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
       done: (panel: PlayerPanel = this.state.panels[0], monument: Monument) => {
-          this.table.logText(`${panel.player.godName} built Monument: ${monument.hex.toString()}`);
+        this.table.logText(`${panel.player.godName} built Monument: ${monument.hex.toString()}`);
         // no cost if Done *without* building (cbir>0)
         if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
           this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
@@ -470,6 +469,7 @@ export class GameState {
 
         const panels = this.state.panels;
         const ndx = panels.indexOf(panel);
+        if (ndx < 0) return;    // spurious doneification
         panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
         if (panels.length === 0) {
           this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
@@ -477,9 +477,9 @@ export class GameState {
           return;
         }
         // console.log(stime(this, `Build.done: return NOT done...`))
+        panels[0].enableBuild(this.conflictRegion); // Monument.dropFunc() --> buildDone --> panel.enableBuild
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.doneButton('Build Done', panels[0].player.color);
-        // TODO: at ConflictDone, mark yellow cards green, and check reclaimCards (Cycle of Ma`at)
       }
     },
     Plague: {
@@ -538,7 +538,7 @@ export class GameState {
         if (panels.length === 0) {
           // wtf? plague killed the all?
           this.table.logText(`Battle[${rid}]: no Figures in Battle[${rid}]`);
-          this.phase('ConflictNextRegion'); return;
+          this.phase('ConflictRegionDone'); return;
         }
         panels.forEach(panel => panel.strength = panel.strengthInRegion(rid - 1));
         panels.sort((a, b) => b.strength - a.strength);
@@ -567,7 +567,6 @@ export class GameState {
             devReason(inDesert, 'Drought');
           }
           if (powers.includes('Glorious') && d >= 3) devReason(3, 'Glorious');
-          if (powers.includes('Worshipful') && winPlyr.coins >= 2) (winPlyr.coins -= 2, devReason(1, 'Worshipful')); // assume yes, they want the point.
           if (this.hasRadiance(winner)) devReason(1, `Radiance`);
           this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`); //slice initial SPACE
           this.addDevotion(winPlyr, dev, `Battle[${rid}]:${dev}`);
@@ -592,20 +591,8 @@ export class GameState {
           const nKilled = nPlague + nBattle;
           if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
         })
-
-        // ASSERT: panels0 is [still] sorted by player rank.
-        const worships0 = panels0.filter(panel => panel.hasAnkhPower('Workshipful'));
-        const workship1 = worships0.filter(panel => panel.player.coins >= 2)
-        workship1.forEach(panel => {
-          this.addFollowers(panel.player, -2, `Worshipful[${rid}]`);
-          this.addDevotion(panel.player, 1, `Worshipful[${rid}]:1`);
-        });
-        panels0.forEach(panel => panel.battleCardsToTable());
-        panels0.forEach(panel => panel.cycleWasPlayed && panel.allCardsToHand());
-        // resolve Mummy in deadFigs;
-        // resolve Osiris:
-        const nextState = panels.find(panel => panel.player.godName === 'Osiris') ? 'Osiris' : 'ConflictNextRegion';
-        this.phase(nextState);
+        const doOsiris = panels.find(panel => panel.player.godName === 'Osiris')
+        this.phase(doOsiris ? 'Osiris' : 'Worshipful')
       },
     },
     Osiris: {
@@ -618,6 +605,39 @@ export class GameState {
       done: () => {
         const osiris = God.byName.get('Osiris');
         osiris.doSpecial(false);  // un-highlight Portal tiles.
+        this.phase('Worshipful');
+      }
+    },
+    Worshipful: {
+      panels: [],
+      start: () => {
+        const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
+        const rid = this.conflictRegion;
+        // ASSERT: panels0 is [still] sorted by player rank.
+        this.state.panels = panels0.filter(panel => panel.hasAnkhPower('Worshipful') && panel.player.coins >= 2);
+        this.done();
+      },
+      done: (p: PlayerPanel) => {
+        const panels = this.state.panels, rid = this.conflictRegion;
+        if (p) {
+          const ndx = panels.indexOf(p);
+          panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
+        }
+        if (panels.length === 0) { this.phase('ConflictRegionDone'); return }
+        const panel = panels[0];
+        panel.areYouSure('Sacrifice 2 for Worshipful?', () => {
+          this.addFollowers(panel.player, -2, `Worshipful[${rid}]`); // assume yes: they want Devotion
+          this.addDevotion(panel.player, 1, `Worshipful[${rid}]:1`);
+          this.done(panel)
+        }, () => { this.done(panel) })
+      }
+    },
+    ConflictRegionDone: {
+      start: () => {
+        // battle cards go to table:
+        const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
+        panels0.forEach(panel => panel.battleCardsToTable());
+        panels0.forEach(panel => panel.cycleWasPlayed && panel.allCardsToHand());
         this.phase('ConflictNextRegion');
       }
     },
@@ -692,6 +712,9 @@ export class GameState {
     player.coins += n;
     const verb = (n >= 0) ? 'gains' : 'sacrifices';
     this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} Followers: ${reason}`);
+    if (n < 0 && player.godName === 'Hathor') {
+      player.panel.highlightStable(true);
+    }
   }
 
   addDevotion(player: Player, n: number, reason?: string) {

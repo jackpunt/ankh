@@ -67,6 +67,7 @@ export class TP {
   static ankhChar = '\u2625';
   static ankhString = `${'\u2625'}`;
   static inRedzone = 20;     // score in the redzone
+  static autoRevealDone = 0;  // 2000? to speed past card Reveal phase
 
 
   /** map size for (dpb, dop) */
