@@ -106,6 +106,9 @@ export class PlayerPanel extends Container {
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
+    if (this.player.godName === 'Anubis' && this.figuresInRegion(regionNdx + 1 as RegionId, this.player).includes(this.god.figure)) {
+      addStrength(this.god.doSpecial('occupied').length, `Anubis`)
+    }
     // TODO: add Bastet-Cats
     return this.strength;
   }
