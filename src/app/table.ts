@@ -121,6 +121,8 @@ export class RegionMarker extends Tile {
     this.hexMap = table.hexMap as AnkhMap<AnkhHex>;
     const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
     this.baseShape.paint();
+    const rad = this.radius;
+    this.setBounds(-rad, -rad, 2 * rad, 2 * rad)
     this.addChild(txt);
   }
   override setPlayerAndPaint(player: Player): this {
@@ -281,7 +283,7 @@ export class Table extends EventDispatcher  {
   bgRect: Shape
   hexMap: HexMap<Hex2>; // from gamePlay.hexMap
 
-  undoCont: Container = new Container()
+  undoCont: Container = new Container();
   undoShape: Shape = new Shape();
   skipShape: Shape = new Shape();
   redoShape: Shape = new Shape();
@@ -295,7 +297,7 @@ export class Table extends EventDispatcher  {
   overlayCont = new Container();
   constructor(stage: Stage) {
     super();
-
+    this.overlayCont.name = 'overlay';
     // backpointer so Containers can find their Table (& curMark)
     Table.table = (stage as StageTable).table = this;
     this.stage = stage
@@ -316,6 +318,7 @@ export class Table extends EventDispatcher  {
   }
   setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 4, col = -9) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
+    undoC.name = `undoCont`;
     this.setToRowCol(undoC, row, col);
     const progressBg = new Shape(), bgw = 200, bgym = 140, y0 = 0; // bgym = 240
     const bgc = C.nameToRgbaString(TP.bgColor, .8);
@@ -389,7 +392,7 @@ export class Table extends EventDispatcher  {
     let table = this
     // c m v on buttons
     let makeButton = (dx: number, bc = TP.bgColor, tc = TP.bgColor, text: string, key = text) => {
-      let cont = new Container
+      let cont = new Container(); cont.name='aiControl'
       let circ = new Graphics().f(bc).drawCircle(0, 0, rad)
       let txt = new Text(text, F.fontSpec(rad), tc)
       txt.y = - rad/2
@@ -401,7 +404,7 @@ export class Table extends EventDispatcher  {
       cont.on(S.click, (ev) => { KeyBinder.keyBinder.dispatchChar(key) })
       return cont
     }
-    let bpanel = new Container()
+    let bpanel = new Container(); bpanel.name = 'bpanel';
     let c0 = TP.colorScheme[playerColor0], c1 = TP.colorScheme[playerColor1]
     let cm = "rgba(100,100,100,.5)"
     let bc = makeButton(-dx, c0, c1, 'C', 'c')
@@ -533,7 +536,7 @@ export class Table extends EventDispatcher  {
   }
 
   makeCircleButton(color = C.WHITE, rad = 20, c?: string, fs = 30) {
-    const button = new Container();
+    const button = new Container(); button.name = 'circle';
     const shape = new CircleShape(color, rad, '');
     button.addChild(shape);
     if (c) {
@@ -546,7 +549,7 @@ export class Table extends EventDispatcher  {
   }
 
   makeSquareButton(color = C.WHITE, xywh: XYWH, c?: string, fs = 30) {
-    const button = new Container();
+    const button = new Container(); button.name = 'square';
     const shape = new RectShape(xywh, color, '');
     button.addChild(shape);
     if (c) {
@@ -736,7 +739,7 @@ export class Table extends EventDispatcher  {
   get nextEventIndex() { return this.eventCells.findIndex(ec => !ec.children.find(c => (c instanceof AnkhMarker)))}
   eventCells: EventIcon[] = [];
   makeEventCont(row = TP.nHexes + 0.5, col = 7.05) {
-    const eventCont = new Container();
+    const eventCont = new Container(); eventCont.name = 'eventCont';
     this.hexMap.mapCont.resaCont.addChild(eventCont);
     this.setToRowCol(eventCont, row, col);
     const events: EventName[] = [
@@ -749,7 +752,7 @@ export class Table extends EventDispatcher  {
     const lf = false, rad = TP.ankhRad, gap = 5, dx = 2 * rad + gap, bx = .5;
     let cx = 0;
     events.forEach((evt, nth) => {
-      const icon = new Container() as EventIcon;
+      const icon = new Container() as EventIcon; icon.name = 'eventIcon';
       icon.eventName = evt;
       const k = (evt === 'Conflict') ? 'B' : firstChar(evt);
       const shape = new CircleShape('rgb(240,240,240)', rad, );
@@ -792,7 +795,7 @@ export class Table extends EventDispatcher  {
   makeScoreStacks(row = TP.nHexes + .5, col = -7.2, np = Player.allPlayers.length, w = 34) {
     const inRed = TP.inRedzone;
     const redzone = 'rgb(230,100,100)', win = C.lightgreen;
-    const scoreCont = this.scoreCont = new Container();
+    const scoreCont = this.scoreCont = new Container(); scoreCont.name = 'scoreCont';
     this.hexMap.mapCont.resaCont.addChild(scoreCont);
     this.setToRowCol(scoreCont, row, col);
     const h = 20, gap = 5, dx = w + gap, x = -w / 2, y = -h / 2, sh = h * np; // stack height; ym = (np - 1) * h;

@@ -172,10 +172,10 @@ export class Portal extends AnkhPiece {
     this.paint(vis ? 'black' : this.player.color);
   }
 
-  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-    super.dropFunc(targetHex, ctx);
-    this.parent.addChildAt(this, 0); // under any Figure
-  }
+  // override dropFunc(targetHex: Hex2, ctx: DragContext): void {
+  //   super.dropFunc(targetHex, ctx);
+  //   this.parent.addChildAt(this, 0); // under any Figure
+  // }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
     return (ctx.phase === 'Osiris') ? undefined : 'Only after losing in Battle';
@@ -188,6 +188,60 @@ export class Portal extends AnkhPiece {
       && (toHex instanceof AnkhHex)
       && !toHex.occupied
       && (toHex.regionId === ctx.regionId)
+  }
+}
+
+export class RadianceMarker extends AnkhPiece {
+  static source = [[]]; // per-player source, although only 1 Ra player...
+
+  override get radius(): number { return TP.hexRad * H.sqrt3_2; }
+  constructor(player: Player, serial: number) {
+    super(player, serial, 'RaMark');
+  }
+
+  override makeShape(): PaintableShape {
+    const rad = this.radius;
+    const shape = new PaintableShape((color) => {
+      return new Graphics().c().f(color).dp(0, 0, rad, 24, .4, 0).dc(0, 0, TP.ankh1Rad)
+    });
+    this.setBounds(-rad, -rad, rad * 2, rad * 2)
+    return shape;
+  }
+
+  override moveTo(hex: AnkhHex) {
+    if (hex === this.source.hex) {
+      super.moveTo(hex);
+      return;
+    }
+    const figure = hex?.figure;
+    if (figure instanceof Figure) {
+      figure.raMarker = this;
+      const at = figure.children.indexOf(figure.baseShape);
+      figure.addChildAt(this, at);     // below baseShape
+      this.x = 0; this.y = 0;
+      const { x, y, width, height } = this.getBounds()
+      const { x: x0, y: y0, width: w0, height: h0} = figure.getBounds()
+      figure.setBounds(Math.min(x, x0), Math.min(y, y0), Math.max(width, w0), Math.max(height, h0));
+      {
+        const { x, y, width, height } = figure.getBounds()
+        figure.cache(x, y, width, height);
+      }
+      this.hex = undefined;            // take it off the source.hex
+    } else if (this.parent instanceof Figure) {
+      this.parent.raMarker = undefined;
+      this.parent?.removeChild(this);
+    } else if (hex === undefined) {
+      super.moveTo(hex);
+    }
+  }
+
+  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
+    // TODO: during Summon!
+    return (toHex instanceof AnkhHex)
+      && toHex.isOnMap
+      && toHex.figure?.player === this.player
+      && (toHex.figure instanceof Warrior || toHex.figure instanceof Guardian)
+      && toHex.figure.raMarker === undefined;
   }
 }
 
@@ -256,54 +310,6 @@ export class AnkhMeeple extends Meeple {
     super.dropFunc(targetHex, ctx);
   }
 
-}
-
-export class RadianceMarker extends Tile {
-  static source = [[]]; // per-player source, although only 1 Ra player...
-
-  override get radius(): number { return TP.hexRad; }
-  constructor(player: Player, serial: number, Aname: string ) {
-    super(`RaMark=${serial}`, player);
-
-  }
-  override makeShape(): PaintableShape {
-    const rad = this.radius;
-    const shape = new PaintableShape((color) => {
-      return new Graphics().c().f(color).dp(0, 0, rad, 24, .5, 0)
-    });
-    this.setBounds(-rad, -rad, rad * 2, rad * 2)
-    return shape;
-  }
-
-  override moveTo(hex: AnkhHex) {
-    if (hex === this.source.hex) {
-      super.moveTo(hex);
-      return;
-    }
-    const figure = hex?.figure;
-    if (figure instanceof Figure) {
-      figure.raMarker = this;
-      const at = figure.children.indexOf(figure.baseShape);
-      figure.addChildAt(this, at);     // below baseShape
-      this.x = 0; this.y = 0;
-      const { x, y, width, height } = this.getBounds()
-      figure.setBounds(x, y, width, height)
-      figure.cache(x, y, width, height);
-      this.hex = undefined;            // take it off the source.hex
-    } else if (this.parent instanceof Figure) {
-      this.parent.raMarker = undefined;
-      this.parent?.removeChild(this);
-    }
-  }
-
-  override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-    // TODO: during Summon!
-    return (toHex instanceof AnkhHex)
-      && toHex.isOnMap
-      && toHex.figure?.player === this.player
-      && (toHex.figure instanceof Warrior || toHex.figure instanceof Guardian)
-      && toHex.figure.raMarker === undefined;
-  }
 }
 
 export class Figure extends AnkhMeeple {

@@ -213,7 +213,7 @@ export class PlayerPanel extends Container {
   makeConfirmation() {
     const { wide, high, brad, gap, rowh } = this.metrics;
     const { table } = this.objects;
-    const conf = this.confirmContainer = new Container() as ConfirmCont;
+    const conf = this.confirmContainer = new Container() as ConfirmCont; conf.name = 'confirm'
     const bg0 = new RectShape({ x: 0, y: - brad - gap, w: wide, h: high }, '', '');
     bg0.paint('rgba(240,240,240,.2)');
     const bg1 = new RectShape({ x: 0, y: 4 * rowh - brad - 2 * gap, w: wide, h: high - 4 * rowh + gap }, '', '');
@@ -373,7 +373,7 @@ export class PlayerPanel extends Container {
     // Ankh Power line: circle + text; Ankhs
     const { brad, gap, ankhRowy, colWide, dir} = this.metrics;
     PlayerPanel.ankhPowers.forEach((powerList, colNdx) => {
-      const colCont = new Container() as AnkhPowerCont, rank = colNdx +1;
+      const colCont = new Container() as AnkhPowerCont, rank = colNdx +1; colCont.name = `colCont-${colNdx}`;
       colCont.rank = rank;
       colCont.guardianSlot = (colNdx < 2) ? 1 : 0;
       colCont.x = colNdx * colWide + [2 * brad + 3 * gap, 0, 0][1 - dir];
@@ -490,7 +490,7 @@ export class PlayerPanel extends Container {
   makeStable() {
     const { wide, gap, rowh, dir, swidth } = this.metrics
     const { panel, god, player, index, table} = this.objects
-    const stableCont = new Container();
+    const stableCont = new Container(); stableCont.name = `stableCont:${player.index}`
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
     const swide0 = 4 * (srad1 + srad2); // 2 * sum(this.stableSizes)
     const sgap = (wide - (gap + swidth + gap + gap + swide0 + 0 * gap)) / 3;
@@ -519,7 +519,7 @@ export class PlayerPanel extends Container {
   makeSpecial(sy: number, shigh: number) {
     const { dir, wide, gap, swidth } = this.metrics;
     const { panel, god, table } = this.objects;
-    const specl = new Container();
+    const specl = new Container(); specl.name = `special:${god.name}`
     specl.y = sy;
     specl.x = [gap, wide - (swidth + gap)][(1 + dir) / 2];
     panel.addChild(specl);
@@ -538,7 +538,7 @@ export class PlayerPanel extends Container {
 
   cardSelector: CardSelector;
   makeCardSelector() {
-    const cardSelector = this.cardSelector = new Container as CardSelector;
+    const cardSelector = this.cardSelector = new Container as CardSelector; cardSelector.name = `cs:${this.player.index}`
     const apCont = cardSelector as Container as AnkhPowerCont;
     const { wide, high, dir, brad, gap, rowh } = this.metrics;
     const { panel, table, player, gamePlay } = this.objects;

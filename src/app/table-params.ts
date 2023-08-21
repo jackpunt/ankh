@@ -23,7 +23,7 @@ export class TP {
   static useEwTopo = false;
   static ankhRad = 20;
   static ankh1Rad = 36;
-  static ankh2Rad = 45;
+  static ankh2Rad = 42;
   static hexRad = 60;
   static meepleRad = TP.hexRad * .4;
   static meepleY0 = 0;//TP.hexRad * .25;
