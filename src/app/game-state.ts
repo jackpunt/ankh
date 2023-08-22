@@ -8,7 +8,7 @@ import type { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
-import type { PlayerPanel, PowerLine } from "./player-panel";
+import { PlayerPanel, PowerLine } from "./player-panel";
 import { HexShape, PaintableShape } from "./shapes";
 import { DragContext, EventName } from "./table";
 import { TP } from "./table-params";
@@ -23,6 +23,7 @@ interface Phase {
   panels?: PlayerPanel[],
   players?: Player[],
   deadFigs?: Figure[], // for Plague
+  horusState?: string[], // save state of Horus's cards
 }
 
 export class GameState {
@@ -57,6 +58,7 @@ export class GameState {
   buildPanels: PlayerPanel[];
 
   battleResults: any; // TODO: record winner, who lost units, etc for use by special powers (Osiris move) and Cards.
+  bannedCard: string; // keyof PlayerPanel.colorForState
 
   actionsDone = 0;
   bastetEnabled = false;
@@ -325,14 +327,16 @@ export class GameState {
           }
         });
 
-        this.phase('ConflictNextRegion', 1);
+        this.phase(God.byName.get('Horus') ? 'Horus' : 'ConflictNextRegion', 1);
       },
-      // process Scorpion
-      // process Omnipresent
-      // phase(Horus ? Horus : ConflictRegions)
     },
     Horus: {
-      start: () => { },
+      start: () => {
+        this.doneButton('Horus Eyes', 'darkred');
+      },
+      done: () => {
+        this.phase('ConflictNextRegion', 1); // AKA: Conflict FIRST Region
+      }
       // place enable Eyes, drag to each Region (to Region index marker...)
       // Done(phase(ConflictNextRegion))
     },
@@ -382,11 +386,32 @@ export class GameState {
           if (ndx < 0) return;    // ignore extra doneification.
           panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
         }
-        if (panels.length === 0) { this.phase('Card'); return; }
-        panels[0].enableObeliskTeleport(this.conflictRegion);
+        if (panels.length > 0) {
+          panels[0].enableObeliskTeleport(this.conflictRegion);
+          return;
+        }
+        this.phase(this.horusInRegion(this.conflictRegion) ? 'HorusCard' : 'ChooseCard');
       }
     },
-    Card: {
+    HorusCard: {
+      horusState: [],
+      start: () => {
+        const panel = God.byName.get('Horus').player.panel;
+        this.state.horusState = panel.cardSelector.powerLines.map(pl => pl.button.colorn);
+        panel.cardSelector.powerLines.forEach(pl => {
+          pl.button.paint(PlayerPanel.colorForState[(pl.button.name !== 'Cycle') ? 'inHand' : 'onTable']);
+        });
+        panel.activateCardSelector(true, 'Ban Card'); // --> phaseDone(panel)
+      },
+      done: () => {
+        const panel = God.byName.get('Horus').player.panel, colorn = this.state.horusState;
+        this.bannedCard = panel.cardsInBattle[0].name;
+        // restore state of Horus's cards:
+        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.paint(colorn[ndx]));
+        this.phase('ChooseCard');
+      }
+    },
+    ChooseCard: {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
@@ -730,6 +755,10 @@ export class GameState {
   hasRadiance(panel: PlayerPanel) {
     const playerFigs = panel.figuresInRegion(this.conflictRegion, panel.player);
     return playerFigs.find(fig => fig.raMarker !== undefined);
+  }
+
+  horusInRegion(rid: RegionId) {
+    return God.byName.get('Horus')?.doSpecial(rid);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];

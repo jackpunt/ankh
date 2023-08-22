@@ -11,7 +11,8 @@ import { Hex, Hex2, HexMap, IHex } from "./hex";
 import { H, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
-import { CenterText, CircleShape, HexShape, PaintableShape, PolyShape, RectShape, UtilButton } from "./shapes";
+import { RegionMarker } from "./RegionMarker";
+import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
@@ -107,99 +108,6 @@ export class ActionContainer extends Container {
 }
 interface ScoreShape extends Shape {
   color: string;
-}
-
-/** a Tile, but it lives on markCont !! */
-export class RegionMarker extends Tile {
-  override get radius() { return TP.ankh1Rad }
-  override makeShape(): PaintableShape {
-    return new PolyShape(4, 0, 'rgba(40,40,40,.7)', this.radius, C.WHITE);
-  }
-  hexMap: AnkhMap<AnkhHex>;
-  constructor(public regionId = 1 as RegionId, public table: Table) {
-    super(`Region-${regionId}`);
-    this.hexMap = table.hexMap as AnkhMap<AnkhHex>;
-    const txt = new CenterText(`${regionId}`, this.radius, C.WHITE);
-    this.baseShape.paint();
-    const rad = this.radius;
-    this.setBounds(-rad, -rad, 2 * rad, 2 * rad)
-    this.addChild(txt);
-  }
-  override setPlayerAndPaint(player: Player): this {
-    return this;
-  }
-  override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
-    if (this.regionId > this.hexMap.regions.length) return false;
-    if (!this.gamePlay.isPhase('Swap')) {
-      ctx.nLegal = 1;
-      return false;
-    } else {
-      if (!toHex || !toHex.isOnMap) return false;
-      return this.gamePlay.gameState.ankhMapSplitter.isLegalSwap(toHex, ctx)
-    }
-  }
-  override isLegalRecycle(ctx: DragContext): boolean {
-    return false;
-  }
-
-  readonly lastXY: XY = { x: 500, y: 500 }; // <--- a bit like targtHex
-  override dragFunc0(legalHex: AnkhHex, ctx: DragContext): void {
-    const swap = this.gamePlay.isPhase('Swap');
-    const hex = this.hexMap.hexUnderObj(this, swap);
-    const legalXY = !!hex && hex.isOnMap && (swap ? hex.terrain !== 'w' : this.hexMap.regions[this.regionId - 1]?.includes(hex));
-    const srcCont = (ctx.info as DragInfo).srcCont;
-
-    if (ctx?.info.first) {
-
-    }
-    if (this.regionId > this.hexMap.regions.length) {
-      this.table.dragger.stopDrag();
-      return;
-    } else if (legalXY) {
-      ctx.targetHex = hex;
-      // record location in original parent coordinates:
-      this.parent.localToLocal(this.x, this.y, srcCont, this.lastXY);
-      if (swap) {
-        super.dragFunc0(legalHex, ctx); // set ctx.target and showMark()
-      }
-    } else {
-      // keep this at lastXY (in dragCont coordinates):
-      srcCont.localToLocal(this.lastXY.x, this.lastXY.y, this.parent, this);
-    }
-    return;
-  }
-  override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-    const hex = targetHex as AnkhHex;
-    const gamePlay = this.gamePlay, table = this.table, hexMap = this.hexMap;
-    if (!gamePlay.isPhase('Swap')) { return; }
-    if (!hex) return;
-    const regionA = this.regionId, regionB = hex.regionId
-    if (regionA !== regionB) {
-      this.swapRegions(regionA, regionB);
-    }
-    return;
-  }
-
-  /** marker(ra=4, '4') has moved into region of marker(rb=1, '1') */
-  swapRegions(ra: RegionId, rb: RegionId) {
-    const table = this.table, hexMap = this.hexMap, regions = hexMap.regions;
-    const ndxa = ra - 1, ndxb = rb - 1;
-    const ma = table.regionMarkers[ndxa], mb = table.regionMarkers[ndxb];
-
-    const xregion = regions[ndxa];
-    regions[ndxa] = regions[ndxb];
-    regions[ndxb] = xregion;
-    hexMap.setRegionId(ra); // the original (1) is now in slot (4); set the district/RegionId
-    hexMap.setRegionId(rb); // the original (4) is now in slot (1); set the district/RegionId
-
-    mb.x = ma.x; mb.y = ma.y;
-    // the marker for RegionB ('1') now in same location as marker for RegionA ('4')
-    // move ma '4' to its center of regionB
-    table.setRegionMarker(rb);  // Swap: move ma to center of rb
-    const mb2 = table.regionMarkers[rb];
-    mb2.lastXY.x = mb2.x; mb2.lastXY.y = mb2.y; // using srcCont coords!
-    hexMap.update();
-  }
 }
 
 /** to own file... */
@@ -857,34 +765,38 @@ export class Table extends EventDispatcher  {
   regionMarkers: RegionMarker[] = [];
   makeRegionMarkers(n: RegionId = 8) {
     for (let regionId: RegionId = n; regionId > 0; --regionId) {
-      const marker = new RegionMarker(regionId, this);
+      const marker = new RegionMarker(this, regionId);
       this.regionMarkers.unshift(marker);
       this.hexMap.mapCont.markCont.addChild(marker);
       marker.updateCache();
     }
   }
 
-  setRegionMarker(rid = this.regionMarkers.length as RegionId) {
-    const marker = this.regionMarkers[rid - 1];
+  setRegionMarker(rid = this.regionMarkers.length as RegionId, marker = this.regionMarkers[rid - 1]) {
+    // move marker to 'corner' of hex (or {0,0} of markCont):
+    const [x, y] = this.centerOfRegion(rid);
+    const hex = this.hexMap.hexUnderPoint(x, y, false);
+    this.placeRegionMarker(marker, hex as AnkhHex, x, y);
+    return;
+  }
+  centerOfRegion(regionId: RegionId) {
     const hexMap = this.hexMap as AnkhMap<AnkhHex>, regions = hexMap.regions;
-    const region = regions[rid - 1] ?? [], nHexes = region.length || 1;
+    const region = regions[regionId - 1] ?? [], nHexes = region.length || 1;
     // if (region.length === 0) 'debugger'; // we have injected a intial value, but something is wrong.
     const txy = (region.length > 0) ? (region.map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
       return { x: pv.x + cv.x, y: pv.y + cv.y }
     }, { x: 0, y: 0 }) : { x: 0, y: 0 };
-    const [x, y] = [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
-    // move marker to 'corner' of hex (or {0,0} of markCont):
-    const hex = hexMap.hexUnderPoint(x, y, false);
+    return [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
+  }
+  placeRegionMarker(marker: RegionMarker, hex: AnkhHex, x = hex?.x, y = hex?.y) {
     if (hex) {
       const cxy = hex.cornerXY(hex.cornerDir({ x, y }, undefined, H.nsDirs)[0]);
       hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker);
       hex.cont.localToLocal(cxy.x * H.sqrt3_2, cxy.y * H.sqrt3_2, marker.parent, marker.lastXY);
     } else {
-      hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker)
-      hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker.lastXY);
+      this.hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker)
+      this.hexMap.mapCont.markCont.localToLocal(0, 0, marker.parent, marker.lastXY);
     }
-
-    return;
   }
 
 
@@ -1003,11 +915,12 @@ export class Table extends EventDispatcher  {
       this.stopDragging();
     } else {
       // mark legal targets for tile; SHIFT for all hexes, if payCost
+      tile.dragStart(ctx); // prepare for isLegalTarget
+
       const hexIsLegal = (hex: Hex2) => ((hex !== tile.hex) && (hex.isLegal = tile.isLegalTarget(hex, ctx)) && (ctx.nLegal += 1));
       tile.markLegal(this, hexIsLegal, ctx);           // delegate to check each potential target
       this.gamePlay.recycleHex.isLegal = tile.isLegalRecycle(ctx); // do not increment ctx.nLegal!
       tile.moveTo(undefined); // notify source Hex, so it can scale; also triggers nextUnit !!
-      tile.dragStart(ctx);  // which *could* reset nLegal ?
       this.hexMap.update();
       if (ctx.nLegal === 0) {
         tile.noLegal();

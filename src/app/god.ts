@@ -1,10 +1,13 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
+import { DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
-import { AnkhMeeple, AnkhPiece, AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
-import { AnkhHex } from "./ankh-map";
+import { RegionMarker } from "./RegionMarker";
+import { AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
+import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
+import { Hex2 } from "./hex";
 import { Player } from "./player";
-import { CenterText, CircleShape, UtilButton } from "./shapes";
-import { Table } from "./table";
+import { CenterText, CircleShape, PaintableShape, PolyShape, UtilButton } from "./shapes";
+import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 
 
@@ -49,7 +52,7 @@ export class God {
     return new AnkhMarker(color, rad);
   }
 
-  makeSpecial(cont: Container, wh: WH, table: Table): Container {
+  makeSpecial(cont: Container, wh: WH, table: Table) {
     const fillc = 'rgb(140,140,140)';
     const rad = TP.ankhRad, y = wh.height/2 + rad/2;
     const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
@@ -57,7 +60,6 @@ export class God {
     const tname = new CenterText(this.Aname, rad, this.color );
     tname.x = wh.width / 2; tname.textBaseline = 'top';
     cont.addChild(tname);
-    return cont;
   }
   doSpecial(...args: any[]): any { return; }
 
@@ -66,60 +68,12 @@ export class God {
   figure: GodFigure;
 }
 
-/** SpecialHex scales the Tile or Meep by .8 */
-class SpecialHex extends AnkhHex {
-  static scale = .8;
-  scale = SpecialHex.scale;
-
-  override get meep() { return super.meep; }
-
-  override set meep(meep: AnkhMeeple) {
-    if (meep === undefined && this.meep) {
-      this.meep.scaleX = this.meep.scaleY = 1;
-      this.meep.updateCache();
-    }
-    super.meep = meep;
-    if (meep !== undefined) {
-      meep.scaleX = meep.scaleY = SpecialHex.scale;
-      meep.updateCache();
-    }
-  }
-
-  override get tile() { return super.tile; }
-
-  override set tile(tile: AnkhPiece) {
-    if (tile === undefined && this.tile) {
-      this.tile.scaleX = this.tile.scaleY = 1;
-      this.tile.updateCache();
-    }
-    super.tile = tile;
-    if (tile !== undefined) {
-      tile.scaleX = tile.scaleY = this.scale;
-      tile.updateCache();
-    }
-  }
-  // override setUnit(unit: Tile, meep?: boolean): void {
-  //   if (unit === undefined) {
-  //     const unit0 = meep ? this.meep : this.tile;
-  //     unit0.scaleX = unit0.scaleY = 1;
-  //     unit0.updateCache();
-  //   }
-  //   super.setUnit(unit, meep);
-  //   const unit0 = meep ? this.meep : this.tile;
-  //   if (unit0 !== undefined) {
-  //     unit0.scaleX = unit0.scaleY = SpecialHex.scale;
-  //     unit0.updateCache();
-  //   }
-  // }
-
-}
-
 
 class Anubis extends God {
   constructor() { super('Anubis', 'green') }
   anubisHexes: SpecialHex[] = [];
 
-  override makeSpecial(cont0: Container, wh: WH, table: Table): Container {
+  override makeSpecial(cont0: Container, wh: WH, table: Table) {
     super.makeSpecial(cont0, wh, table);
     const cont = new Container(), sc = cont.scaleX = cont.scaleY = SpecialHex.scale;
     cont.name = 'AnubisCont';
@@ -137,7 +91,6 @@ class Anubis extends God {
       cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       hex.legalMark.setOnHex(hex);
     });
-    return cont0;
   }
   override doSpecial(query: string) {
     switch (query) {
@@ -170,12 +123,11 @@ class Amun extends God {
   override doSpecial(faceUp: boolean): void {
     this.tokenFaceUp = faceUp;
   }
-  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+  override makeSpecial(cont: Container, wh: WH, table: Table) {
     super.makeSpecial(cont, wh, table);
     const token = this.token;
     token.x = wh.width / 2; token.y = wh.height * .6;
     cont.addChild(token);
-    return cont;
   }
 }
 
@@ -188,8 +140,77 @@ class Hathor extends God {
   // constructor() { super('Hathor', 'rgb(74,35,90)') }
 }
 
+class HorusMarker extends RegionMarker {
+  static source: AnkhSource<HorusMarker>;
+  static table: Table;
+  constructor(player: Player, serial: number, Aname: string) {
+    super(HorusMarker.table, 1, `Aname-${serial}`);
+    this.regionId = undefined;
+    return;
+  }
+  override makeShape(): PaintableShape {
+    return new PolyShape(4, 0, C.nameToRgbaString('darkred', .8), this.radius, C.WHITE);
+  }
+  override dragStart(ctx: DragContext): void {
+    this.regionId = undefined;
+    super.dragStart(ctx);
+  }
+  override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
+      ctx.nLegal = 1;
+      if (!toHex || !toHex.isOnMap || toHex.terrain === 'w') return false;
+      if (this.source.filterUnits(((unit: HorusMarker) => unit.regionId === toHex.regionId)).length > 0) return false;
+      return true;
+  }
+  override dragFunc0(ankhHex: AnkhHex, ctx: DragContext): void {
+    const hex = this.hexMap.hexUnderObj(this, false);
+    const legalXY = !!hex && hex.isOnMap && hex.terrain !== 'w';
+    const srcCont = (ctx.info as DragInfo).srcCont;
+    if (legalXY) {
+      ctx.targetHex = hex;
+      this.regionId = hex.regionId;
+      this.idText.text = `${this.regionId}`
+      this.updateCache()
+      // record location in original parent coordinates:
+      this.parent.localToLocal(this.x, this.y, srcCont, this.lastXY);
+      this.showTargetMark(hex, ctx);
+    } else if (this.regionId === undefined) {
+      this.showTargetMark(hex, ctx);
+    } else {
+      // keep this at lastXY (in dragCont coordinates):
+      srcCont.localToLocal(this.lastXY.x, this.lastXY.y, this.parent, this);
+    }
+    return;
+  }
+  override dropFunc(hex: Hex2, ctx: DragContext): void {
+    // const { x, y } = this.table.hexMap.mapCont.hexCont.localToLocal(hex.x, hex.y, hex.cont.parent);
+    this.parent.addChild(this);
+    if (this.regionId !== undefined) this.table.placeRegionMarker(this, hex as AnkhHex, this.x, this.y);
+  }
+  override sendHome(): void {
+    this.regionId = undefined;
+    super.sendHome();
+  }
+}
+
+
 class Horus extends God {
+  specialHex: SpecialHex;
+  specialSource: AnkhSource<HorusMarker>;
   constructor() { super('Horus', 'darkred') }
+  override makeSpecial(cont: Container, wh: WH, table: Table) {
+    super.makeSpecial(cont, wh, table); cont.name = 'Horus-Special'
+    HorusMarker.table = table;
+    const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .9;
+    cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    const source = this.specialSource = HorusMarker.makeSource0(AnkhSource<HorusMarker>, HorusMarker, undefined, hex, 2);
+    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.x += TP.ankh2Rad * .5;
+    table.sourceOnHex(source, hex);
+  }
+  override doSpecial(regionId: RegionId) {
+    const inRegion = HorusMarker.source.filterUnits(hm => hm.regionId === regionId);
+    return (inRegion.length > 0);
+  }
 }
 
 class Isis extends God {
@@ -201,7 +222,7 @@ class Osiris extends God {
   specialHex: SpecialHex;
   specialSource: AnkhSource<Portal>;
 
-  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+  override makeSpecial(cont: Container, wh: WH, table: Table) {
     super.makeSpecial(cont, wh, table);
     cont.name = 'Osiris-Special'
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
@@ -210,7 +231,6 @@ class Osiris extends God {
     source.counter.y -= TP.ankh2Rad * 1.5;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
-    return cont;
   }
 
   override doSpecial(vis = true) {
@@ -225,7 +245,7 @@ class Ra extends God {
   specialSource: AnkhSource<RadianceMarker>;
   specialHex: SpecialHex;
 
-  override makeSpecial(cont: Container, wh: WH, table: Table): Container {
+  override makeSpecial(cont: Container, wh: WH, table: Table) {
     super.makeSpecial(cont, wh, table);
     cont.name = `Ra-Special`;
     const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
@@ -234,7 +254,6 @@ class Ra extends God {
     source.counter.y -= TP.ankh2Rad * 1.5;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
-    return cont;
   }
 }
 
@@ -247,6 +266,6 @@ class Toth extends God {
 }
 
 // List all the God constructors:
-const godCbyName: {[index: string]: Constructor<God>} = {Anubis: Anubis, Amun: Amun, Bastet: Bastet, Hathor: Hathor, Horus: Horus, Isis: Isis, Osiris: Osiris, Ra: Ra, Set: SetGod, Toth: Toth};
+const godCbyName: { [index: string]: Constructor<God> } = { Anubis: Anubis, Amun: Amun, Bastet: Bastet, Hathor: Hathor, Horus: Horus, Isis: Isis, Osiris: Osiris, Ra: Ra, Set: SetGod };
 
 // godSpecs.forEach(god => new god());

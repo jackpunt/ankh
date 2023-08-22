@@ -1,16 +1,17 @@
 import { C, XY, stime } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { DisplayObject } from "@thegraid/easeljs-module";
+import { RegionMarker } from "./RegionMarker";
 import { AnkhHex, RegionId } from "./ankh-map";
 import { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { Arrays_intersect } from "./functions";
+import { GamePlay } from "./game-play";
 import { GameState, SplitterShape } from "./game-state";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import { CircleShape, EdgeShape } from "./shapes";
+import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { GamePlay } from "./game-play";
-import { DragContext, RegionMarker, Table } from "./table";
 
 export class AnkhMapSplitter {
   isLegalSwap(toHex: AnkhHex, ctx: DragContext): boolean {

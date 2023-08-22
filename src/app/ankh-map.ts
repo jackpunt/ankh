@@ -1,12 +1,12 @@
 import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
-import { Graphics, Shape } from "@thegraid/easeljs-module";
+import { Graphics } from "@thegraid/easeljs-module";
 import type { AnkhMeeple, AnkhPiece, Figure, Guardian } from "./ankh-figure";
 import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
 import { permute } from "./functions";
-import { Hex, Hex2, HexConstructor, HexMap, HexMark } from "./hex";
+import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
-import { CircleShape, EdgeShape, HexShape, RectShape } from "./shapes";
+import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
 
@@ -138,7 +138,7 @@ export class AnkhHex extends Hex2 {
     let rotLow = ((rots[0] + rots[n - 1] - 360) / 2);
     // find ndx:: rot[ndx-1]<rot[ndx]<rot[ndx+1]  indicies modulo (dirs.length-1)
     const rot = rots.find((rot: number, ndx: number) => {
-      const rotHi = (rot + rots[ndx + 1]) / 2;
+      const rotHi = (rot + (rots[ndx + 1] ?? 720)) / 2; // (rotHi >= 720/2) guarantees: (deg <= rotHi)
       if (deg >= rotLow && deg <= rotHi) return true;
       rotLow = rotHi;
       return false;
@@ -209,6 +209,42 @@ export class StableHex extends AnkhHex {
     this.size = meep.radius;
   }
 }
+
+/** SpecialHex scales the Tile or Meep by .8 */
+export class SpecialHex extends AnkhHex {
+  static scale = .8;
+  scale = SpecialHex.scale;
+
+  override get meep() { return super.meep; }
+
+  override set meep(meep: AnkhMeeple) {
+    if (meep === undefined && this.meep) {
+      this.meep.scaleX = this.meep.scaleY = 1;
+      this.meep.updateCache();
+    }
+    super.meep = meep;
+    if (meep !== undefined) {
+      meep.scaleX = meep.scaleY = SpecialHex.scale;
+      meep.updateCache();
+    }
+  }
+
+  override get tile() { return super.tile; }
+
+  override set tile(tile: AnkhPiece) {
+    if (tile === undefined && this.tile) {
+      this.tile.scaleX = this.tile.scaleY = 1;
+      this.tile.updateCache();
+    }
+    super.tile = tile;
+    if (tile !== undefined) {
+      tile.scaleX = tile.scaleY = this.scale;
+      tile.updateCache();
+    }
+  }
+}
+
+
 /** row, col, terrain-type, edges(river) */
 export type hexSpec = [r: number, c: number];
 export type hexSpecr = [r: number, c: number, ...e: HexDir[]];

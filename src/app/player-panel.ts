@@ -608,14 +608,15 @@ export class PlayerPanel extends Container {
   get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
   activateCardSelector(activate = true, done = 'Done') {
     const selector = this.cardSelector;
+    const bannedCard = this.player.gamePlay.gameState.bannedCard;
+    const inHand = PlayerPanel.colorForState['inHand'];
+    const inBattle = PlayerPanel.colorForState['inBattle'];
     selector.powerLines.forEach(pl => {
-      const color = pl.button.colorn;
-      const inHand = PlayerPanel.colorForState['inHand'];
-      const inBattle = PlayerPanel.colorForState['inBattle'];
-      if (pl.name === 'Build' && (color === inHand)) {
-        pl.text.color = this.canAffordMonument ? C.BLACK : 'rgb(180,0,0)';
-      }
-      pl.button.mouseEnabled = activate && (color === inHand || color === inBattle);
+      pl.text.color = C.BLACK;
+      const button = pl.button, color = button.colorn;
+      button.mouseEnabled = activate && (color === inBattle || color === inHand);
+      if (button.name === 'Build' && (color === inHand) && !this.canAffordMonument) { pl.text.color = 'grey'; }
+      if (button.name === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
     });
     this.showCardSelector(activate, done);
   }
@@ -676,11 +677,11 @@ export class PlayerPanel extends Container {
   selectForBattle(evt, button: CircleShape) {
     const max = this.god.nCardsAllowedInBattle;
 
-    const colorInHand = PlayerPanel.colorForState['inHand']
-    const colorInBattle = PlayerPanel.colorForState['inBattle']
-    button.paint((button.colorn === colorInHand) ? colorInBattle : colorInHand);
+    const inHand = PlayerPanel.colorForState['inHand']
+    const inBattle = PlayerPanel.colorForState['inBattle']
+    button.paint((button.colorn === inBattle) ? inHand : inBattle);
     if(this.cardsInState('inBattle').length > max) {
-      button.paint(colorInHand);
+      button.paint(inHand);
       this.blink(button);
     }
     button.stage.update();

@@ -250,6 +250,11 @@ export class Tile extends Tile0 implements Dragable {
     }
   }
 
+  showTargetMark(hex: Hex2, ctx: DragContext) {
+    ctx.targetHex = hex?.isLegal ? hex : this.fromHex;
+    ctx.targetHex?.map.showMark(ctx.targetHex);
+  }
+
   /**
    * Augment Table.dragFunc0().
    *
@@ -257,8 +262,7 @@ export class Tile extends Tile0 implements Dragable {
    * record ctx.targetHex & showMark() when Tile is over a legal targetHex.
    */
   dragFunc0(hex: Hex2, ctx: DragContext) {
-    ctx.targetHex = hex?.isLegal ? hex : this.fromHex;
-    ctx.targetHex?.map.showMark(ctx.targetHex);
+    this.showTargetMark(hex, ctx);
   }
 
   /** entry point from Table.dropFunc; delegate to this.dropFunc() */
