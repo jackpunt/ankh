@@ -209,7 +209,7 @@ class Horus extends God {
   }
   override doSpecial(regionId: RegionId) {
     const inRegion = HorusMarker.source.filterUnits(hm => hm.regionId === regionId);
-    return (inRegion.length > 0);
+    return (inRegion[0] as HorusMarker);
   }
 }
 

@@ -4,6 +4,7 @@ import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
+import { ClassByName } from "./class-by-name";
 import { afterUpdate } from "./functions";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
@@ -255,7 +256,8 @@ export class GamePlay extends GamePlay0 {
     // Players have: civics & meeples & TownSpec
     this.table = table;
     if (this.table.stage.canvas) this.bindKeys();
-    this.guards = Guardian.randomGuards;  // intially random, until/unless Scenario.parse supplies: guards: [,,]
+    const sguards = scenario.guards?.map((gn: string) => ClassByName.classByName[gn] as Constructor<Guardian>);
+    this.guards = sguards ?? Guardian.randomGuards;  // intially random, until/unless Scenario.parse supplies: guards: [,,]
   }
 
   /** suitable for keybinding */

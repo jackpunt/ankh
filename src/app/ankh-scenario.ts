@@ -3,14 +3,14 @@
 
 import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
-import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument } from "./ankh-figure";
+import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, Scorpion } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
 import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
-import { HexDir } from "./hex-intfs";
+import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import type { Player } from "./player";
 import { ActionContainer } from "./table";
@@ -21,7 +21,7 @@ export type GuardName = string | Constructor<Guardian>;
 export type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
 type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorius' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
 export type RegionElt = [row: number, col: number, bid: RegionId];
-type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number];
+type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number, dir?: EwDir];
 type ClaimElt = [row: number, col: number, pid: number];
 type MoveElt = [row: number, col: number, row1: number, col1: number]; // move Piece from [r,c] to [r1,c1];
 type AnkhElt = PowerIdent[];
@@ -248,6 +248,21 @@ export class AnkhScenario {
     ankhs: [["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"],["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"]],
     places: [[2,6,"CatMum",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[1,3,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[1,4,"Warrior",2],[1,5,"Portal",2],[0,4,"Apep",1],[1,5,"Scorpion",2],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
   }
+  static big16: {
+    ngods: 4,
+    godNames: ["Horus","Ra","Anubis","Osiris"],
+    turn: 16,
+    regions: [[4,0,1],[3,0,2],[0,1,3],[4,6,4]],
+    splits: [[[3,0,1],[4,0,"N","EN"],[4,1,"N","EN"]]],
+    guards: ["CatMum","Apep","Androsphinx"],
+    events: [0,1,0,3],
+    actions: {"Move":[0,1,2,3],"Summon":[0,2,3,0],"Gain":[1,2,3],"Ankh":[2,3,1,2],"selected":[]},
+    coins: [2,0,0,3],
+    scores: [4,3,2,1],
+    stable: [[],["Apep"],["CatMum","Apep"],["CatMum"]],
+    ankhs: [["Revered","Omnipresent","Pyramid"],["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Obelisk"],["Revered","Omnipresent","Pyramid","Temple"]],
+    places: [[4,1,"Obelisk",null],[3,5,"Obelisk",3],[3,8,"Obelisk",null],[5,5,"Pyramid",null],[7,0,"Pyramid",1],[2,8,"Pyramid",null],[5,7,"Pyramid",4],[8,2,"Pyramid",1],[1,5,"Pyramid",1],[5,0,"Pyramid",2],[3,2,"Pyramid",3],[3,3,"Pyramid",4],[4,2,"Temple",1],[8,4,"Temple",2],[1,3,"Temple",1],[8,6,"Temple",2],[7,6,"Warrior",2],[2,5,"Warrior",3],[6,6,"Warrior",4],[4,3,"Portal",4],[4,8,"Portal",4],[2,4,"Portal",4],[3,4,"CatMum",3],[6,1,"GodFigure",1],[7,1,"GodFigure",2],[2,7,"GodFigure",3],[1,7,"GodFigure",4]],
+  }
 
   static AltMidKingdom5: Scenario = {
     ngods: 5,
@@ -388,10 +403,10 @@ export class ScenarioParser {
     }
     //console.groupCollapsed('place');
     place.forEach(elt => {
-      const [row, col, cons0, pid] = elt;
+      const [row, col, cons0, pid, dir] = elt;
       const cons = (typeof cons0 === 'string') ? ClassByName.classByName[cons0] : cons0;
       const hex = map[row][col];
-      const player = (pid !== undefined) ? this.gamePlay.allPlayers[pid - 1] : undefined;
+      const player = (pid !== undefined) ? this.gamePlay.allPlayers[pid - 1] : undefined; // required for Figure
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'];
@@ -400,23 +415,23 @@ export class ScenarioParser {
       const piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
       const piece = piece0 ?? new cons(player, 0, cons.name);
       if (piece instanceof Guardian) {
-        // put in Stable first, to reserve its slot for future sendHome()
-        const rank = undefined;  // guardSources.indexOf(source) + 1;
-        player.panel.takeGuardianIfAble(rank, piece);
+        // first: put in Stable, to reserve its slot for future sendHome()
+        player.panel.takeGuardianIfAble(undefined, piece); // setPlayerAndPaint()
+        if (piece instanceof Scorpion) piece.rotDir = dir;
       }
       piece.moveTo(hex);
       // if a Claimed Monument, add AnkhToken:
       if (player && (piece instanceof Monument)) {
-        this.claimHex(hex, player); // claimMonument?
+        this.claimHex(hex, player); // claimMonument
       }
     })
     //console.groupEnd();
   }
 
   claimHex(hex: AnkhHex, player: Player) {
-    const unit = AnkhToken.source[player.index].takeUnit();
-    unit.moveTo(hex);
-    unit.setPlayerAndPaint(player);
+    const ankhToken = AnkhToken.source[player.index].takeUnit();
+    ankhToken.moveTo(hex);
+    ankhToken.setPlayerAndPaint(player);
     // console.log(stime(this, `.claimHex: ${hex}`), player.color);
   }
 
@@ -464,10 +479,12 @@ export class ScenarioParser {
     if (regions) this.parseRegions(regions);
     table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId)); // after parseRegions
     guards?.forEach((name, ndx) => {
-      if (typeof name !== 'string') name = name.name; // if Constructor was given in Scenario def'n
-      const guardianConstructor = ClassByName.classByName[name] as Constructor<Guardian>;
       const source = table.guardSources[ndx];
+      source.filterUnits((unit) => !unit.setPlayerAndPaint(undefined));
+
+      if (typeof name !== 'string') name = name.name; // if Constructor was given in Scenario def'n
       if (name !== source.type.name) {
+        const guardianConstructor = ClassByName.classByName[name] as Constructor<Guardian>;
         // replace existing gamePlay.guards[ndx] & install new TileSource:
         const n = source.deleteAll(unit => {
           removeEltFromArray(unit, Tile.allTiles);
@@ -558,7 +575,8 @@ export class ScenarioParser {
     const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());
     const places = this.gamePlay.allTiles.filter(t => t.hex?.isOnMap && !(t instanceof AnkhToken)).map(t => {
       const row = t.hex.row, col = t.hex.col, cons = className(t), pid = t.player ? t.player.index + 1 : undefined;
-      return [row, col, cons, pid] as PlaceElt;
+
+      return ((t instanceof Scorpion) ? [row, col, cons, pid, t.rotDir]: [row, col, cons, pid, ]) as PlaceElt;
     })
 
     return { ngods, godNames, turn, regions, splits, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;

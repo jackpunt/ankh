@@ -6,7 +6,7 @@ import { NumCounter } from "./counters";
 import { selectN } from "./functions";
 import { God } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
-import { H } from "./hex-intfs";
+import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { C1, CircleShape, HexShape, PaintableShape } from "./shapes";
@@ -14,6 +14,7 @@ import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
+import { AnkhToken } from "./ankh-token";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -81,15 +82,15 @@ export class Monument extends AnkhPiece {
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
     if (!this.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
-    if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
-    const panel = this.gamePlay.gameState.state.panels[0];
-    if (!panel.canBuildInRegion) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
+    // if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
+    const panel = this.gamePlay.gameState.state.panels?.[0];
+    if (!panel?.canBuildInRegion) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
     const regionNdx = this.gamePlay.gameState.conflictRegion - 1;
     const region = this.gamePlay.hexMap.regions[regionNdx];
     if (!region?.includes(toHex) && !ctx.lastShift) return false;  // now: toHex !== undefined, toHex.isOnMap
-    if (toHex.meep) return false;
+    if (toHex.occupied) return false;
     if (toHex.terrain == 'w') return false;
-    if ((this.hex as Hex2)?.isOnMap && !ctx?.lastShift) return false;
+    if (this.hex?.isOnMap && !ctx?.lastShift) return false;
     return true;
   }
 
@@ -108,6 +109,12 @@ export class Monument extends AnkhPiece {
         setTimeout( () => this.gamePlay.table.dispatchEvent({ type: 'buildDone', panel0, monument }), 10);
       }
     }
+  }
+
+  override placeTile(toHex: Hex1, payCost?: boolean): void {
+    const ankhToken = this.fromHex?.meep as AnkhToken;
+    super.placeTile(toHex, payCost);
+    if (ankhToken) ankhToken.moveTo(this.hex)
   }
 
   override sendHome(): void {   // Monument AnkhToken.sendHome()
@@ -716,8 +723,24 @@ export class Scorpion extends Guardian3 {
     return rv;
   }
 
-  dirDisk: Container;
-  dirRot = 0;
+  dirDisk;
+  dirRot = 0;  // [0..5] rotation/60; index into H.nsDir
+  get rotDir() { return H.ewDirs[this.dirRot]}
+  set rotDir(dir: EwDir) {
+    this.dirDisk.rotation = H.ewDirRot[dir];
+    this.dirRot = H.ewDirRot[dir] - 30;
+  }
+  get attackDirs() {
+    const rot1 = (this.dirRot) % 6;
+    const rot2 = (this.dirRot + 1) % 6;
+    return [H.nsDirs[rot1], H.nsDirs[rot2]];
+  }
+  get attackMonuments() {
+    const tiles = this.attackDirs.map(dir => this.hex?.links[dir]?.tile);
+    const monts = tiles.filter(tile => tile instanceof Monument) as Monument[];
+    return monts;
+  }
+
   addDirDisk() {
     const ax = this.radius/2, ay = this.radius * .8, ang = 30, cl = 3;
     const a1 = this.makeClaw(cl), a2 = this.makeClaw(cl);
@@ -726,7 +749,7 @@ export class Scorpion extends Guardian3 {
     a1.x = -ax; a2.x = ax;
     a1.y = a2.y = -ay;
     const dirDisk = this.dirDisk = new Container(); dirDisk.name = 'dirDisk';
-    dirDisk.rotation = 30 + this.dirRot * 60;
+    dirDisk.rotation = this.dirRot * 60 + 30; // H.dirRot[dirRot(*60) --> nsDir(+30) --> ewDir]
     dirDisk.addChild(a1, a2);
     this.addChild(dirDisk);
     const { x, y, width, height } = this.getBounds();
@@ -747,15 +770,9 @@ export class Scorpion extends Guardian3 {
       this.diskRotate();
     }
   }
-  get attackDirs() {
-    const rot1 = (this.dirRot) % 6;
-    const rot2 = (this.dirRot + 1) % 6;
-    return [H.nsDirs[rot1], H.nsDirs[rot2]];
-  }
-  get attackMonuments() {
-    const tiles = this.attackDirs.map(dir => this.hex?.links[dir]?.tile);
-    const monts = tiles.filter(tile => tile instanceof Monument) as Monument[];
-    return monts;
+  override setPlayerAndPaint(player: Player): this {
+    if (!player && this.dirDisk) this.rotDir = 'NE'; // no dirDisk during Tile.constructor
+    return super.setPlayerAndPaint(player);
   }
 }
 

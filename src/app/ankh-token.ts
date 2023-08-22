@@ -54,7 +54,7 @@ export class AnkhToken extends AnkhMeeple {
     if (hex?.isOnMap) {
       this.y += TP.ankh2Rad - this.radius;
       if (hex.tile) {
-        hex.tile.setPlayerAndPaint(this.player);
+        hex.tile.setPlayerAndPaint(this.player); // Claim Monument
         this.highlight(false);
         if (this.gamePlay.isPhase('Claim')) this.gamePlay.phaseDone(hex); // Claim done
       }

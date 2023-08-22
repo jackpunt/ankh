@@ -1,5 +1,6 @@
 import { C, stime } from "@thegraid/common-lib";
-import { Figure, GodFigure, Monument, Obelisk, Portal, Scorpion, Warrior } from "./ankh-figure";
+import { RegionMarker } from "./RegionMarker";
+import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
@@ -454,7 +455,7 @@ export class GameState {
             const nFlood = inRegion.filter(fig => fig.hex.terrain === 'f').length;
             this.addFollowers(panel.player, nFlood, 'Flood');
           }
-          if (panel.cardsInBattle.length === 2) panel.player.god.doSpecial(false); // must be Amun
+          if (panel.cardsInBattle.length === 2) panel.player.god.doSpecial(false); // must be Amun:Two Cards used
         });
         this.gamePlay.hexMap.update();
         this.doneButton('Reveal Done', C.grey);
@@ -622,14 +623,12 @@ export class GameState {
     },
     Osiris: {
       start: () => {
-        const osiris = God.byName.get('Osiris'); Portal
         // highlight empty cells of conflictRegion
-        osiris.doSpecial(true);// highlight Portal tiles.
-        this.doneButton('Place Portal', osiris.color);
+        God.byName.get('Osiris').doSpecial(true);// highlight Portal tiles.
+        this.doneButton('Place Portal', God.byName.get('Osiris').color);
       },
       done: () => {
-        const osiris = God.byName.get('Osiris');
-        osiris.doSpecial(false);  // un-highlight Portal tiles.
+        God.byName.get('Osiris')?.doSpecial(false);  // un-highlight Portal tiles.
         this.phase('Worshipful');
       }
     },
@@ -659,6 +658,8 @@ export class GameState {
     },
     ConflictRegionDone: {
       start: () => {
+        this.horusInRegion(this.conflictRegion)?.sendHome();
+        this.bannedCard = undefined;
         // battle cards go to table:
         const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
         panels0.forEach(panel => panel.battleCardsToTable());
@@ -673,9 +674,7 @@ export class GameState {
         God.byName.get('Amun')?.doSpecial(true); // reset 'Two Cards' token.
         this.phase('EventDone');
       },
-      // coins from Scales to Toth, add Devotion(Scales)
-      // mark on Event panel
-      // phase EndTurn
+      // TODO: coins from Scales to Toth, add Devotion(Scales)
     },
     EndTurn: {
       start: () => {
@@ -758,7 +757,7 @@ export class GameState {
   }
 
   horusInRegion(rid: RegionId) {
-    return God.byName.get('Horus')?.doSpecial(rid);
+    return God.byName.get('Horus')?.doSpecial(rid) as RegionMarker;
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
