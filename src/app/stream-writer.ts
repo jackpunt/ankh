@@ -55,9 +55,10 @@ export class LogWriter extends FileBase implements ILogWriter {
   /**
    *
    * @param name suggested name for write file
+   * @param atEnd insert at end-of-file; but remove before writeLine. [\n]
    * @param buttonId DOM id of button to click to bring up FilePicker
    */
-  constructor(name = 'logFile', buttonId = "fsOpenFileButton") {
+  constructor(name = 'logFile', public atEnd = '\n', buttonId = "fsOpenFileButton") {
     super(name, buttonId)
     this.setButtonToSaveLog()
   }
@@ -101,9 +102,9 @@ export class LogWriter extends FileBase implements ILogWriter {
     //console.log(stime(this, ident), `Backlog:`, this.backlog.length, this.backlog)
     if (thus.backlog.length > 0) try {
       const stream = await thus.streamPromise;     // indicates writeable is ready
-      await stream.seek((await thus.fileHandle.getFile()).size)
+      await stream.seek(Math.max(0, (await thus.fileHandle.getFile()).size - this.atEnd.length));
       const lines = thus.backlog;
-      await stream.write({ type: 'write', data: lines }); // write to tmp store
+      await stream.write({ type: 'write', data: `${lines}${this.atEnd}` }); // write to tmp store
       await stream.close(); // flush to file system.
       thus.backlog = '';    // indicate all lines are now on disk.
       thus.streamPromise = thus.openWriteStream(); // begin open new stream (streamPromise will be fullfiled)

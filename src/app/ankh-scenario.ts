@@ -608,12 +608,12 @@ export class ScenarioParser {
   }
 
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {
-    let lines = '{ setup: {';
-    Object.keys(state).forEach((key, ndx) => {
+    let lines = '{', keys = Object.keys(state), n = keys.length - 1;
+    keys.forEach((key, ndx) => {
       const line = JSON.stringify(state[key])
-      lines = `${lines}\n  ${key}: ${line},`;
+      lines = `${lines}\n  ${key}: ${line}${ndx < n ? ',' : ''}`;
     })
-    lines = `${lines}\n}},`
+    lines = `${lines}\n},`
     logWriter.writeLine(lines);
   }
 

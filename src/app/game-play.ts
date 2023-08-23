@@ -76,7 +76,7 @@ export class GamePlay0 {
     let line0 = json(line, false)
     let logFile = `log_${time}.js`
     console.log(stime(this, `.constructor: -------------- ${line0} --------------`))
-    let logWriter = new LogWriter(logFile)
+    let logWriter = new LogWriter(logFile, ']\n'); // terminate array, but insert before terminal
     logWriter.writeLine(`[\n{start: ${line0}},`)
     return logWriter;
   }
