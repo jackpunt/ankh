@@ -336,6 +336,8 @@ export class GameState {
         this.doneButton('Horus Eyes', 'darkred');
       },
       done: () => {
+        const regionIds = God.byName.get('Horus').doSpecial() as RegionId[];
+        this.table.logText(`Horus Eyes to ${regionIds}`)
         this.phase('ConflictNextRegion', 1); // AKA: Conflict FIRST Region
       }
       // place enable Eyes, drag to each Region (to Region index marker...)
@@ -352,7 +354,7 @@ export class GameState {
     ConflictInRegion: {
       start: () => {
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
-        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
+        this.table.logText(`${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
 
         if (panels.length > 1) this.phase('Obelisks'); // begin 'Battle': check for Obelisk
         else if (panels.length === 0) this.phase('ConflictRegionDone'); // no points for anyone.
@@ -363,7 +365,7 @@ export class GameState {
       start: (panel: PlayerPanel) => {
         let dev = 0, reasons = '';
         const devReason = (n, reason: string) => { dev += n, reasons = `${reasons} ${reason}:${n}` }
-        this.table.logText(`.${this.state.Aname}[${this.conflictRegion}] Player-${panel.player.index}`);
+        this.table.logText(`${this.state.Aname}[${this.conflictRegion}] Player-${panel.player.index}`);
         this.scoreMonuments(true); // Monument majorities (for sole player in region)
         devReason(1, `Dominate[${this.conflictRegion}]`)
         if (this.hasRadiance(panel)) devReason(1, 'Radiance');
@@ -539,7 +541,7 @@ export class GameState {
         const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]
         const isWinner = (b0 > b1);
         const winner = isWinner ? panels[0].player.god : undefined;
-        this.table.logText(`Plague[${rid}] ${winner.Aname ?? 'Nobody'} survives! [${b0}]`)
+        this.table.logText(`Plague[${rid}] ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
         this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
         this.phase('ScoreMonuments');
       },
@@ -578,6 +580,7 @@ export class GameState {
           // TODO: offer curPanel a choice, mark choice used.
           if (contenders.includes(curPanel)) {
             winner = curPanel;
+            this.table.logText(`${winner.name} uses tiebreaker: +1 strength`)
             console.log(stime(this, `Battle[${rid}]: ${winner.name} uses tiebreaker (${d})`));
             curPanel.canUseTiebreaker = false
           }

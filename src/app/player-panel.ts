@@ -55,25 +55,26 @@ export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
   isPlayerInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.god;
+    const region = this.hexMap.regions[regionNdx], god = this.god;
     return !!region.find(hex => (hex.meep instanceof Figure) && hex.meep.controller === god);
   }
   templeHexesInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx];
+    const region = this.hexMap.regions[regionNdx];
     return region.filter(hex => hex.tile instanceof Temple && hex.tile?.player === this.player);
   }
   /** strength from Figures in Region controlled by this.god */
   nFiguresInRegion(regionNdx: number) {
-    const region = this.table.gamePlay.hexMap.regions[regionNdx], god = this.god;
+    const region = this.hexMap.regions[regionNdx], god = this.god;
     const figs = region.filter(hex => hex.meep instanceof Figure && hex.meep.controller === god);
     return figs.filter(fig => !fig.findAdjHex(hex => hex.meep instanceof Androsphinx && hex.meep.controller !== god)).length;
   }
   nRegionsWithFigures() {
-    return this.table.gamePlay.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;
+    return this.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;
   }
   /** Figures in Region controled by player.god */
   figuresInRegion(regionId: RegionId, player = this.player) {
-    const figuresInRegion = Figure.allFigures.filter(fig => fig.hex?.district === regionId);
+    const region = this.hexMap.regions[regionId - 1];
+    const figuresInRegion = region.filter(hex => hex.meep instanceof Figure).map(hex => hex.figure);
     return figuresInRegion.filter(fig => fig.controller === player.god);
   }
   hasAnkhPower(power: string) {
@@ -148,6 +149,7 @@ export class PlayerPanel extends Container {
   outline: RectShape;
   ankhSource: AnkhSource<AnkhToken>;
   get god() { return this.player.god; }
+  get hexMap() { return this.table.gamePlay.hexMap }
 
   constructor(
     public table: Table,

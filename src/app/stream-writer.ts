@@ -52,9 +52,9 @@ export class LogWriter extends FileBase implements ILogWriter {
 
   async openWriteStream(fileHandle: FileSystemFileHandle = this.fileHandle,
     options: FileSystemCreateWritableOptions = { keepExistingData: true }) {
-    let stream = await fileHandle.createWritable(options)
+    let stream = await fileHandle.createWritable(options), thus = this;
     //await writeable.seek((await fileHandle.getFile()).size)
-    this.streamPromise.fulfill(stream).then(() => this.writeBacklog())
+    this.streamPromise.fulfill(stream).then(() => this.writeBacklog(thus))
   }
 
   /**
@@ -93,27 +93,27 @@ export class LogWriter extends FileBase implements ILogWriter {
     if (!stream) {
       return
     }
-    this.writeBacklog() // try write, but do not wait.
+    this.writeBacklog(this) // try write, but do not wait.
   }
   showBacklog() {
     console.log(stime(this, `.showBacklog:\n`), this.backlog)
   }
 
-  async writeBacklog() {
+  async writeBacklog(thus = this) {
     //console.log(stime(this, ident), `Backlog:`, this.backlog.length, this.backlog)
-    if (this.backlog.length > 0) try {
-      await this.closePromise
-      this.closePromise = new EzPromise<number>()
-      let stream = await this.streamPromise     // indicates writeable is ready
-      this.streamPromise = this.newOpenPromise    // new Promise for next cycle:
-      await stream.seek((await this.fileHandle.getFile()).size)
-      let lines = this.backlog; this.backlog = ''  // would prefer a lock on this.backlog...
+    if (thus.backlog.length > 0) try {
+      await thus.closePromise; // closePromise is fullfilled by stream.close().then()
+      thus.closePromise = new EzPromise<number>()
+      let stream = await thus.streamPromise     // indicates writeable is ready
+      thus.streamPromise = thus.newOpenPromise    // new Promise for next cycle:
+      await stream.seek((await thus.fileHandle.getFile()).size)
+      let lines = thus.backlog; thus.backlog = ''  // would prefer a lock on this.backlog...
       await stream.write({ type: 'write', data: lines }); // write to tmp store
-      await stream.close().then(() => this.closePromise.fulfill(1))       // flush to real-file
-      while (!this.streamPromise.value) await this.openWriteStream();     // loop until re-opens?
+      await stream.close().then(() => thus.closePromise.fulfill(1))       // flush to real-file
+      while (!thus.streamPromise.value) await thus.openWriteStream();     // loop until re-opens?
       // ASSERT: streamPromise is now fulfilled with a new Writeable Stream
     } catch (err) {
-      console.warn(stime(this, this.ident('writeBacklog')), `failed:`, err)
+      console.warn(stime(thus, thus.ident('writeBacklog')), `failed:`, err)
       throw err
     }
   }

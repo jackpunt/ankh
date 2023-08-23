@@ -47,7 +47,7 @@ export class AnkhToken extends AnkhMeeple {
   }
 
   override moveTo(hex: Hex1) {
-    if (hex?.meep instanceof AnkhToken) {
+    if (hex?.meep instanceof AnkhToken && hex.meep !== this) {
       hex.meep.sendHome();  // Assert: (phase === 'Claim') && no unclaimed Monuments.
     }
     super.moveTo(hex);

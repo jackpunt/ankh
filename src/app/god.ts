@@ -207,7 +207,8 @@ class Horus extends God {
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
   }
-  override doSpecial(regionId: RegionId) {
+  override doSpecial(regionId?: RegionId) {
+    if (!regionId) return HorusMarker.source.filterUnits(hm => true).map(hm => hm.regionId);
     const inRegion = HorusMarker.source.filterUnits(hm => hm.regionId === regionId);
     return (inRegion[0] as HorusMarker);
   }

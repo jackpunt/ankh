@@ -81,22 +81,23 @@ export class Monument extends AnkhPiece {
   }
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
-    if (!this.gamePlay.isPhase('BuildMonument') && !ctx.lastShift) return false;
+    if (ctx.lastShift && toHex.isOnMap) return true;
+    if (!this.gamePlay.isPhase('BuildMonument')) return false;
     // if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
     const panel = this.gamePlay.gameState.state.panels?.[0];
     if (!panel?.canBuildInRegion) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
     const regionNdx = this.gamePlay.gameState.conflictRegion - 1;
     const region = this.gamePlay.hexMap.regions[regionNdx];
-    if (!region?.includes(toHex) && !ctx.lastShift) return false;  // now: toHex !== undefined, toHex.isOnMap
+    if (!region?.includes(toHex)) return false;  // now: toHex !== undefined, toHex.isOnMap
     if (toHex.occupied) return false;
     if (toHex.terrain == 'w') return false;
-    if (this.hex?.isOnMap && !ctx?.lastShift) return false;
+    if (!this.hex?.isOnMap) return false;
     return true;
   }
 
   override dropFunc(targetHex: Hex2, ctx: DragContext): void {
     super.dropFunc(targetHex, ctx);
-    if (targetHex.isOnMap && !targetHex.meep) {
+    if (targetHex.isOnMap && !targetHex.meep) { // override placeTile?
       const tohex = targetHex as AnkhHex, map = tohex.map as AnkhMap<AnkhHex>;
       const gamePlay = this.gamePlay, gameState = gamePlay.gameState;
       if (!this.isPhase('BuildMonument')) return;
@@ -112,14 +113,18 @@ export class Monument extends AnkhPiece {
   }
 
   override placeTile(toHex: Hex1, payCost?: boolean): void {
-    const ankhToken = this.fromHex?.meep as AnkhToken;
     super.placeTile(toHex, payCost);
-    if (ankhToken) ankhToken.moveTo(this.hex)
+    const ankhToken = this.fromHex?.meep as AnkhToken;
+    if (ankhToken) {
+      if (toHex && toHex !== this.fromHex) ankhToken.moveTo(this.hex);
+      ankhToken.parent?.addChild(ankhToken); // above Monument
+    }
   }
 
   override sendHome(): void {   // Monument AnkhToken.sendHome()
-    if (this.hex?.meep) {
-      this.hex.meep.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
+    const ankhToken = this.fromHex?.meep as AnkhToken;
+    if (ankhToken) {
+      ankhToken.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
       this.setPlayerAndPaint(undefined); // un-Claim this Monument
     }
     super.sendHome();
@@ -357,7 +362,7 @@ export class Figure extends AnkhMeeple {
 
   /** summon from Stable to Portal on map */
   isOsirisSummon(hex: AnkhHex, ctx: DragContext) {
-    return hex.isOnMap
+    return hex?.isOnMap
       && (hex.figure === undefined)
       && this.isFromStable
       && (ctx.phase === 'Summon')
@@ -396,10 +401,11 @@ export class Figure extends AnkhMeeple {
 
   override isLegalTarget0(hex: AnkhHex, ctx?: DragContext) {  // Meeple
     if (!hex) return false;
-    // AnkhToken can moveTo Monument, but that is not a user-drag.
     if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
-    if (!!hex.occupied && !(this.player.godName === 'Osiris' && hex.tile?.name === 'Portal') ) return false;
     if (this.backSide.visible && !ctx?.lastShift) return false;
+    // AnkhToken (not a Figure!) can moveTo Monument, but that is not a user-drag.
+    if (this.player.godName === 'Osiris' && hex.tile?.name === 'Portal' && !hex.meep) return true;
+    if (!!hex.occupied) return false;
     return true;
   }
 
@@ -723,7 +729,7 @@ export class Scorpion extends Guardian3 {
     return rv;
   }
 
-  dirDisk;
+  dirDisk: Container;
   dirRot = 0;  // [0..5] rotation/60; index into H.nsDir
   get rotDir() { return H.ewDirs[this.dirRot]}
   set rotDir(dir: EwDir) {

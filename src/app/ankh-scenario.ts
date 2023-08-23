@@ -248,7 +248,7 @@ export class AnkhScenario {
     ankhs: [["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"],["Revered","Omnipresent","Pyramid","Obelisk","Bountiful"]],
     places: [[2,6,"CatMum",1],[1,8,"Obelisk",null],[5,0,"Obelisk",1],[2,5,"Pyramid",1],[8,1,"Pyramid",1],[5,8,"Pyramid",2],[0,3,"Temple",1],[6,5,"Temple",2],[3,4,"Warrior",1],[1,7,"Warrior",1],[4,1,"Warrior",1],[1,3,"Warrior",1],[7,1,"Warrior",1],[2,4,"Warrior",1],[1,4,"Warrior",2],[1,5,"Portal",2],[0,4,"Apep",1],[1,5,"Scorpion",2],[8,2,"GodFigure",1],[4,7,"GodFigure",2]],
   }
-  static big16: {
+  static big16 = {
     ngods: 4,
     godNames: ["Horus","Ra","Anubis","Osiris"],
     turn: 16,
@@ -262,6 +262,21 @@ export class AnkhScenario {
     stable: [[],["Apep"],["CatMum","Apep"],["CatMum"]],
     ankhs: [["Revered","Omnipresent","Pyramid"],["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Obelisk"],["Revered","Omnipresent","Pyramid","Temple"]],
     places: [[4,1,"Obelisk",null],[3,5,"Obelisk",3],[3,8,"Obelisk",null],[5,5,"Pyramid",null],[7,0,"Pyramid",1],[2,8,"Pyramid",null],[5,7,"Pyramid",4],[8,2,"Pyramid",1],[1,5,"Pyramid",1],[5,0,"Pyramid",2],[3,2,"Pyramid",3],[3,3,"Pyramid",4],[4,2,"Temple",1],[8,4,"Temple",2],[1,3,"Temple",1],[8,6,"Temple",2],[7,6,"Warrior",2],[2,5,"Warrior",3],[6,6,"Warrior",4],[4,3,"Portal",4],[4,8,"Portal",4],[2,4,"Portal",4],[3,4,"CatMum",3],[6,1,"GodFigure",1],[7,1,"GodFigure",2],[2,7,"GodFigure",3],[1,7,"GodFigure",4]],
+  }
+  static big21 = {
+    ngods: 4,
+    godNames: ["Horus","Ra","Anubis","Osiris"],
+    turn: 21,
+    regions: [[7,2,1],[3,0,2],[6,1,3],[4,6,4],[0,1,5]],
+    splits: [[[3,0,1],[4,0,"N","EN"],[4,1,"N","EN"]],[[8,1,5,false],[6,1,"ES"],[7,1,"EN"],[8,2,"WN"],[7,1,"S"],[8,1,"WN"]]],
+    guards: ["CatMum","Apep","Androsphinx"],
+    events: [0,1,0,3,0,1,2],
+    actions: {"Move":[],"Summon":[],"Gain":[1,2,3,3,0],"Ankh":[3,0],"selected":[]},
+    coins: [3,0,0,2],
+    scores: [4,4.1,2,1],
+    stable: [["Androsphinx"],[],["CatMum","Apep"],["CatMum","Androsphinx"]],
+    ankhs: [["Revered","Omnipresent","Pyramid","Temple","Bountiful"],["Revered","Omnipresent","Pyramid","Temple"],["Revered","Omnipresent","Pyramid","Obelisk"],["Revered","Omnipresent","Pyramid","Temple","Bountiful"]],
+    places: [[4,4,"CatMum",3],[6,4,"Apep",2],[4,1,"Obelisk",null],[3,5,"Obelisk",3],[3,8,"Obelisk",null],[5,5,"Pyramid",2],[7,0,"Pyramid",1],[2,8,"Pyramid",3],[5,7,"Pyramid",4],[8,2,"Pyramid",1],[1,5,"Pyramid",1],[5,0,"Pyramid",2],[3,2,"Pyramid",3],[3,3,"Pyramid",4],[4,2,"Temple",1],[8,4,"Temple",2],[1,3,"Temple",1],[8,6,"Temple",2],[6,0,"Warrior",1],[3,1,"Warrior",1],[7,3,"Warrior",1],[1,4,"Warrior",1],[5,6,"Warrior",2],[5,1,"Warrior",2],[3,7,"Warrior",3],[6,6,"Warrior",4],[4,3,"Portal",4],[4,8,"Portal",4],[2,4,"Portal",4],[6,1,"GodFigure",1],[8,3,"GodFigure",2],[2,7,"GodFigure",3],[1,7,"GodFigure",4]],
   }
 
   static AltMidKingdom5: Scenario = {
