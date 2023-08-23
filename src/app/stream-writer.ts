@@ -156,10 +156,10 @@ export class LogReader extends FileBase  {
     return fileReadPromise
   }
 
-  /* OpenFilePickerOptions
-    types?: FilePickerAcceptType[] | undefined;
-    excludeAcceptAllOption?: boolean | undefined;
-    multiple?: false;
+  /**  OpenFilePickerOptions:
+   * - types?: FilePickerAcceptType[] | undefined;
+   * - excludeAcceptAllOption?: boolean | undefined;
+   * - multiple?: false;
    */
   setButtonToReadFile() {
     let options: OpenFilePickerOptions = {}
