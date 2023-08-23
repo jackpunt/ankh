@@ -110,7 +110,7 @@ class Amun extends God {
   get tokenFaceUp() { return this._tokenFaceUp; }
   set tokenFaceUp(v: boolean) {
     this._tokenFaceUp = v;
-    this.token.text = v ? 'Two Cards' : 'Face Down';
+    this.token.label_text = v ? 'Two Cards' : 'Face Down';
     this.token.paint(v ? C.legalRed : C.grey );
   }
   constructor() { super('Amun', 'red') }
@@ -203,7 +203,7 @@ class Horus extends God {
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .9;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = this.specialSource = HorusMarker.makeSource0(AnkhSource<HorusMarker>, HorusMarker, undefined, hex, 2);
-    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.y -= TP.ankh2Rad * .3;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
   }
@@ -229,7 +229,7 @@ class Osiris extends God {
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = this.specialSource = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
-    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.y -= TP.ankh2Rad * .9;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
   }
@@ -252,7 +252,7 @@ class Ra extends God {
     const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = this.specialSource = RadianceMarker.makeSource0(AnkhSource<RadianceMarker>, RadianceMarker, this.player, hex, 3);
-    source.counter.y -= TP.ankh2Rad * 1.5;
+    source.counter.y -= TP.ankh2Rad * .7;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
   }

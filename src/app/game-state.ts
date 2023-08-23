@@ -89,7 +89,7 @@ export class GameState {
   doneButton(label?: string, color = this.gamePlay.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
     const doneButton = this.table.doneButton;
     doneButton.visible = true;
-    doneButton.label.text = label;
+    doneButton.label_text = label;
     doneButton.paint(color, true);
     doneButton.updateWait(false, afterUpdate);
   }
@@ -403,8 +403,9 @@ export class GameState {
         const panel = God.byName.get('Horus').player.panel;
         this.state.horusState = panel.cardSelector.powerLines.map(pl => pl.button.colorn);
         panel.cardSelector.powerLines.forEach(pl => {
-          pl.button.paint(PlayerPanel.colorForState[(pl.button.name !== 'Cycle') ? 'inHand' : 'onTable']);
+          pl.button.paint(PlayerPanel.colorForState['inHand']);
         });
+        this.bannedCard = 'Cycle';
         panel.activateCardSelector(true, 'Ban Card'); // --> phaseDone(panel)
       },
       done: () => {

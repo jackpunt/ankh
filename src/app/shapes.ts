@@ -348,8 +348,11 @@ export class UtilButton extends Container implements Paintable {
   blocked: boolean = false
   shape: PaintableShape;
   label: CenterText;
-  get text() { return this.label.text; }
-  set text(t: string) { this.label.text = t; }
+  get label_text() { return this.label.text; }
+  set label_text(t: string) {
+    this.label.text = t;
+    this.paint(undefined, true);
+  }
 
   constructor(color: string, text: string, public fontSize = 30, public textColor = C.black, cgf?: CGF) {
     super();

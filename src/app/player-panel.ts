@@ -267,7 +267,7 @@ export class PlayerPanel extends Container {
       button1.updateWait(false, func);
     }
     button2.visible = !!cancel;
-    button1.label.text = !!cancel ? 'Yes' : 'Continue';
+    button1.label_text = !!cancel ? 'Yes' : 'Continue';
     conf.titleText.text = !!cancel ? 'Are your sure?' : 'Click to Confirm';
 
     button1.on(S.click, () => clear(yes), this, true);
@@ -572,12 +572,15 @@ export class PlayerPanel extends Container {
     }
     // add a Done button:
     {
-      const doneButton = cardSelector.doneButton = new UtilButton(player.color, 'Done');
+      const doneButton = cardSelector.doneButton = new UtilButton(player.color, 'Card Done');
+      const tcolor = (C.dist(player.color, C.WHITE) < C.dist(player.color, C.black)) ? C.black : C.white;
+      doneButton.label.color = tcolor;
+      doneButton.label.textAlign = 'right';
       cardSelector.addChild(doneButton);
       doneButton.y = 4 * rowh;
-      doneButton.x = w - 2 * (brad + gap);
+      doneButton.x = w - 3 * (gap);
       doneButton.on(S.click, () => {
-        if (doneButton.text !== 'Teleport') {
+        if (doneButton.label_text !== 'Teleport') {
           const nSelected = this.cardsInState('inBattle').length;
           if (nSelected === 0) {
             this.blink(doneButton, 80, true);
@@ -633,7 +636,7 @@ export class PlayerPanel extends Container {
       cs.visible = vis;
       cs.addChildAt(cs.bground, 0);
     }
-    cs.doneButton.text = done;
+    cs.doneButton.label_text = done;
     cs.powerLines.forEach(pl => pl.showDocText(false));
   }
 
