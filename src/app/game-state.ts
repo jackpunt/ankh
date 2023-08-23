@@ -9,7 +9,7 @@ import type { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
-import { PlayerPanel, PowerLine } from "./player-panel";
+import { CardSelector, PlayerPanel, PowerLine } from "./player-panel";
 import { HexShape, PaintableShape } from "./shapes";
 import { DragContext, EventName } from "./table";
 import { TP } from "./table-params";
@@ -400,19 +400,17 @@ export class GameState {
     HorusCard: {
       horusState: [],
       start: () => {
-        const panel = God.byName.get('Horus').player.panel;
-        this.state.horusState = panel.cardSelector.powerLines.map(pl => pl.button.colorn);
-        panel.cardSelector.powerLines.forEach(pl => {
-          pl.button.paint(PlayerPanel.colorForState['inHand']);
-        });
+        const horus = God.byName.get('Horus');
+        const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
+        const panel = horus.player.panel;
         this.bannedCard = 'Cycle';
-        panel.activateCardSelector(true, 'Ban Card'); // --> phaseDone(panel)
+        cardSelector.activateCardSelector(true, 'Ban Card', panel);
       },
       done: () => {
-        const panel = God.byName.get('Horus').player.panel, colorn = this.state.horusState;
-        this.bannedCard = panel.cardsInBattle[0].name;
-        // restore state of Horus's cards:
-        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.paint(colorn[ndx]));
+        const horus = God.byName.get('Horus');
+        const panel = horus.player.panel;
+        const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
+        this.bannedCard = cardSelector.cardsInState('inBattle')[0].name;
         this.phase('ChooseCard');
       }
     },

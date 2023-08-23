@@ -5,10 +5,9 @@ import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
 import { God } from "./god";
-import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
-import { DragContext, Table } from "./table";
+import { Table } from "./table";
 import { TP } from "./table-params";
 
 
@@ -22,11 +21,13 @@ export interface PowerLine extends Container {
   docText: UtilButton;
   showDocText: (vis?: boolean) => void
 }
+interface PowerLineCont extends Container {
+  powerLines: PowerLine[];
+}
 
-export interface AnkhPowerCont extends Container {
+export interface AnkhPowerCont extends PowerLineCont {
   rank: number;
   ankhs: AnkhToken[];
-  powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
   guardianSlot: number;
 }
 
@@ -37,16 +38,51 @@ interface ConfirmCont extends Container {
   buttonCan: UtilButton;
 }
 
-interface CardSelector extends Container {
-  y0: number;    // drag keep this.y = y0;
-  x0: number;    //
-  dragFunc0: (hex: Hex2, ctx: DragContext) => void;
-  dropFunc0: () => void;
-  bground: RectShape;
+export class CardSelector extends Container implements PowerLineCont {
+  constructor(name = 'cs') {
+    super()
+    this.name = name;
+  }
+
   powerLines: PowerLine[]; // powerLine.children: CircleShape, qMark, Text, maybe AnkhToken
   doneButton: UtilButton;
+  bidCounter: BidCounter;
+  block: RectShape;        // Teleport: doneButton only; block the card selections.
   // CardSelector children // CircleShape, qMark, Text, docText
-  cycleCard: CircleShape;
+
+  cardsInState(state: keyof typeof PlayerPanel.colorForState) {
+    const color = PlayerPanel.colorForState[state];
+    return this.powerLines.filter(pl => pl.button.colorn === color);
+  }
+
+  activateCardSelector(activate = true, done = 'Done', panel: PlayerPanel) {
+    const bannedCard = panel?.player.gamePlay.gameState.bannedCard;
+    const inHand = PlayerPanel.colorForState['inHand'];
+    const inBattle = PlayerPanel.colorForState['inBattle'];
+    const canAfford = panel ? panel.canAffordMonument : true;
+    this.powerLines.forEach(pl => {
+      pl.text.color = C.BLACK;
+      const button = pl.button, color = button.colorn;
+      button.mouseEnabled = activate && (color === inBattle || color === inHand);
+      if (button.name === 'Build' && (color === inHand) && !canAfford) { pl.text.color = 'grey'; }
+      if (button.name === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
+    });
+    this.showCardSelector(activate, done);
+  }
+
+  showCardSelector(vis = true, done = 'Done') {
+    const cs = this;
+    const asTeleport = (done === 'Teleport');
+    if (asTeleport) {
+      cs.visible = true;
+      cs.addChildAt(cs.block, cs.children.indexOf(cs.doneButton) - 1);
+    } else {
+      cs.visible = vis;
+      cs.addChildAt(cs.block, 0);
+    }
+    cs.doneButton.label_text = done;
+    cs.powerLines.forEach(pl => pl.showDocText(false));
+  }
 }
 
 type CardSpec = [name: string, text: string, doc: string, power: number];
@@ -116,25 +152,22 @@ export class PlayerPanel extends Container {
     return this.strength;
   }
 
-  get plagueBid() { return this.bidCounter.getValue() }
-  set plagueBid(v: number) { this.bidCounter.setValue(v) }
+  get plagueBid() { return this.cardSelector.bidCounter.getValue() }
+  set plagueBid(v: number) { this.cardSelector.bidCounter.setValue(v) }
   enablePlagueBid(region: RegionId): void {
     this.plagueBid = 0;
-    this.bidCounter.visible = true;
+    this.cardSelector.bidCounter.visible = true;
     this.showCardSelector(true, 'Bid Done');
-    // this.player.gamePlay.phaseDone(this);  // TODO: convert async/Promise ?
   }
 
   canBuildInRegion: RegionId = undefined; // disabled.
-  // really: detectBuildDne.
+  // really: detectBuildDone.
   enableBuild(regionId: RegionId): void {
     this.canBuildInRegion = regionId;
     const panel = this;
     const onBuildDone = this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
       const { panel0, monument } = evt;
       panel0.table.monumentSources.forEach(ms => ms.sourceHexUnit.setPlayerAndPaint(undefined));
-      // Monument, hex.isOnMap, mont.player === this.player,
-      // console.log(stime(this, `.enableBuild[${this.player.color}]: buildDone eq? ${panel0 === this} `), panel0.player.color, monument)
       if (panel0 === panel) {
         this.table.off('buildDone', onBuildDone);
         panel0.canBuildInRegion = undefined;
@@ -167,7 +200,8 @@ export class PlayerPanel extends Container {
     this.makeAnkhSource();
     this.makeAnkhPowerGUI();
     this.makeFollowers();
-    this.makeCardSelector();
+    this.cardSelector = this.makeCardSelector();
+    this.activateCardSelector(false);
     this.makeStable();
   }
   static readonly ankhPowers: PowerSpec[][] = [
@@ -403,11 +437,10 @@ export class PlayerPanel extends Container {
     });
   }
 
-  makePowerLines(colCont: AnkhPowerCont, powerList: PowerSpec[], onClick) {
+  makePowerLines(colCont: PowerLineCont, powerList: PowerSpec[], onClick) {
     const panel = this;
     const {brad, gap, rowh, dir,} = panel.metrics;
-    const { player } = panel.objects;
-      // place powerLines --> selectAnkhPower:
+    // place powerLines --> selectAnkhPower:
       colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
       powerList.forEach(([powerName, powerText, docString, power], nth) => {
         const powerLine = new Container() as PowerLine;
@@ -530,7 +563,7 @@ export class PlayerPanel extends Container {
     specl.y = sy;
     specl.x = [gap, wide - (swidth + gap)][(1 + dir) / 2];
     panel.addChild(specl);
-    god.makeSpecial(specl, { width: swidth, height: shigh }, table);
+    god.makeSpecial(specl, { width: swidth, height: shigh }, table, this);
   }
 
   static readonly cardSpecs: CardSpec[] = [
@@ -544,107 +577,87 @@ export class PlayerPanel extends Container {
   ]
 
   cardSelector: CardSelector;
-  makeCardSelector() {
-    const cardSelector = this.cardSelector = new Container as CardSelector; cardSelector.name = `cs:${this.player.index}`
-    const apCont = cardSelector as Container as AnkhPowerCont;
+  makeCardSelector(name = `cs:${this.player.index}`) {
+    const cardSelector = new CardSelector(name);
     const { wide, high, dir, brad, gap, rowh } = this.metrics;
     const { panel, table, player, gamePlay } = this.objects;
     const x = 0, y = -(brad + gap), w = wide * .5, h = high, di = (1 - dir) / 2;
     const dxmax = [wide - w, w][di], dxmin = dxmax - wide;
-    const dragFunc = (dobj: CardSelector, info: DragInfo) => {
-      if (dobj.x0 === undefined) {
-        dobj.x0 = dobj.x; // coordinate on DragCont! [is aligned with mapCont.panelCont?]
-        dobj.y0 = dobj.y;
-      }
-      dobj.y = dobj.y0;
-      dobj.x = Math.max(dobj.x0 + dxmin, Math.min(dobj.x0 + dxmax, dobj.x))
+
+    const cont = table.hexMap.mapCont.eventCont;
+    cont.addChild(cardSelector);
+    panel.localToLocal((wide - w) * (1 - dir) / 2, 0, cont, cardSelector,);
+
+    const bground = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.8)',)
+    cardSelector.block = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.4)',)
+    cardSelector.addChild(cardSelector.block, bground);
+    const pt0 = cardSelector.localToLocal(0, 0, table.dragger.dragCont);
+    const xmin = pt0.x + dxmin, xmax = pt0.x + dxmax, y0 = pt0.y;
+    cardSelector.x += [wide, -wide][di] * .25;
+
+    const dragFunc = (cs: CardSelector, info: DragInfo) => {
+      cs.x = Math.max(xmin, Math.min(xmax, cs.x));
+      cs.y = y0;
     }
     const dropFunc = () => {}
     table.dragger.makeDragable(cardSelector, this, dragFunc, dropFunc);
-    const bg = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.8)',)
-    cardSelector.bground = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.4)',)
-    cardSelector.addChild(bg, cardSelector.bground);
+
     // add PowerLines:
     {
-      this.makePowerLines(apCont, PlayerPanel.cardSpecs, this.selectForBattle);
+      this.makePowerLines(cardSelector, PlayerPanel.cardSpecs, this.selectForBattle);
       const inHand = PlayerPanel.colorForState['inHand'];
       cardSelector.powerLines.forEach(pl => (pl.button.paint(inHand)));
     }
     // add a Done button:
     {
-      const doneButton = cardSelector.doneButton = new UtilButton(player.color, 'Card Done');
-      const tcolor = (C.dist(player.color, C.WHITE) < C.dist(player.color, C.black)) ? C.black : C.white;
+      const color = player.color;
+      const doneButton = cardSelector.doneButton = new UtilButton(color, 'Done');
+      const tcolor = (C.dist(color, C.WHITE) < C.dist(color, C.black)) ? C.black : C.white;
       doneButton.label.color = tcolor;
       doneButton.label.textAlign = 'right';
+      doneButton.label_text = doneButton.label_text;
       cardSelector.addChild(doneButton);
       doneButton.y = 4 * rowh;
       doneButton.x = w - 3 * (gap);
       doneButton.on(S.click, () => {
         if (doneButton.label_text !== 'Teleport') {
-          const nSelected = this.cardsInState('inBattle').length;
+          const nSelected = cardSelector.cardsInState('inBattle').length;
           if (nSelected === 0) {
             this.blink(doneButton, 80, true);
             return; // you must select a card
           }
         }
-        this.showCardSelector(false);
-        this.bidCounter.visible = false;
-        doneButton.updateWait(false, () => {
-          gamePlay.phaseDone(panel);
-        }, this);
+        cardSelector.showCardSelector(false);
+        cardSelector.bidCounter.visible = false;
+        doneButton.updateWait(false, () => { gamePlay.phaseDone(panel); }, gamePlay);
       });
     }
     // add Plague Counter:
     {
       const [x, y] = [w - 2 * (brad + gap), 1 * rowh];
-      const counter = this.bidCounter = new BidCounter(panel, 'bid', 0, 'orange', TP.ankh1Rad);
+      const counter = cardSelector.bidCounter = new BidCounter(panel, 'bid', 0, 'orange', TP.ankh1Rad);
       counter.x = x; counter.y = y;
       counter.visible = false;
       counter.clickToInc(panel.player.coinCounter);
-      panel.cardSelector.addChild(counter);
+      cardSelector.addChild(counter);
     }
-    const cont = table.hexMap.mapCont.eventCont;
-    cont.addChild(cardSelector);
-    panel.localToLocal((wide - w) * (1 - dir) / 2, 0, cont, cardSelector,);
-    this.activateCardSelector(false);
+    return cardSelector;
   }
-  bidCounter: BidCounter;
 
   get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
-  activateCardSelector(activate = true, done = 'Done') {
-    const selector = this.cardSelector;
-    const bannedCard = this.player.gamePlay.gameState.bannedCard;
-    const inHand = PlayerPanel.colorForState['inHand'];
-    const inBattle = PlayerPanel.colorForState['inBattle'];
-    selector.powerLines.forEach(pl => {
-      pl.text.color = C.BLACK;
-      const button = pl.button, color = button.colorn;
-      button.mouseEnabled = activate && (color === inBattle || color === inHand);
-      if (button.name === 'Build' && (color === inHand) && !this.canAffordMonument) { pl.text.color = 'grey'; }
-      if (button.name === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
-    });
-    this.showCardSelector(activate, done);
+  activateCardSelector(activate = true, done = 'Done', selector = this.cardSelector) {
+    selector.activateCardSelector(activate, done, this);
   }
 
   showCardSelector(vis = true, done = 'Done') {
     const cs = this.cardSelector;
-    const asTeleport = (done === 'Teleport');
-    if (asTeleport) {
-      cs.visible = true;
-      cs.addChildAt(cs.bground, cs.children.indexOf(cs.doneButton) - 1);
-    } else {
-      cs.visible = vis;
-      cs.addChildAt(cs.bground, 0);
-    }
-    cs.doneButton.label_text = done;
-    cs.powerLines.forEach(pl => pl.showDocText(false));
+    cs.showCardSelector(vis, done);
   }
 
   static colorForState = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
 
   cardsInState(state: keyof typeof PlayerPanel.colorForState) {
-    const color = PlayerPanel.colorForState[state];
-    return this.cardSelector.powerLines.filter(pl => pl.button.colorn === color);
+    return this.cardSelector.cardsInState(state);
   }
 
   get cardsInHand() { return this.cardsInState('inHand'); }     // GREEN

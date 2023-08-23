@@ -6,6 +6,7 @@ import { AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
+import { CardSelector, PlayerPanel } from "./player-panel";
 import { CenterText, CircleShape, PaintableShape, PolyShape, UtilButton } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
@@ -52,7 +53,7 @@ export class God {
     return new AnkhMarker(color, rad);
   }
 
-  makeSpecial(cont: Container, wh: WH, table: Table) {
+  makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     const fillc = 'rgb(140,140,140)';
     const rad = TP.ankhRad, y = wh.height/2 + rad/2;
     const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
@@ -73,22 +74,22 @@ class Anubis extends God {
   constructor() { super('Anubis', 'green') }
   anubisHexes: SpecialHex[] = [];
 
-  override makeSpecial(cont0: Container, wh: WH, table: Table) {
-    super.makeSpecial(cont0, wh, table);
-    const cont = new Container(), sc = cont.scaleX = cont.scaleY = SpecialHex.scale;
-    cont.name = 'AnubisCont';
-    cont0.addChild(cont);
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    super.makeSpecial(cont, wh, table, panel);
+    const cont2 = new Container(), sc = cont2.scaleX = cont2.scaleY = SpecialHex.scale;
+    cont2.name = 'AnubisCont';
+    cont.addChild(cont2);
     const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
     const sgap = (wh.width / sc - 6 * rad) / 4;
     [rad, rad, rad].forEach((radi, i) => {
       const circle = new CircleShape('lightgrey', radi, this.color);
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
-      cont.addChild(circle);
+      cont2.addChild(circle);
       const hex = table.newHex2(0, 0, `amun-${i}`, SpecialHex) as SpecialHex;
       this.anubisHexes.push(hex);
       hex.cont.visible = false;
-      cont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      cont2.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       hex.legalMark.setOnHex(hex);
     });
   }
@@ -123,8 +124,8 @@ class Amun extends God {
   override doSpecial(faceUp: boolean): void {
     this.tokenFaceUp = faceUp;
   }
-  override makeSpecial(cont: Container, wh: WH, table: Table) {
-    super.makeSpecial(cont, wh, table);
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    super.makeSpecial(cont, wh, table, panel);
     const token = this.token;
     token.x = wh.width / 2; token.y = wh.height * .6;
     cont.addChild(token);
@@ -196,9 +197,10 @@ class HorusMarker extends RegionMarker {
 class Horus extends God {
   specialHex: SpecialHex;
   specialSource: AnkhSource<HorusMarker>;
+  cardSelector: CardSelector;
   constructor() { super('Horus', 'darkred') }
-  override makeSpecial(cont: Container, wh: WH, table: Table) {
-    super.makeSpecial(cont, wh, table); cont.name = 'Horus-Special'
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    super.makeSpecial(cont, wh, table, panel); cont.name = 'Horus-Special'
     HorusMarker.table = table;
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .9;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
@@ -206,8 +208,13 @@ class Horus extends God {
     source.counter.y -= TP.ankh2Rad * .3;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
+    this.cardSelector = panel.makeCardSelector(`cs:Horus`);
+    this.cardSelector.activateCardSelector(false, 'Ban Card', undefined);
   }
-  override doSpecial(regionId?: RegionId) {
+  override doSpecial(regionId?: RegionId | 'cardSelector') {
+    if (regionId === 'cardSelector') {
+      return this.cardSelector;
+    }
     if (!regionId) return HorusMarker.source.filterUnits(hm => true).map(hm => hm.regionId);
     const inRegion = HorusMarker.source.filterUnits(hm => hm.regionId === regionId);
     return (inRegion[0] as HorusMarker);
@@ -223,8 +230,8 @@ class Osiris extends God {
   specialHex: SpecialHex;
   specialSource: AnkhSource<Portal>;
 
-  override makeSpecial(cont: Container, wh: WH, table: Table) {
-    super.makeSpecial(cont, wh, table);
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    super.makeSpecial(cont, wh, table, panel);
     cont.name = 'Osiris-Special'
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
@@ -246,8 +253,8 @@ class Ra extends God {
   specialSource: AnkhSource<RadianceMarker>;
   specialHex: SpecialHex;
 
-  override makeSpecial(cont: Container, wh: WH, table: Table) {
-    super.makeSpecial(cont, wh, table);
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    super.makeSpecial(cont, wh, table, panel);;
     cont.name = `Ra-Special`;
     const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);

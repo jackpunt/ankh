@@ -1109,7 +1109,7 @@ export class Table extends EventDispatcher  {
    */
   // bindKeysToScale('a', scaleC, 436, 0, .5)
   bindKeysToScale(scaleC: ScaleableContainer2, char: string, xos: number, yos: number, scale0 = .5) {
-      const nsA = scale0;
+    const nsA = scale0;
     const apt = { x: xos, y: yos }
     let nsZ = 0.647; //
     const zpt = { x: 120, y: 104 }
