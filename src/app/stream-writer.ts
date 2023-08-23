@@ -40,21 +40,16 @@ class FileBase {
  * (so log is already saved if browser crashes...)
  */
 export class LogWriter extends FileBase implements ILogWriter {
-  /** signal Promise filled when writeLine has finished write & close. */
-  closePromise = new EzPromise<number>().fulfill(0) // a filled Promise<void>
-  /** contains WriteableFileStream */
-  streamPromise: EzPromise<FileSystemWritableFileStream> = this.newOpenPromise;
+  /** when fulfilled, value is a WriteableFileStream; from createWriteable(). */
+  streamPromise: Promise<FileSystemWritableFileStream>;
 
   /** WriteableFileStream Promise that is fulfilled when stream is open & ready for write */
-  get newOpenPromise() {
-    return new EzPromise<FileSystemWritableFileStream>()
-  }
-
   async openWriteStream(fileHandle: FileSystemFileHandle = this.fileHandle,
     options: FileSystemCreateWritableOptions = { keepExistingData: true }) {
-    let stream = await fileHandle.createWritable(options), thus = this;
-    //await writeable.seek((await fileHandle.getFile()).size)
-    this.streamPromise.fulfill(stream).then(() => this.writeBacklog(thus))
+    const promise = fileHandle.createWritable(options), thus = this;
+    this.streamPromise = promise;
+    const x = promise.then(() => this.writeBacklog(thus));
+    return promise;
   }
 
   /**
@@ -65,7 +60,6 @@ export class LogWriter extends FileBase implements ILogWriter {
   constructor(name = 'logFile', buttonId = "fsOpenFileButton") {
     super(name, buttonId)
     this.setButtonToSaveLog()
-    this.streamPromise = this.newOpenPromise
   }
   setButtonToSaveLog(name: string = this.name) {
     const options = {
@@ -79,39 +73,40 @@ export class LogWriter extends FileBase implements ILogWriter {
     };
     // console.log(stime(this, `.new LogWriter:`), { file: this.fileHandle })
     // Note return type changes: [FileHandle], [DirHandle], FileHandle
-    this.setButton('showSaveFilePicker', options, (value) => {
-      this.fileHandle = value as FileSystemFileHandle
+    this.setButton('showSaveFilePicker', options, (value: FileSystemFileHandle) => {
+      this.fileHandle = value;
       console.log(stime(this, `${this.ident('FilePicker')}.picked:`), value)
-      this.openWriteStream()
+      this.openWriteStream(value);
     }, 'SaveLog')
   }
 
   backlog: string = ''
   writeLine(text = '') {
-    this.backlog += `${text}\n`
-    let stream = this.streamPromise.value as FileSystemWritableFileStream
-    if (!stream) {
-      return
+    const wasNoBacklog = (this.backlog.length === 0);
+    this.backlog += `${text}\n`;
+    if (wasNoBacklog && this.streamPromise) {
+      this.writeBacklog(this); // try write new backlog.
     }
-    this.writeBacklog(this) // try write, but do not wait.
   }
   showBacklog() {
     console.log(stime(this, `.showBacklog:\n`), this.backlog)
   }
 
+  /**
+   * called when openWriteStream has fulfilled streamPromise with a new writeableStream.
+   *
+   * or when application invokes writeline when stream is already open.
+   */
   async writeBacklog(thus = this) {
     //console.log(stime(this, ident), `Backlog:`, this.backlog.length, this.backlog)
     if (thus.backlog.length > 0) try {
-      await thus.closePromise; // closePromise is fullfilled by stream.close().then()
-      thus.closePromise = new EzPromise<number>()
-      let stream = await thus.streamPromise     // indicates writeable is ready
-      thus.streamPromise = thus.newOpenPromise    // new Promise for next cycle:
+      const stream = await thus.streamPromise;     // indicates writeable is ready
       await stream.seek((await thus.fileHandle.getFile()).size)
-      let lines = thus.backlog; thus.backlog = ''  // would prefer a lock on this.backlog...
+      const lines = thus.backlog;
       await stream.write({ type: 'write', data: lines }); // write to tmp store
-      await stream.close().then(() => thus.closePromise.fulfill(1))       // flush to real-file
-      while (!thus.streamPromise.value) await thus.openWriteStream();     // loop until re-opens?
-      // ASSERT: streamPromise is now fulfilled with a new Writeable Stream
+      await stream.close(); // flush to file system.
+      thus.backlog = '';    // indicate all lines are now on disk.
+      thus.streamPromise = thus.openWriteStream(); // begin open new stream (streamPromise will be fullfiled)
     } catch (err) {
       console.warn(stime(thus, thus.ident('writeBacklog')), `failed:`, err)
       throw err
@@ -119,9 +114,10 @@ export class LogWriter extends FileBase implements ILogWriter {
   }
   async closeFile() {
     try {
-      let stream = await this.streamPromise
-      this.streamPromise = this.newOpenPromise // prep a new OpenPromise
-      return stream.close();
+      const stream = await this.streamPromise;
+      const promise = stream.close();
+      this.streamPromise = undefined;
+      return promise;
     } catch (err) {
       console.warn(stime(this, `.closeFile failed:`), err)
       throw err

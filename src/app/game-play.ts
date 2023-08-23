@@ -307,6 +307,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
+    KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
     KeyBinder.keyBinder.setKey('C', () => {
       const up = (cardSelectorsUp = !cardSelectorsUp);
       this.allPlayers.forEach(player => {

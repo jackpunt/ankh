@@ -82,16 +82,15 @@ export class Monument extends AnkhPiece {
 
   override isLegalTarget(toHex: AnkhHex, ctx?: DragContext): boolean {
     if (ctx.lastShift && toHex.isOnMap) return true;
+    if (this.hex?.isOnMap) return false;    // can't move if already placed on map.
     if (!this.gamePlay.isPhase('BuildMonument')) return false;
-    // if (!this.gamePlay.gameState.state.panels) return true; // QQQ: reload before panels are up?
-    const panel = this.gamePlay.gameState.state.panels?.[0];
-    if (!panel?.canBuildInRegion) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
+    const panel = this.gamePlay.gameState.state.panels?.[0];   // current 'Build' player
+    if (panel?.canBuildInRegion === undefined) return false;   // can't build IN conflictRegion; also: can't build outside conflictRegion.
     const regionNdx = this.gamePlay.gameState.conflictRegion - 1;
     const region = this.gamePlay.hexMap.regions[regionNdx];
     if (!region?.includes(toHex)) return false;  // now: toHex !== undefined, toHex.isOnMap
     if (toHex.occupied) return false;
     if (toHex.terrain == 'w') return false;
-    if (!this.hex?.isOnMap) return false;
     return true;
   }
 
@@ -204,7 +203,7 @@ export class Portal extends AnkhPiece {
 }
 
 export class RadianceMarker extends AnkhPiece {
-  static source = [[]]; // per-player source, although only 1 Ra player...
+  static source: AnkhSource<RadianceMarker>[] = []; // per-player source, although only 1 Ra player...
 
   override get radius(): number { return TP.hexRad * H.sqrt3_2; }
   constructor(player: Player, serial: number) {
@@ -685,17 +684,6 @@ export class Mummy extends Guardian2 {
 
   override sendHome(): void {
     const god = this.player.god, godFig = god.figure;
-    // const ctx = {
-    //   lastShift: false,
-    //   lastCtrl: false,
-    //   info: { first: false, event: undefined},
-    //   tile: this,
-    //   phase: 'Summon',
-    //   gameState: this.player.gamePlay.gameState,
-    //   targetHex: this.hex,
-    // } as DragContext;
-    // if (godFig.hex.findAdjHex(hex => this.isLegalTarget(hex, { ...ctx, targetHex: hex }))) {}
-    // need empty hex (or Portal if Osiris)
     const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
     const dir = godFig.hex.findAdjHex(hex => isLegal(hex));
     if (dir) {

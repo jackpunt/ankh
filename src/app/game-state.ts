@@ -111,6 +111,7 @@ export class GameState {
       const color = vis ? ((ndx === regionId - 1) ? '' : 'rgba(230,230,230,.6)') : '';
       map.showRegion(ndx, color);
     })
+    map.showRegion(regionId - 1, '');
     afterUpdate && map.mapCont.stage.on('drawend', afterUpdate, this, true);
  }
 
