@@ -4,6 +4,7 @@ import { Container, Shape } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
+import { PowerIdent } from "./ankh-scenario";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { CardSelector, PlayerPanel } from "./player-panel";
@@ -33,7 +34,11 @@ export class God {
   static get allGods() {
     return Array.from(God.byName).map(([gname, god]) => god);
   }
-  static get allNames() { return Object.keys(godCbyName); }
+  static get allGodNames() {
+    return Array.from(God.byName).map(([gname, god]) => gname);
+  }
+
+  static get allNames() { return Object.keys(godCbyName); };
 
   public player: Player;
   public name: string;
@@ -46,7 +51,7 @@ export class God {
     God.byName.set(Aname, this); // Aname === className(this);
     this.name = Aname;
   }
-  readonly ankhPowers: string[] = [];
+  readonly ankhPowers: PowerIdent[] = [];
 
   radius = TP.ankh2Rad;
   getAnkhMarker(rad = TP.ankhRad, color = this.color) {
@@ -274,6 +279,6 @@ class Toth extends God {
 }
 
 // List all the God constructors:
-const godCbyName: { [index: string]: Constructor<God> } = { Anubis: Anubis, Amun: Amun, Bastet: Bastet, Hathor: Hathor, Horus: Horus, Isis: Isis, Osiris: Osiris, Ra: Ra, Set: SetGod };
+const godCbyName: { [index: string]: Constructor<God> } = { Anubis: Anubis, Amun: Amun, Bastet: Bastet, Hathor: Hathor, Horus: Horus, Isis: Isis, Osiris: Osiris, Ra: Ra, Set: SetGod } as const;
 
 // godSpecs.forEach(god => new god());

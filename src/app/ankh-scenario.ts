@@ -12,14 +12,15 @@ import type { GamePlay } from "./game-play";
 import { AnkhMarker } from "./god";
 import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
-import type { Player } from "./player";
+import { Player } from "./player";
+import { CardName, CardState, PlayerPanel, cardStates } from "./player-panel";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
 
 type GodName = string;
 export type GuardName = string | Constructor<Guardian>;
 export type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
-type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorius' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
+export type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorious' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
 export type RegionElt = [row: number, col: number, bid: RegionId];
 /** ...elt4 is 'Ra' for Radiance and/or EwDir for Scorpion */
 type PlaceElt = [row: number, col: number, cons?: Constructor<AnkhPiece | Figure> | GodName, pid?: number, ...elt4: any[]];
@@ -27,7 +28,7 @@ type AnkhElt = PowerIdent[];
 export type ActionIdent = 'Move' | 'Summon' | 'Gain' | 'Ankh';
 /** 'Move': [1,2] showing playerId */
 type PlayerId = number;
-type ActionElt = { [index in ActionIdent]?: PlayerId[]; } & { selected?: ActionIdent[]; };
+type ActionElt = { [key in ActionIdent]?: PlayerId[]; } & { selected?: ActionIdent[]; };
 type EventElt = PlayerId[];
 
 /** [row, col, bid] -> new rid, with battle order = bid ;
@@ -46,6 +47,7 @@ type SetupElt = {
   regions: RegionElt[],  // delta, east, west, ...; after splits.
   // the rest assume defaults or random values:
   godNames?: string[]    // Gods in the game ?? use names from URL command.
+  cards?: (0|1|2)[][],   // [flood...cycle][0=inHand|1=inBattl|2=onTable]
   coins?: number[],      // 1
   scores?: number[],     // 0
   events?: EventElt,
@@ -464,20 +466,30 @@ export class ScenarioParser {
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, godNames, events, actions, stable, ankhs, places } = setup;
+    const { regions, splits, coins, scores, turn, guards, cards, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
     const turnSet = (turn !== undefined); // indicates a Saved Scenario.
     if (turnSet) {
+      gamePlay.turnNumber = turn;
       table.turnLog.log(`turn = ${turn}`, `parseSetup`);
-      table.gamePlay.turnNumber = turn;
       table.guardSources.forEach(source => {
         // retrieve Units from board or stables; return to source:
         source.filterUnits(u => true).forEach(unit => (unit.moveTo(undefined), source.availUnit(unit)))
         source.nextUnit();
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
+    }
+    const states = cardStates, colorForState = PlayerPanel.colorForState;
+    if (cards !== undefined) {
+      table.panelForPlayer.forEach((panel, pi) => {
+        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.colorn = colorForState[states[cards[pi][ndx]]] );
+      })
+    } else {
+      table.panelForPlayer.forEach(panel => {
+        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.colorn = colorForState[states[0]] );
+      })
     }
     if (events !== undefined) {
       table.eventCells.forEach((evc, ndx) => table.removeEventMarker(ndx))
@@ -591,7 +603,10 @@ export class ScenarioParser {
       actions[id] = buttons.slice(0, nActions).map(elt => elt.pid);
     })
     actions.selected = this.gamePlay.gameState.selectedActions;
-
+    const indexForColor = PlayerPanel.indexForColor;
+    const cards = table.panelForPlayer.map(panel =>
+      panel.cardSelector.powerLines.map(pl => indexForColor[pl.button.colorn])
+    );
     const stable = table.panelForPlayer.map(panel => {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
@@ -604,7 +619,7 @@ export class ScenarioParser {
       return [row, col, cons, pid, ...elt4] as PlaceElt;
     })
 
-    return { ngods, godNames, turn, regions, splits, guards, events, actions, coins, scores, stable, ankhs, places } as SetupElt;
+    return { ngods, godNames, turn, regions, splits, guards, events, actions, coins, scores, cards, stable, ankhs, places } as SetupElt;
   }
 
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {

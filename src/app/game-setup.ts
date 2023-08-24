@@ -31,7 +31,7 @@ export class GameSetup {
    * @param canvasId supply undefined for 'headless' Stage
    */
   constructor(canvasId: string, public qParams: Params) {
-    stime.fmt = "MM-DD kk:mm:ss.SSS"
+    stime.fmt = "MM-DD kk:mm:ss.SSSL"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
     Tile.loader.loadImages(() => this.startup(qParams));
@@ -116,8 +116,8 @@ export class GameSetup {
       return pguards;
     }
     Guardian.setGuardiansByName();
-    const guardNames = fillGuardNames(this.guards ?? [undefined, undefined, undefined], [undefined, undefined, undefined]);
-    console.log(stime(this, `.startup: guardNames =`), this.guards, guardNames);
+    fillGuardNames(this.guards ?? [undefined, undefined, undefined], [undefined, undefined, undefined]);
+    // console.log(stime(this, `.startup: guardNames =`), this.guards, guardNames);
     if (scenario.turn === undefined || scenario.godNames === undefined) scenario.godNames = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
     if (scenario.turn === undefined || scenario.guards === undefined) scenario.guards = fillGuardNames(this.guards, scenario.guards);
 

@@ -2,6 +2,7 @@ import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
 import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
+import { PowerIdent } from "./ankh-scenario";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
 import { God } from "./god";
@@ -11,11 +12,15 @@ import { Table } from "./table";
 import { TP } from "./table-params";
 
 
+export type CardName = 'Flood' | 'Build' | 'Plague' | 'Chariots' | 'Miracle' | 'Drought' | 'Cycle';
+export const cardStates = ['inHand', 'inBattle', 'onTable'] as const;
+export type CardState = typeof cardStates[number];
+
 /** children as [button: typeof CircleShape, qmark: typeof CenterText, text: typeof CenterText, token?: AnkhToken] */
 export interface PowerLine extends Container {
   ankhToken: AnkhToken;
   button: CircleShape;
-  power: number;
+  strength: number;
   qmark: Text;
   text: Text;
   docText: UtilButton;
@@ -39,6 +44,7 @@ interface ConfirmCont extends Container {
 }
 
 export class CardSelector extends Container implements PowerLineCont {
+
   constructor(name = 'cs') {
     super()
     this.name = name;
@@ -62,10 +68,10 @@ export class CardSelector extends Container implements PowerLineCont {
     const canAfford = panel ? panel.canAffordMonument : true;
     this.powerLines.forEach(pl => {
       pl.text.color = C.BLACK;
-      const button = pl.button, color = button.colorn;
+      const button = pl.button, color = button.colorn, powerName = pl.name ;
       button.mouseEnabled = activate && (color === inBattle || color === inHand);
-      if (button.name === 'Build' && (color === inHand) && !canAfford) { pl.text.color = 'grey'; }
-      if (button.name === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
+      if (powerName === 'Build' && (color === inHand) && !canAfford) { pl.text.color = 'grey'; }
+      if (powerName === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
     });
     this.showCardSelector(activate, done);
   }
@@ -85,8 +91,8 @@ export class CardSelector extends Container implements PowerLineCont {
   }
 }
 
-type CardSpec = [name: string, text: string, doc: string, power: number];
-type PowerSpec = [name: string, text: string, doc: string, power?: number];
+type CardSpec = [name: CardName, text: string, doc: string, strength: number];
+type PowerSpec = [name: PowerIdent | CardName, text: string, doc: string];
 export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
@@ -114,7 +120,7 @@ export class PlayerPanel extends Container {
     return figuresInRegion.filter(fig => fig.controller === player.god);
   }
   hasAnkhPower(power: string) {
-    return this.god.ankhPowers.includes(power);
+    return this.god.ankhPowers.includes(power as PowerIdent);
   }
   get isResplendent() {
     const hasThreeOfMonu = (ndx: number) =>
@@ -137,7 +143,7 @@ export class PlayerPanel extends Container {
     }
     const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionNdx); addStrength(nFigures, 'Figures');
     const cardsInPlay = this.cardsInBattle;
-    const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.power ?? 0] as [string, number]);
+    const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.strength ?? 0] as [string, number]);
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
@@ -359,15 +365,17 @@ export class PlayerPanel extends Container {
    */
   selectAnkhPower(evt?: Object, button?: CircleShape) {
     const rank = this.nextAnkhRank, ankhCol = this.ankhPowerTokens.length % 2;
-    const ankh = this.addAnkhToPowerLine(button?.parent as PowerLine);
+    const powerLine = button?.parent as PowerLine;
+    const powerName = powerLine.name as PowerIdent;
+    const ankh = this.addAnkhToPowerLine(powerLine);
     const colCont = this.powerCols[rank - 1];        // aka: button.parent.parent
     this.activateAnkhPowerSelector(colCont, false); // deactivate
 
     // get God power, if can sacrific followers:
     if (this.player.coins >= colCont.rank) {
-      this.player.gamePlay.gameState.addFollowers(this.player, -colCont.rank, `Ankh Power: ${button?.name ?? '---'}`);
-      if (button?.name) this.god.ankhPowers.push(button.name); // 'Commanding', 'Resplendent', etc.
-      //console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, button?.name, button?.id);
+      this.player.gamePlay.gameState.addFollowers(this.player, -colCont.rank, `Ankh Power: ${powerName ?? '---'}`);
+      if (powerName) this.god.ankhPowers.push(powerName); // 'Commanding', 'Resplendent', etc.
+      //console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, power, button?.id);
     } else {
       ankh.sendHome(); // AnkhToken
     }
@@ -437,12 +445,12 @@ export class PlayerPanel extends Container {
     });
   }
 
-  makePowerLines(colCont: PowerLineCont, powerList: PowerSpec[], onClick) {
+  makePowerLines(colCont: PowerLineCont, powerList: (CardSpec | PowerSpec)[], onClick) {
     const panel = this;
     const {brad, gap, rowh, dir,} = panel.metrics;
     // place powerLines --> selectAnkhPower:
       colCont.powerLines = []; // Container with children: [button:CircleShape, text: CenterText, token?: AnkhToken]
-      powerList.forEach(([powerName, powerText, docString, power], nth) => {
+      powerList.forEach(([powerName, powerText, docString, strength], nth) => {
         const powerLine = new Container() as PowerLine;
         powerLine.name = powerName;
         powerLine.x = brad + gap;
@@ -456,12 +464,12 @@ export class PlayerPanel extends Container {
         button.mouseEnabled = false;
         powerLine.addChild(button);
         powerLine.button = button;
-        powerLine.power = power;
+        powerLine.strength = strength;
         const qmark = new CenterText('?', brad * 1.4, C.BLACK);
         qmark.visible = qmark.mouseEnabled = false;
-        if (!!power) {
+        if (!!strength) {
           // show Card power in qmark:
-          qmark.text = `+${power}`;
+          qmark.text = `+${strength}`;
           qmark.color = C.BLACK;
           qmark.x -= brad / 10;
           qmark.visible = true;
@@ -654,7 +662,12 @@ export class PlayerPanel extends Container {
     cs.showCardSelector(vis, done);
   }
 
-  static colorForState = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
+  static colorForState: { [key in CardState]: string } = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
+  static indexForColor: { [key in string]: number } = {}
+  static {
+    Object.keys(PlayerPanel.colorForState).forEach((key: CardState, ndx) =>
+      PlayerPanel.indexForColor[PlayerPanel.colorForState[key]] = ndx);
+  }
 
   cardsInState(state: keyof typeof PlayerPanel.colorForState) {
     return this.cardSelector.cardsInState(state);
@@ -664,7 +677,7 @@ export class PlayerPanel extends Container {
   get cardsInBattle() { return this.cardsInState('inBattle'); } // YELLOW
   get cardsOnTable() { return this.cardsInState('onTable'); }   // RED
 
-  get cycleWasPlayed() { return !!this.cardsOnTable.find(pl => pl.button.name === 'Cycle') }
+  get cycleWasPlayed() { return !!this.cardsOnTable.find(pl => pl.name === 'Cycle') }
 
   revealCards(vis = true): void {
     const inBattle = this.cardsInBattle.map(pl => pl.name);

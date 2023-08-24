@@ -577,7 +577,7 @@ export class Table extends EventDispatcher  {
     button.stage.update();
   }
 
-  activeButtons: {[index: string]: [ActionButton, number]} = {}
+  activeButtons: {[key in ActionIdent]?: [ActionButton, number]} = {}
   /**
    * On each row: activate or deactivate the first button without an AnkhMarker on each line.
    * If a row is 'full' (previous Event) it is reset to the beginning.
@@ -823,6 +823,7 @@ export class Table extends EventDispatcher  {
     this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer
     // Place Pieces and Figures on map:
     this.parseScenenario(scenario); // may change turnNumber
+    this.gamePlay.logWriterLine0();
 
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {

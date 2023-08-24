@@ -8,6 +8,7 @@ import { ClassByName } from "./class-by-name";
 import { afterUpdate } from "./functions";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
+import { God } from "./god";
 import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
@@ -55,7 +56,8 @@ export class GamePlay0 {
 
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
-  readonly logWriter: LogWriter
+
+  readonly logWriter = this.makeLogWriter();
 
   get allPlayers() { return Player.allPlayers; }
   get allTiles() { return Tile.allTiles; }
@@ -67,23 +69,22 @@ export class GamePlay0 {
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly redoMoves = []
 
+  makeLogWriter() {
+    const time = stime.fs('MM-DD_Lkk_mm');
+    const logFile = `log_${time}.js`;
+    return new LogWriter(logFile, '{}\n]\n'); // terminate array, but insert before terminal
+  }
   logWriterLine0() {
-    let time = stime('').substring(6,15)
-    let line = {
-      time: stime.fs(), maxBreadth: TP.maxBreadth, maxPlys: TP.maxPlys,
-      mHexes: TP.mHexes, tHexes: TP.tHexes
-    }
-    let line0 = json(line, false)
-    let logFile = `log_${time}.js`
-    console.log(stime(this, `.constructor: -------------- ${line0} --------------`))
-    let logWriter = new LogWriter(logFile, ']\n'); // terminate array, but insert before terminal
-    logWriter.writeLine(`[\n{start: ${line0}},`)
-    return logWriter;
+    const setup = this.gameSetup, thus = this as any as GamePlay, turn = thus.turnNumber;
+    const scene = setup.scene, ngods = setup.ngods, gods = God.allGodNames, guards = thus.guards.map(CoG => CoG.name)
+    let line = { time: stime.fs(), scene, turn, ngods, gods, guards };
+    let line0 = json(line, true); // machine readable starting conditions
+    console.log(`-------------- ${line0} --------------`)
+    this.logWriter.writeLine(`[\n{start: ${line0}},`)
   }
 
   /** GamePlay0 - supply GodNames for each: new Player(...). */
-  constructor(godNames: string[]) {
-    this.logWriter = this.logWriterLine0()
+  constructor(godNames: string[], public gameSetup: GameSetup) {
     this.hexMap.Aname = `mainMap`;
     //this.hexMap.makeAllDistricts(); // For 'headless'; re-created by Table, after addToMapCont()
 
@@ -250,8 +251,8 @@ export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
   readonly guards: Constructor<Guardian>[];
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
-  constructor(public scenario: Scenario, table: Table, public gameSetup: GameSetup) {
-    super(scenario.godNames);            // hexMap, history, gStats...
+  constructor(public scenario: Scenario, table: Table, gameSetup: GameSetup) {
+    super(scenario.godNames, gameSetup);            // hexMap, history, gStats...
     Tile.gamePlay = this; // table
     // Players have: civics & meeples & TownSpec
     this.table = table;
@@ -375,9 +376,12 @@ export class GamePlay extends GamePlay0 {
   }
 
   cardShowing: boolean = false;
-  showCards(vis = !this.cardShowing) {
-    this.cardShowing = vis;
-    this.forEachPlayer(player => player.panel.showCardSelector(vis));
+  showCards(vis0?: boolean) {
+    this.cardShowing = !this.cardShowing;
+    this.forEachPlayer(player => {
+    const panel = player.panel, vis = vis0 !== undefined ? vis0 : (panel.cardsInBattle.length > 0);
+      panel.showCardSelector(vis);
+    });
     this.hexMap.update();
   }
 
