@@ -2,7 +2,6 @@ import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContai
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
-import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { ClassByName } from "./class-by-name";
 import { type GamePlay } from "./game-play";
 import type { GameState } from "./game-state";
@@ -12,6 +11,7 @@ import { H, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
 import { RegionMarker } from "./RegionMarker";
+import { ActionIdent, Scenario, ScenarioParser } from "./scenario-parser";
 import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
@@ -32,6 +32,7 @@ export interface Dragable {
 
 /** rowCont is an ActionContainer; children are EventButton. */
 export class ActionContainer extends Container {
+  readonly buttons: ActionButton[] = [];
   constructor(public rad = 30, public table: Table) {
     super();
     this.highlight = new CircleShape(C.WHITE, this.rad + 5, '');
@@ -42,8 +43,11 @@ export class ActionContainer extends Container {
   highlight: PaintableShape;
   active: ActionButton; // most recently activated button
   /** just the Buttons, ignore the highlight Shape. */
-  get buttons() { return this.children.filter(c => (c instanceof Container)) as ActionButton[] }
-
+  //get buttons() { return this.children.filter(c => (c instanceof Container)) as ActionButton[] }
+  addButton(button: ActionButton) {
+    this.addChild(button);
+    this.buttons.push(button);
+  }
   getButton(cn: number) {
     return this.buttons[cn];
   }
@@ -541,7 +545,7 @@ export class Table extends EventDispatcher  {
         button.name = `${id}-${cn}`;
         button.isEvent = (cn === nc - 1);
         button.x = cn * dx;
-        rowCont.addChild(button);
+        rowCont.addButton(button);
         button.on(S.click, (evt: Object) => this.selectAction(id, button, cn), this);
       }
       this.actionPanels[actionRow.id] = rowCont;
@@ -549,7 +553,7 @@ export class Table extends EventDispatcher  {
     this.addDoneButton(actionCont, rh)
   }
 
-  /** mark Action as selected, inform GamePlay & phaseDone() */
+  /** onClick: mark Action as selected, inform GamePlay & phaseDone() */
   selectAction (id: ActionIdent, button: ActionButton, cn: number) {
     ;(button.parent as ActionContainer).rollover?.(button, false);  // implicit 'rollout'
     this.gamePlay.selectedAction = id;
@@ -585,7 +589,7 @@ export class Table extends EventDispatcher  {
    * @param afterRow name of previous actionSelected; that row and above are deactivated.
    * @return false if no buttons were activated (afterRow == 'Ankh')
    */
-  activateActionSelect(activate: boolean, afterRow?: string, cat = false) {
+  activateActionSelect(activate: boolean, afterRow?: string) {
     let isAfter = (afterRow === undefined);
     let active = 0;
     this.activeButtons = {};
@@ -599,9 +603,6 @@ export class Table extends EventDispatcher  {
       }
       isAfter = isAfter || id === afterRow;
     })
-    if (cat) {
-      // [de]activate 'Cat' & 'Pass' buttons..?
-    }
     this.stage.enableMouseOver(active > 0 ? 5 : 0);// enable or disable MouseOver
     return active > 0;
   }

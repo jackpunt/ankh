@@ -3,7 +3,6 @@ import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
 import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
-import { ActionIdent, Scenario, ScenarioParser } from "./ankh-scenario";
 import { ClassByName } from "./class-by-name";
 import { afterUpdate } from "./functions";
 import type { GameSetup } from "./game-setup";
@@ -13,6 +12,7 @@ import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
+import { ActionIdent, Scenario, ScenarioParser } from "./scenario-parser";
 import { LogWriter } from "./stream-writer";
 import { EventName, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
@@ -169,9 +169,10 @@ export class GamePlay0 {
   newTurn() {}
 
   setNextPlayer(turnNumber?: number): void {
+    this.logText(`turnNumber=${turnNumber ?? this.turnNumber + 1}`, `GamePlayer.setNextPlayer`)
     if (turnNumber === undefined) {
       this.turnNumber = turnNumber = this.turnNumber + 1;
-      this.newTurn()
+      this.newTurn();  // override calls saveState()
     }
     this.turnNumber = turnNumber;
     const index = (turnNumber % this.allPlayers.length);
@@ -221,8 +222,8 @@ export class GamePlay0 {
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.fromHex;
-    const verb = this.gamePhase.Aname;
-    if (toHex !== fromHex) this.logText(`${verb} ${tile} -> ${toHex}`, `gamePlay.placeEither`)
+    const verb = this.gamePhase.Aname, god = this.curPlayer.godName;
+    if (toHex !== fromHex) this.logText(`${god} ${verb}s ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     // if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {
@@ -517,7 +518,8 @@ export class GamePlay extends GamePlay0 {
 
 
   override endTurn(): void {
-    // this.curPlayer.panel.visible = false;
+    // vvvv maybe unnecessary: prompted by other confusion in save/restore:
+    // this.table.activateActionSelect(true, undefined); // resetToFirstButton() before newTurn->saveState.
     super.endTurn();
   }
 

@@ -1,12 +1,13 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
+import { Androsphinx, AnkhSource, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
-import { PowerIdent } from "./ankh-scenario";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
+import { afterUpdate } from "./functions";
 import { God } from "./god";
 import { Player } from "./player";
+import { PowerIdent } from "./scenario-parser";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
 import { Table } from "./table";
 import { TP } from "./table-params";
@@ -33,7 +34,7 @@ interface PowerLineCont extends Container {
 export interface AnkhPowerCont extends PowerLineCont {
   rank: number;
   ankhs: AnkhToken[];
-  guardianSlot: number;
+  guardianSlot: number; // 0 or 1 is designated to provide a Guardian
 }
 
 interface ConfirmCont extends Container {
@@ -96,27 +97,32 @@ type PowerSpec = [name: PowerIdent | CardName, text: string, doc: string];
 export class PlayerPanel extends Container {
   canUseTiebreaker = false;
 
-  isPlayerInRegion(regionNdx: number) {
-    const region = this.hexMap.regions[regionNdx], god = this.god;
-    return !!region.find(hex => (hex.meep instanceof Figure) && hex.meep.controller === god);
-  }
   templeHexesInRegion(regionNdx: number) {
     const region = this.hexMap.regions[regionNdx];
     return region.filter(hex => hex.tile instanceof Temple && hex.tile?.player === this.player);
   }
-  /** strength from Figures in Region controlled by this.god */
-  nFiguresInRegion(regionNdx: number) {
-    const region = this.hexMap.regions[regionNdx], god = this.god;
-    const figs = region.filter(hex => hex.meep instanceof Figure && hex.meep.controller === god);
-    return figs.filter(fig => !fig.findAdjHex(hex => hex.meep instanceof Androsphinx && hex.meep.controller !== god)).length;
+  figsInRegion(regionId: RegionId) {
+    return this.hexMap.regions[regionId - 1].filter(hex => hex.figure).map(hex => hex.figure);
   }
-  nRegionsWithFigures() {
-    return this.hexMap.regions.filter((region, ndx) => this.isPlayerInRegion(ndx)).length;
+  /** strength from Figures in Region controlled by this.god */
+  figStrengthOfGod(regionNdx: number, god = this.god) {
+    const figs = this.figsInRegion(regionNdx + 1 as RegionId).filter(fig => fig.controller === god);
+    // remove strength of Figures adjacent to Androsphinx:
+    const figs2 = figs.filter(fig => fig.hex.findAdjHex(hex => hex?.meep instanceof Androsphinx && hex.meep.controller !== god))
+    return figs2.length;
+  }
+  isPlayerInRegion(regionId: RegionId, god = this.god) {
+    if (!regionId) return false;
+    const region = this.hexMap.regions[regionId - 1];
+    return !!region.find(hex => hex.figure?.controller === god);
+  }
+  nRegionsWithFigures(god = this.god) {
+    return this.hexMap.regions.filter(region => !!region.find(hex => hex.figure?.controller === god)).length;
   }
   /** Figures in Region controled by player.god */
   figuresInRegion(regionId: RegionId, player = this.player) {
     const region = this.hexMap.regions[regionId - 1];
-    const figuresInRegion = region.filter(hex => hex.meep instanceof Figure).map(hex => hex.figure);
+    const figuresInRegion = region.filter(hex => hex.figure).map(hex => hex.figure);
     return figuresInRegion.filter(fig => fig.controller === player.god);
   }
   hasAnkhPower(power: string) {
@@ -141,7 +147,7 @@ export class PlayerPanel extends Container {
       this.reasons[why] = val;
       this.reasons.total = this.strength;
     }
-    const nFigures = this.nFigsInBattle = this.nFiguresInRegion(regionNdx); addStrength(nFigures, 'Figures');
+    const nFigures = this.nFigsInBattle = this.figStrengthOfGod(regionNdx); addStrength(nFigures, 'Figures');
     const cardsInPlay = this.cardsInBattle;
     const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.strength ?? 0] as [string, number]);
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
@@ -360,42 +366,53 @@ export class PlayerPanel extends Container {
     return ankh;
   }
 
-  /** the click handler for AnkhPower buttons; info supplied by on.Click()
-   *  confirm supplies (button === undefined) when insufficent funds to purchase AnkhPower
+  /**
+   * the click handler for AnkhPower buttons; button supplied as data by on.Click(... button)
    */
-  selectAnkhPower(evt?: Object, button?: CircleShape) {
-    const rank = this.nextAnkhRank, ankhCol = this.ankhPowerTokens.length % 2;
-    const powerLine = button?.parent as PowerLine;
-    const powerName = powerLine.name as PowerIdent;
-    const ankh = this.addAnkhToPowerLine(powerLine);
+  selectAnkhPower(evt: Object, button: CircleShape) {
+    const rank = this.nextAnkhRank;
     const colCont = this.powerCols[rank - 1];        // aka: button.parent.parent
-    this.activateAnkhPowerSelector(colCont, false); // deactivate
+    this.activateAnkhPowerSelector(colCont, false);  // deactivate
 
-    // get God power, if can sacrific followers:
-    if (this.player.coins >= colCont.rank) {
-      this.player.gamePlay.gameState.addFollowers(this.player, -colCont.rank, `Ankh Power: ${powerName ?? '---'}`);
+    const powerLine = button.parent as PowerLine;
+    const powerName = powerLine.name as PowerIdent;
+    const nCoins = this.player.coins, cost = rank;
+
+    const ankh = this.addAnkhToPowerLine(powerLine);
+    if (!ankh) {
+      this.player.gamePlay.logText(`${this.god.name} gets no Ankh Power from Action`)
+    } else if (nCoins >= cost) {
+      // get God power, if can sacrific followers:
+      this.player.gamePlay.gameState.addFollowers(this.player, -cost, `Ankh Power: ${powerName ?? '---'}`);
       if (powerName) this.god.ankhPowers.push(powerName); // 'Commanding', 'Resplendent', etc.
       //console.log(stime(this, `.onClick: ankhPowers =`), this.god.ankhPowers, power, button?.id);
     } else {
+      const reason = (nCoins === 0) ? 'no Followers' : `only ${nCoins} Follower${nCoins > 1 ? 's': ''}`;
+      this.player.gamePlay.logText(`${this.god.name} gets no Ankh Power ${powerName}; ${reason}`)
       ankh.sendHome(); // AnkhToken
     }
     // Maybe get Guardian:
+    const ankhCol = ankh && (this.ankhPowerTokens.length % 2 as 0 | 1);
     if (colCont.guardianSlot === ankhCol) {
-      this.takeGuardianIfAble(colCont.rank - 1)
+      this.takeGuardianIfAble(colCont.rank - 1); // will log the aquisition (or not)
     }
-    this.stage.on('drawend', () => this.player.gamePlay.phaseDone(), this, true);
-    this.stage.update();
+    afterUpdate(this, () => this.player.gamePlay.phaseDone());
   };
 
   takeGuardianIfAble(rank: number, guard?: Guardian) {
     const guardian = guard ?? this.table.guardSources[rank].takeUnit();
-    if (!guardian) return;    // no Guardian to be picked/placed.
-    guardian.setPlayerAndPaint(this.player);
-    this.stage.update();
-    const size = guardian.radius;
-    const slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
-    if (slot < 0) return;     // Stable is full! (no rings of the right size)
-    guardian.moveTo(this.stableHexes[slot]);
+    let slot = -2;
+    if (guardian) {
+      guardian.setPlayerAndPaint(this.player);
+      this.stage.update();
+      const size = guardian.radius;
+      slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
+      if (slot >= 0) {
+        guardian.moveTo(this.stableHexes[slot]);
+      }              // else: slot = -1: Stable is full! (no rings of the right size)
+    }                // else: slot = -2: no Guardian to be picked/placed.
+    this.table.logText(`${this.player.godName} takes ${guardian ? guardian.name : 'no Guardian'} to slot ${slot}`);
+    return guardian; // may be undefined
   }
 
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){
@@ -413,7 +430,7 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  get nextAnkhRank() { return [1, 1, 2, 2, 3, 3][Math.max(0, 6 - this.ankhPowerTokens.length)] }  // 6,5: 1, 4,3: 2, 0,1: 3
+  get nextAnkhRank() { return [1, 1, 2, 2, 3, 3, 3][Math.max(0, 6 - this.ankhPowerTokens.length)] as 1 | 2 | 3 }  // 6,5: 1, 4,3: 2, 0,1: 3
   readonly powerCols: AnkhPowerCont[] = [];
   readonly ankhPowerTokens: AnkhToken[] = [];
   makeAnkhPowerGUI() {
@@ -422,7 +439,7 @@ export class PlayerPanel extends Container {
     // Ankh Power line: circle + text; Ankhs
     const { brad, gap, ankhRowy, colWide, dir} = this.metrics;
     PlayerPanel.ankhPowers.forEach((powerList, colNdx) => {
-      const colCont = new Container() as AnkhPowerCont, rank = colNdx +1; colCont.name = `colCont-${colNdx}`;
+      const colCont = new Container() as AnkhPowerCont, rank = colNdx + 1; colCont.name = `colCont-${colNdx}`;
       colCont.rank = rank;
       colCont.guardianSlot = (colNdx < 2) ? 1 : 0;
       colCont.x = colNdx * colWide + [2 * brad + 3 * gap, 0, 0][1 - dir];

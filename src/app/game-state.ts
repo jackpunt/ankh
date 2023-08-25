@@ -2,7 +2,6 @@ import { C, stime } from "@thegraid/common-lib";
 import { RegionMarker } from "./RegionMarker";
 import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
-import type { ActionIdent } from "./ankh-scenario";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
 import { json } from "./functions";
 import type { GamePlay } from "./game-play";
@@ -10,6 +9,7 @@ import { God } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
 import { CardSelector, PlayerPanel, PowerLine } from "./player-panel";
+import type { ActionIdent } from "./scenario-parser";
 import { HexShape, PaintableShape } from "./shapes";
 import { DragContext, EventName } from "./table";
 import { TP } from "./table-params";
@@ -53,7 +53,7 @@ export class GameState {
   conflictRegion: RegionId = undefined;
 
   get panelsInConflict() {
-    return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion((this.conflictRegion ?? 0) - 1));
+    return this.table.panelsInRank.filter(panel => panel.isPlayerInRegion(this.conflictRegion));
   }
   panelsInThisConflict: PlayerPanel[];
   buildPanels: PlayerPanel[];
@@ -212,8 +212,8 @@ export class GameState {
           console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
           panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
             () => {
-              console.log(stime(this, `.Ankh state: yes`))
-              panel.selectAnkhPower();       // as if a button was clicked: take the AnkhToken, get Guardian.
+              console.log(stime(this, `.Ankh state: yes`));
+              this.state.start(true);
             },
             () => {
               console.log(stime(this, `.Ankh state: cancel`), this.selectedActions)
@@ -267,6 +267,7 @@ export class GameState {
       start: () => {
         // todo: disable table.dragger!
         console.log(stime(this, `.Split:`));
+        this.table.logText(`${this.gamePlay.curPlayer.godName} makes Split [${this.gamePlay.hexMap.regions.length}]`);
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
         this.ankhMapSplitter.runSplitShape();
         this.doneButton();
@@ -279,6 +280,7 @@ export class GameState {
     Swap: {
       start: () => {
         console.log(stime(this, `Swap:`));
+        this.table.logText(`${this.gamePlay.curPlayer.godName} does Swap [${this.gamePlay.hexMap.regions.length}]`);
         this.ankhMapSplitter.runSwap();
         // TODO: no Button until 'finalize'
         this.doneButton('Swap done');
@@ -550,7 +552,7 @@ export class GameState {
     ScoreMonuments: {
       // score Monuments in conflictRegion; incr Player.devotion (score);
       start: () => {
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
+        // console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         this.scoreMonuments(false);
         this.phase('BattleResolution')
       },
@@ -680,6 +682,11 @@ export class GameState {
       // TODO: coins from Scales to Toth, add Devotion(Scales)
     },
     EndTurn: {
+      // TODO: I suspect that setNextPlayer -> saveState is happening *before*
+      // the Event --> resetAction, so the representation in saveState looks funny.
+      // that would be ok IF on restoration, it auto-resets.
+      // but in turn 27; Osiris takes an Ankh power, but the Ankk: [3,0,1,2] does not incr to [3,0,1,2,3] !!
+      // Also: maybe something about 'selected:' action not being reset?
       start: () => {
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
@@ -696,9 +703,9 @@ export class GameState {
   // if (winner === undefined): all non-GodFigure are at risk.
   deadFigs(cause: string, winner: God | undefined, rid: RegionId, isBattle = true) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
-    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHex(hex => hex.meep && (hex.meep?.player.godName !== 'Isis'));
+    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHex(hex => hex.figure && (hex.meep?.player.godName !== 'Isis'));
     const region = this.gamePlay.hexMap.regions[rid - 1];
-    const figsInRegion = region.map(hex => hex?.meep).filter(meep => meep instanceof Figure) as Figure[];
+    const figsInRegion = region.filter(hex => hex?.figure).map(hex => hex.figure);
     const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !(fig.controller === winner));
     const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisProtected(fig)) : deadFigs0;
     const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
@@ -721,10 +728,10 @@ export class GameState {
 
   countCurrentGain(player = this.gamePlay.curPlayer) {
     // Osiris Portal begins offMap.
-    const allMonts = this.gamePlay.allTiles.filter(tile => (tile instanceof Monument) && (tile.hex?.isOnMap));
-    const monts =  allMonts.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
-    const mine = monts.filter(mont => mont.hex.findAdjHex(hex => hex.meep?.player === player));
-    const n = mine.length + (player.god.ankhPowers.includes('Revered') ? 1 : 0);
+    const montsOnMap = this.gamePlay.allTiles.filter(tile => (tile.hex?.isOnMap) && (tile instanceof Monument));
+    const monts =  montsOnMap.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
+    const adjPlayer = monts.filter(mont => mont.hex.findAdjHex(hex => hex.figure?.player === player));
+    const n = adjPlayer.length + (player.god.ankhPowers.includes('Revered') ? 1 : 0);
     return n
   }
 
@@ -769,7 +776,7 @@ export class GameState {
     const rid = this.conflictRegion, regionNdx = rid - 1;
     const allPlayers = this.gamePlay.allPlayers;
     const players = this.panelsInConflict.map(panel => panel.player);
-    console.log(stime(this, `.scoreMonuments[${rid}]`), players);
+    // console.log(stime(this, `.scoreMonuments[${rid}]`), players);
     const hexes = this.gamePlay.hexMap.regions[regionNdx].filter(hex => (hex.tile instanceof Monument) && hex.tile.player);
     const tiles = hexes.map(hex => hex.tile);
     const types = GameState.typeNames;
@@ -781,7 +788,7 @@ export class GameState {
     const deltas = sortedCount.map(pnary => ({t: pnary[0].type, p: pnary[0].player, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) }));
     const winners = deltas.map(({ p, n, d, t }) => ({ p: ((n > 0 && d > 0) ? p : undefined), n, d, t }));
     winners.forEach(({ p, n, d, t }) => {
-      console.log(stime(this, `.scoreMonuments[${rid}]: ${t} -> Player=${p?.Aname}, d=${d}, n=${n}`));
+      console.log(stime(this, `.scoreMonuments[${rid}]: ${t} -> ${p?.godName}, d=${d}, n=${n}`));
     })
     const winp = players.filter(player => winners.find(({p})=> p === player));
     const winnerp = winp.map(p => winners.filter(elt => elt.p === p)); // monuments won by player

@@ -1,11 +1,11 @@
 import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
-import type { AnkhMeeple, AnkhPiece, Figure, Guardian } from "./ankh-figure";
-import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./ankh-scenario";
+import { AnkhMeeple, AnkhPiece, Figure, Guardian } from "./ankh-figure";
 import { permute } from "./functions";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";
+import type { RegionElt, SplitBid, SplitDir, SplitSpec } from "./scenario-parser";
 import { EdgeShape, HexShape } from "./shapes";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
@@ -78,7 +78,7 @@ export class AnkhHex extends Hex2 {
   terrain: Terrain;
   regionId: RegionId;
   overlay: HexShape = this.newOverlay();
-  get piece() { return this.tile ?? this.meep }
+  get piece() { return this.tile ?? this.meep }      // Assert: meep ISA Figure: else Tile ISA Monument
   isStableHex(): this is StableHex { return false; } // must be function/method not a 'get' to use 'is...'
 
   override get meep(): AnkhMeeple { return super.meep as AnkhMeeple; }
@@ -87,7 +87,7 @@ export class AnkhHex extends Hex2 {
   override get tile(): AnkhPiece { return super.tile as AnkhPiece; }
   override set tile(tile: Tile) { super.tile = tile; }
 
-  get figure(): Figure { return this.meep as Figure } // !!! what about AnkhToken on Monument!!???
+  get figure(): Figure { return (this.meep instanceof Figure) ? this.meep : undefined }
 
   override toString(sc?: string): string {
     return `${this.piece ?? this.Aname}`;

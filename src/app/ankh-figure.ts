@@ -1,7 +1,7 @@
 import { C, Constructor, XY, className } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
-import { GuardName } from "./ankh-scenario";
+import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
 import { God } from "./god";
@@ -9,12 +9,12 @@ import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
+import { GuardName } from "./scenario-parser";
 import { C1, CircleShape, HexShape, PaintableShape } from "./shapes";
 import { DragContext } from "./table";
 import { TP } from "./table-params";
 import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
-import { AnkhToken } from "./ankh-token";
 
 
 export class AnkhSource<T extends Tile> extends TileSource<T> {
@@ -225,7 +225,7 @@ export class RadianceMarker extends AnkhPiece {
       return;
     }
     const figure = hex?.figure;
-    if (figure instanceof Figure) {
+    if (figure) {
       figure.raMarker = this;
       const at = figure.children.indexOf(figure.baseShape);
       figure.addChildAt(this, at);     // below baseShape
@@ -247,12 +247,13 @@ export class RadianceMarker extends AnkhPiece {
   }
 
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-    // TODO: during Summon!
-    return (toHex instanceof AnkhHex)
-      && toHex.isOnMap
-      && toHex.figure?.player === this.player
-      && (toHex.figure instanceof Warrior || toHex.figure instanceof Guardian)
-      && toHex.figure.raMarker === undefined;
+    if (!(ctx.phase === 'Summon' || ctx.lastShift)) return false;
+    const figure = (toHex instanceof AnkhHex) && toHex.figure;
+    return toHex.isOnMap
+      && figure
+      && figure.player === this.player
+      && (figure instanceof Warrior || figure instanceof Guardian)
+      && figure.raMarker === undefined;
   }
 }
 
@@ -355,18 +356,19 @@ export class Figure extends AnkhMeeple {
     if (this.raMarker) {
       this.raMarker.sendHome();
       this.raMarker = undefined;
+      this.updateCache();
     }
     super.sendHome();
   }
 
   /** summon from Stable to Portal on map */
   isOsirisSummon(hex: AnkhHex, ctx: DragContext) {
+    if (!(ctx.phase === 'Summon' || ctx.lastShift)) return false;
     return hex?.isOnMap
-      && (hex.figure === undefined)
+      && (hex.tile instanceof Portal)
+      && (hex.meep === undefined)
       && this.isFromStable
-      && (ctx.phase === 'Summon')
       && (this.player?.godName === 'Osiris')
-      && (hex.tile instanceof Portal);
   }
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
     return !hex.piece;
@@ -609,8 +611,9 @@ export class Satet extends Guardian1 {
     return hex && (!hex.occupied || (!hex.meep && hex.tile instanceof Portal && player.godName === 'Osiris'));
   }
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
-    if (ctx.phase === 'Move' && this.noMont(hex) && hex?.figure?.player && hex.figure.player !== this.player) {
-      const aPlayer = hex.figure.player;
+    const figure = hex?.figure;
+    if (ctx.phase === 'Move' && hex?.isOnMap && figure?.player && figure.player !== this.player) {
+      const aPlayer = figure.player;
       if (hex.findAdjHex(ahex => this.openHex(ahex, aPlayer)) && this.distWithin(hex, this.hex, 3)) return true;
     }
     return super.isLegalTarget(hex, ctx);
@@ -631,15 +634,16 @@ export class Satet extends Guardian1 {
       this.movedFigure = undefined;
       this.lastTarget = undefined;
     }
-    if (hex && hex.meep && this.noMont(hex as AnkhHex)) {
+    const figure = hex?.figure;
+    if (hex?.isOnMap && figure) {
       // find the right empty hex... opposite direction from which Satet entered hex
       const pt = this.parent.localToLocal(this.x, this.y, hex.cont); // from DragC --> targetHex coordinates
       const outDir = H.dirRev[hex.cornerDir(pt, hex.cont, H.nsDirs)[0]];
       const mHex = !hex.borders[outDir] && hex.links[outDir]; // may be false
-      if (this.openHex(mHex, hex.figure.player)) {
+      if (this.openHex(mHex, figure.player)) {
         this.lastTarget = hex;
-        this.movedFigure = hex.meep;
-        this.movedFigure.moveTo(mHex);
+        this.movedFigure = figure;
+        figure.moveTo(mHex);
         // now: hex is empty, will be isLegalTarget(), will be available for drop of Satet;
       }
     }
