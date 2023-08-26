@@ -57,7 +57,7 @@ export class GamePlay0 {
   recycleHex: Hex1;
   ll(n: number) { return TP.log > n }
 
-  readonly logWriter = this.makeLogWriter();
+  get logWriter() { return this.gameSetup.logWriter; }
 
   get allPlayers() { return Player.allPlayers; }
   get allTiles() { return Tile.allTiles; }
@@ -80,7 +80,7 @@ export class GamePlay0 {
     let line = { time: stime.fs(), scene, turn, ngods, gods, guards };
     let line0 = json(line, true); // machine readable starting conditions
     console.log(`-------------- ${line0} --------------`)
-    this.logWriter.writeLine(`[\n{start: ${line0}},`)
+    this.logWriter.writeLine(`{start: ${line0}},`)
   }
 
   /** GamePlay0 - supply GodNames for each: new Player(...). */
@@ -169,7 +169,6 @@ export class GamePlay0 {
   newTurn() {}
 
   setNextPlayer(turnNumber?: number): void {
-    this.logText(`turnNumber=${turnNumber ?? this.turnNumber + 1}`, `GamePlayer.setNextPlayer`)
     if (turnNumber === undefined) {
       this.turnNumber = turnNumber = this.turnNumber + 1;
       this.newTurn();  // override calls saveState()
@@ -179,6 +178,7 @@ export class GamePlay0 {
     this.preGame = false;
     this.curPlayerNdx = index;
     this.curPlayer = this.allPlayers[index];
+    this.logText(`turnNumber=${turnNumber} ${this.curPlayer.godName}`, `GamePlayer.setNextPlayer`)
     this.curPlayer.newTurn();
   }
 
@@ -300,6 +300,12 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('c', { thisArg: this, func: this.clickConfirm, argVal: false })
     KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
     KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
+
+    KeyBinder.keyBinder.setKey('l', { thisArg: this.logWriter, func: this.logWriter.pickLogFile })
+    KeyBinder.keyBinder.setKey('L', { thisArg: this.logWriter, func: this.logWriter.showBacklog })
+    KeyBinder.keyBinder.setKey('M-l', { thisArg: this.logWriter, func: () => { this.logWriter.closeFile() } }) // void vs Promise<void>
+    KeyBinder.keyBinder.setKey('C-l', () => this.fileState()) // void vs Promise<void>
+
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
     KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
@@ -310,6 +316,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
+    KeyBinder.keyBinder.setKey('r', () => this.fileState());
     KeyBinder.keyBinder.setKey('C', () => {
       const up = (cardSelectorsUp = !cardSelectorsUp);
       this.allPlayers.forEach(player => {
@@ -349,6 +356,14 @@ export class GamePlay extends GamePlay0 {
   override newTurn(): void {
     this.saveState();
   }
+  async fileState() {
+    const [startelt, ...stateArray] = await ScenarioParser.injestFile(this.gameSetup.scene);
+    const state = stateArray.find(state => state.turn === this.gameSetup.fileTurn);
+    this.backStates.length = this.nstate = 0;
+    this.backStates.unshift(state);
+    console.log(stime(this, `.fileState: logArray =\n`), stateArray);
+    this.gameSetup.restart(state);
+  }
 
   backStates = [];
   /** setNextPlayer->startTurn (or Key['p']) */
@@ -371,7 +386,7 @@ export class GamePlay extends GamePlay0 {
     this.nstate = back ? Math.min(this.backStates.length - 1, this.nstate + 1) : Math.max(0, this.nstate - 1);
     const state = this.backStates[this.nstate];
     console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
-    this.table.parseScenenario(state); // typically sets gamePlay.turnNumber
+    this.gameSetup.parseScenenario(state); // typically sets gamePlay.turnNumber
     console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
     this.setNextPlayer(this.turnNumber);
   }

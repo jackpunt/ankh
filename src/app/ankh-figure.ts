@@ -120,13 +120,12 @@ export class Monument extends AnkhPiece {
     }
   }
 
-  override sendHome(): void {   // Monument AnkhToken.sendHome()
+  override resetTile(): void {      // Monument AnkhToken.resetTile()
     const ankhToken = this.fromHex?.meep as AnkhToken;
     if (ankhToken) {
       ankhToken.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
-      this.setPlayerAndPaint(undefined); // un-Claim this Monument
     }
-    super.sendHome();
+    this.setPlayerAndPaint(undefined); // un-Claim this Monument
   }
 }
 
@@ -217,6 +216,11 @@ export class RadianceMarker extends AnkhPiece {
     });
     this.setBounds(-rad, -rad, rad * 2, rad * 2)
     return shape;
+  }
+
+  override textVis(vis?: boolean): void {
+    super.textVis(vis);
+    if (this.parent instanceof Figure) this.parent.updateCache();
   }
 
   override moveTo(hex: AnkhHex) {
@@ -352,13 +356,13 @@ export class Figure extends AnkhMeeple {
 
   raMarker: RadianceMarker;  // for Ra
 
-  override sendHome(): void { // Figure
+  override resetTile(): void {
     if (this.raMarker) {
       this.raMarker.sendHome();
       this.raMarker = undefined;
       this.updateCache();
     }
-    super.sendHome();
+    super.resetTile();
   }
 
   /** summon from Stable to Portal on map */
@@ -577,14 +581,24 @@ export class Guardian extends Figure {
     super.dropFunc(targetHex, ctx);
   }
 
-  override sendHome(): void {  // Guardian -> Stable
+  override resetTile(): void {
+    if (this.homeHex) {
+      ;(this.homeHex as StableHex).usedBy = undefined;
+      this.homeHex = undefined;
+    }
+    super.resetTile()
+  }
+
+  get stableHex() { return this.homeHex; } // player.stableHexes.find(hex => hex.usedBy === this)
+
+  override sendHome(): void {   // Guardian -> Stable OR Source
     const player = this.player;
     if (!player) {
       this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
-      super.sendHome();
+      super.sendHome();          // homeHex == source.hex
       return;
     }
-    this.moveTo(player.stableHexes.find(hex => hex.usedBy === this));
+    this.moveTo(this.stableHex); // maybe just set homeHex === stableHex?
   }
 }
 class Guardian1 extends Guardian {
@@ -657,8 +671,8 @@ export class CatMum extends Guardian1 {
     super(player, serial, `Cat-Mum`);
   }
   override sendHome(): void {  // CatMum: addDevotion
-    const gamePlay = this.player.gamePlay;
-    gamePlay.allPlayers.forEach(player => {
+    const gamePlay = this.player?.gamePlay;
+    gamePlay?.allPlayers.forEach(player => {
       if (player !== this.player) gamePlay.gameState.addDevotion(player, -1, `${this} died!`);
     })
     super.sendHome();
@@ -687,9 +701,9 @@ export class Mummy extends Guardian2 {
   }
 
   override sendHome(): void {
-    const god = this.player.god, godFig = god.figure;
+    const god = this.player?.god, godFig = god?.figure;
     const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
-    const dir = godFig.hex.findAdjHex(hex => isLegal(hex));
+    const dir = godFig?.hex.findAdjHex(hex => isLegal(hex));
     if (dir) {
       const toHex = godFig.hex.links[dir];
       this.moveTo(toHex);

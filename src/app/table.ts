@@ -224,10 +224,13 @@ export class Table extends EventDispatcher  {
     this.turnLog.log(line, 'table.logTurn'); // in top two lines
   }
   logText(line: string, from = '') {
-    const text = this.textLog.log(`// ${this.gamePlay.turnNumber}: ${line.replace(/\n/g,'-')}`, from); // scrolling lines below
-    this.gamePlay.logWriter.writeLine(text);
-
+    const text = this.textLog.log(`${this.gamePlay.turnNumber}: ${line}`, from || '***'); // scrolling lines below
+    this.gamePlay.logWriter.writeLine(`// ${text}`);
+    // JSON string, instead of JSON5 comment:
+    // const text = this.textLog.log(`${this.gamePlay.turnNumber}: ${line}`, from); // scrolling lines below
+    // this.gamePlay.logWriter.writeLine(`"${line}",`);
   }
+
   setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 4, col = -9) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
     undoC.name = `undoCont`;
@@ -515,9 +518,9 @@ export class Table extends EventDispatcher  {
   }
 
   actionPanels: ActionContainer[] = [];
-  actionRows: { id: ActionIdent, dn?: number, ro?: boolean }[] = [
-    { id: 'Move' }, { id: 'Summon' }, { id: 'Gain' }, { id: 'Ankh', dn: -1 }
-  ];
+  readonly actionRows  = [
+    { id: 'Move',  dn: 2 }, { id: 'Summon', dn: 2 }, { id: 'Gain', dn: 2 }, { id: 'Ankh', dn: 1 }
+  ] as const;
   makeActionCont(row = TP.nHexes -2, col = TP.nHexes + 1.2) {
     const np = Player.allPlayers.length, rad = 30, rh = 2 * rad + 5;//, wide = (2 * rad + 5) * (5 + 1)
     const wide = 400;
@@ -530,7 +533,7 @@ export class Table extends EventDispatcher  {
 
     //for (let rn = 0; rn < actionRows.length; rn++) {
     this.actionRows.forEach((actionRow, rn) => {
-      const nc = np + 2 + (actionRow.dn ?? 0), dx = wide / (nc - 1), id = actionRow.id;
+      const nc = np + actionRow.dn, dx = wide / (nc - 1), id = actionRow.id;
       const rowCont = new ActionContainer(rad, this);
       rowCont.name = `rowCont-${id}`;
       rowCont.y = rn * rh;
@@ -814,18 +817,7 @@ export class Table extends EventDispatcher  {
     this.showScoreMarks();
   }
 
-  scenarioParser: ScenarioParser;
-  parseScenenario(scenario: Scenario) {
-    if (!this.scenarioParser) this.scenarioParser = new ScenarioParser(this.hexMap as AnkhMap<AnkhHex>, this.gamePlay);
-    this.scenarioParser.parseScenario(scenario);
-  }
-
   startGame(scenario: Scenario) {
-    this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer
-    // Place Pieces and Figures on map:
-    this.parseScenenario(scenario); // may change turnNumber
-    this.gamePlay.logWriterLine0();
-
     // All Tiles (& Meeple) are Draggable:
     Tile.allTiles.forEach(tile => {
       this.makeDragable(tile);

@@ -3,6 +3,7 @@
 
 import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
+import { parse as JSON5_parse } from 'json5';
 import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, RadianceMarker, Scorpion } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
@@ -14,6 +15,7 @@ import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { PlayerPanel, cardStates } from "./player-panel";
+import { LogReader } from "./stream-writer";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
 
@@ -58,8 +60,8 @@ type SetupElt = {
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   turn?: number;   // default to 0; (or 1...)
 }
-type StartElt = { start: { time: string, scene: string, turn: number, ngods: 2 | 3 | 4 | 5, gods: string[], guards: GuardIdent } };
-type LogFile = [ StartElt, ...SetupElt[]];
+export type StartElt = { start: { time: string, scene: string, turn: number, ngods: 2 | 3 | 4 | 5, gods: string[], guards: GuardIdent } };
+export type LogElts = [ StartElt, ...SetupElt[]];
 
 export type Scenario = SetupElt;
 
@@ -67,6 +69,12 @@ export class ScenarioParser {
 
   constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
+  }
+  static async injestFile(fname = 'log/log.js') {
+    const logReader = new LogReader(fname, 'fsReadFileButton');
+    const fileText = await logReader.readPickedFile();
+    const logArray = JSON5_parse(fileText) as LogElts;
+    return logArray;
   }
 
   parseRegions(regionElt: RegionElt[]) {
@@ -135,7 +143,7 @@ export class ScenarioParser {
       piece.moveTo(hex);
       if (elt4[0] === 'Ra') {
         elt4.shift();
-        const source = RadianceMarker.source.find(s => !!s);
+        const source = RadianceMarker.source.find(s => !!s); // find Player for 'Ra'
         const rm = source.takeUnit();
         rm?.moveTo(hex);    // set Radiance on piece.
       }
@@ -167,10 +175,12 @@ export class ScenarioParser {
     const turnSet = (turn !== undefined); // indicates a Saved Scenario.
     if (turnSet) {
       gamePlay.turnNumber = turn;
-      table.turnLog.log(`turn = ${turn}`, `parseSetup`);
+      table.logText(`turn = ${turn}`, `parseScenario`);
       table.guardSources.forEach(source => {
         // retrieve Units from board or stables; return to source:
-        source.filterUnits(u => true).forEach(unit => (unit.moveTo(undefined), source.availUnit(unit)))
+        source.filterUnits(u => true).forEach(unit =>
+          (unit.setPlayerAndPaint(undefined), unit.resetTile(), unit.moveTo(undefined), source.availUnit(unit))
+          );
         source.nextUnit();
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
@@ -208,8 +218,7 @@ export class ScenarioParser {
     if (regions) this.parseRegions(regions);
     table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId)); // after parseRegions
     guards?.forEach((name, ndx) => {
-      const source = table.guardSources[ndx];
-      source.filterUnits((unit) => !unit.setPlayerAndPaint(undefined));
+      const source = table.guardSources[ndx]
 
       if (typeof name !== 'string') name = name.name; // if Constructor was given in Scenario def'n
       if (name !== source.type.name) {
@@ -231,7 +240,7 @@ export class ScenarioParser {
       const player = allPlayers[pid], panel = player.panel;
       console.log(stime(this, `.stable:[${pid}]`), gNames);
       gNames.forEach((gName) => {
-        const ndx = table.guardSources.findIndex(source => (source.type.name === gName))
+        const ndx = table.guardSources.findIndex(source => (source.type.name === gName)) as 0 | 1 | 2;
         const source = table.guardSources[ndx];
         if (source) {
           player.panel.takeGuardianIfAble(ndx);
@@ -294,7 +303,8 @@ export class ScenarioParser {
     table.actionRows.forEach(({id}) => {
       const rowCont = table.actionPanels[id] as ActionContainer;
       const buttons = rowCont.buttons;
-      const nActions = buttons.findIndex(elt => !elt.children.find(ch => ch instanceof AnkhMarker));
+      const ndx = buttons.findIndex(elt => !elt.children.find(ch => ch instanceof AnkhMarker));
+      const nActions = ndx < 0 ? buttons.length : ndx;
       actions[id] = buttons.slice(0, nActions).map(elt => elt.pid);
     })
     actions.selected = this.gamePlay.gameState.selectedActions;

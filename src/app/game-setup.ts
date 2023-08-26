@@ -9,7 +9,8 @@ import { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { GuardIdent, Scenario } from "./scenario-parser";
+import { GuardIdent, Scenario, ScenarioParser } from "./scenario-parser";
+import { LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
@@ -46,8 +47,17 @@ export class GameSetup {
   get netState() { return this._netState }
   set playerId(val: string) { this.netGUI?.selectValue("PlayerId", val || "     ") }
 
+  readonly logWriter = this.makeLogWriter();
+  makeLogWriter() {
+    const time = stime.fs('MM-DD_Lkk_mm');
+    const logFile = `log_${time}.js`;
+    const logWriter = new LogWriter(logFile, '{}\n]\n'); // terminate array, but insert before terminal
+    logWriter.writeLine(`[`)
+    return logWriter;
+  }
+
   /** C-s ==> kill game, start a new one, possibly with new dbp */
-  restart(nh = TP.nHexes, mh = TP.mHexes) {
+  restart(scenario = this.scenario) {
     let netState = this.netState
     // this.gamePlay.closeNetwork('restart')
     // this.gamePlay.logWriter?.closeFile()
@@ -61,54 +71,85 @@ export class GameSetup {
       cont.removeAllChildren()
     }
     deContainer(this.stage)
-    TP.fnHexes(nh, mh);
-    let rv = this.startup(this.qParams);
+    this.startScenario(scenario);  // running async...?
     this.netState = " "      // onChange->noop; change to new/join/ref will trigger onChange(val)
     // next tick, new thread...
     setTimeout(() => this.netState = netState, 100) // onChange-> ("new", "join", "ref") initiate a new connection
-    return rv
   }
 
   scene: string;
   ngods: number = undefined;
-  gods: string[] = [];
+  godNames: string[] = [];
   guards: GuardIdent = [undefined, undefined, undefined];
 
+  fileName: string;
+  fileTurn: number;
+  setScenarioFile(scene: string): Scenario {
+    if (!scene.includes('@')) return undefined;
+    const [fname, turnstr] = scene.split('@'), turn = Number.parseInt(turnstr);
+    this.fileName = fname;
+    this.fileTurn = turn;
+    return undefined;
+  }
+  async scenarioFromFile(scene: string) {
+    const [start, ...scenes] = await ScenarioParser.injestFile(`log/${this.fileName}.js`);
+    const scenario = scenes.find(elt => elt.turn === this.fileTurn);
+    console.log(stime(this, `.scenarioFromFile: ${scene} ngods=${this.ngods} scenario=`), scenario);
+    return scenario;
+  }
+
+  scenarioFromSource(scene: string) {
+    const scene1 = AnkhScenario[this.scene] as (Scenario);
+    const scene2 = AnkhScenario[this.scene] as (Scenario[]) ?? AnkhScenario.MiddleKingdom;
+    const scenario = scene1?.['ngods'] ? scene1 : scene2?.find(scen => (scen.ngods === this.ngods));
+    console.log(stime(this, `.scenarioFromSource: ${scene} ngods=${this.ngods} scenario=`), scenario);
+    return scenario;
+  }
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param qParams from URL
    */
-  startup(qParams: Params = []) {
+  async startup(qParams: Params = []) {
     //ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom'
-    this.gods = qParams['gods']?.split(',') ?? this.gods;
-    this.ngods = Number.parseInt(qParams?.['n'] ?? '4') ?? this.ngods;
+    this.godNames = qParams['gods']?.split(',') ?? this.godNames;
+    this.ngods = Number.parseInt(qParams?.['n'] ?? '2') ?? this.ngods;
     this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
     this.guards = qParams['guards']?.split(',') ?? this.guards;
 
+    this.setScenarioFile(this.scene);
+    const scenario = this.scenarioFromSource(this.scene);
+    scenario.Aname = scenario?.Aname ?? this.scene;
+    console.log(stime(this, `.startup: ${this.scene} ngods=${this.ngods} scenario=`), scenario);
+    this.startScenario(scenario);
+  }
+
+  scenario: Scenario;  // last scenario loaded
+  /** scenario.turn indicate a FULL/SAVED scenario */
+  startScenario(scenario: Scenario) {
+    God.byName.clear();
     Tile.allTiles = [];
     Meeple.allMeeples = [];
     Player.allPlayers = [];
+
+    this.scenario = scenario;
+    this.ngods = scenario.ngods ?? this.ngods;
+    this.guards = scenario.guards ?? this.guards;
+    this.godNames = scenario.godNames ?? this.godNames;
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
-
-    const scene1 = AnkhScenario[this.scene] as (Scenario);
-    const scene2 = AnkhScenario[this.scene] as (Scenario[]);
-    const scenario = scene1?.['ngods'] ? scene1 : scene2.find(scen => (scen.ngods === this.ngods));
-
-    console.log(stime(this, `.startup: scenario=`), scene1, this.scene, this.ngods , scenario);
 
     const uniq = <T>(ary: T[]) => {
       const rv: T[] = [];
       ary.forEach(elt => rv.includes(elt) || rv.push(elt))
       return rv;
     }
-    const fillGodNames = (ngods: number, gods: string[]) => {
-      const uniqGods = uniq(gods);
-      const nToFind = (ngods - gods.length);
-      const godNames = (nToFind > 0)
+    const fillGodNames = (ngods: number, godNames: string[]) => {
+      const uniqGods = uniq(godNames);
+      const nToFind = (ngods - godNames.length);
+      const fullNames = (nToFind > 0)
         ? [...uniqGods].concat(selectN(God.allNames.filter(gn => !uniqGods.includes(gn)), ngods - uniqGods.length))
         : (nToFind < 0) ? selectN(uniqGods, ngods) : uniqGods;
-      godNames.length = Math.min(godNames.length, 5);
-      return godNames;
+      fullNames.length = Math.min(fullNames.length, 5);
+      return fullNames;
     }
     const fillGuardNames = (pguards: GuardIdent, sguards: GuardIdent) => {
       [0, 1, 2].forEach((rank: 0 | 1 | 2) => {
@@ -119,15 +160,21 @@ export class GameSetup {
     Guardian.setGuardiansByName();
     fillGuardNames(this.guards ?? [undefined, undefined, undefined], [undefined, undefined, undefined]);
     // console.log(stime(this, `.startup: guardNames =`), this.guards, guardNames);
-    if (scenario.turn === undefined || scenario.godNames === undefined) scenario.godNames = fillGodNames(scenario.ngods, this.gods); // inject requested Gods.
+    if (scenario.turn === undefined || scenario.godNames === undefined) scenario.godNames = fillGodNames(scenario.ngods, this.godNames); // inject requested Gods.
     if (scenario.turn === undefined || scenario.guards === undefined) scenario.guards = fillGuardNames(this.guards, scenario.guards);
 
-    // Inject Table into GamePlay
+    // Inject Table into GamePlay & make allPlayers:
     const gamePlay = new GamePlay(scenario, table, this) // hexMap, players, fillBag, gStats, mouse/keyboard->GamePlay
     this.gamePlay = gamePlay;
 
     // Inject GamePlay to Table; all the GUI components, makeAllDistricts(), addTerrain, initialRegions
-    table.layoutTable(gamePlay)              // mutual injection
+    table.layoutTable(gamePlay);     // mutual injection & make all panelForPlayer
+
+    this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer or parseScenario
+    // Place Pieces and Figures on map:
+    this.parseScenenario(scenario); // may change turnNumber
+    this.gamePlay.logWriterLine0();
+
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
     gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     // if (this.stage.canvas) {
@@ -138,6 +185,15 @@ export class GameSetup {
     table.startGame(scenario); // parseScenario; allTiles.makeDragable(); setNextPlayer();
     return gamePlay
   }
+
+  parseScenenario(scenario: Scenario) {
+    const hexMap = this.gamePlay.hexMap;
+    const scenarioParser = new ScenarioParser(hexMap, this.gamePlay);
+    this.gamePlay.logWriter.writeLine(`// parseScenario: ${scenario.Aname}`)
+    scenarioParser.parseScenario(scenario);
+  }
+
+
   /** affects the rules of the game & board
    *
    * ParamGUI   --> board & rules [under stats panel]
@@ -148,13 +204,13 @@ export class GameSetup {
     let restart = false
     const gui = new ParamGUI(TP, { textAlign: 'right'})
     const schemeAry = TP.schemeNames.map(n => { return { text: n, value: TP[n] } })
-    const setSize = (dpb: number, dop: number) => { restart && this.restart.call(this, dpb, dop) };
+    // const setSize = (dpb: number, dop: number) => { restart && this.restart.call(this, dpb, dop) };
     gui.makeParamSpec("nh", [6, 7, 8, 9, 10, 11], { fontColor: "red" }); TP.nHexes;
     gui.makeParamSpec("mh", [0, 1, 2, 3], { fontColor: "red" }); TP.mHexes;
     gui.makeParamSpec("colorScheme", schemeAry, { chooser: CycleChoice, style: { textAlign: 'center' } });
 
-    gui.spec("nh").onChange = (item: ParamItem) => { setSize(item.value, TP.mHexes) }
-    gui.spec("mh").onChange = (item: ParamItem) => { setSize(TP.nHexes, item.value) }
+    // gui.spec("nh").onChange = (item: ParamItem) => { setSize(item.value, TP.mHexes) }
+    // gui.spec("mh").onChange = (item: ParamItem) => { setSize(TP.nHexes, item.value) }
 
     parent.addChild(gui)
     gui.x = x // (3*cw+1*ch+6*m) + max(line.width) - (max(choser.width) + 20)

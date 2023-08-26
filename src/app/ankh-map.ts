@@ -206,6 +206,7 @@ export class StableHex extends AnkhHex {
     if (this.usedBy && this.usedBy !== meep) debugger;
     if (this.size !== meep.radius) debugger;
     this.usedBy = meep as Guardian;  // never un-set usedBy.
+    meep.homeHex = this;
     this.size = meep.radius;
   }
 }

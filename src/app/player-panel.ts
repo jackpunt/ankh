@@ -32,9 +32,9 @@ interface PowerLineCont extends Container {
 }
 
 export interface AnkhPowerCont extends PowerLineCont {
-  rank: number;
+  ndx: 0 | 1 | 2;
   ankhs: AnkhToken[];
-  guardianSlot: number; // 0 or 1 is designated to provide a Guardian
+  guardianSlot: 0 | 1;           // 0 or 1 is designated to provide a Guardian
 }
 
 interface ConfirmCont extends Container {
@@ -108,7 +108,7 @@ export class PlayerPanel extends Container {
   figStrengthOfGod(regionNdx: number, god = this.god) {
     const figs = this.figsInRegion(regionNdx + 1 as RegionId).filter(fig => fig.controller === god);
     // remove strength of Figures adjacent to Androsphinx:
-    const figs2 = figs.filter(fig => fig.hex.findAdjHex(hex => hex?.meep instanceof Androsphinx && hex.meep.controller !== god))
+    const figs2 = figs.filter(fig => !fig.hex.findAdjHex(hex => hex?.meep instanceof Androsphinx && hex.meep.controller !== god))
     return figs2.length;
   }
   isPlayerInRegion(regionId: RegionId, god = this.god) {
@@ -377,6 +377,7 @@ export class PlayerPanel extends Container {
     const powerLine = button.parent as PowerLine;
     const powerName = powerLine.name as PowerIdent;
     const nCoins = this.player.coins, cost = rank;
+    const ankhCol = (this.ankhPowerTokens.length % 2 as 0 | 1);
 
     const ankh = this.addAnkhToPowerLine(powerLine);
     if (!ankh) {
@@ -392,15 +393,14 @@ export class PlayerPanel extends Container {
       ankh.sendHome(); // AnkhToken
     }
     // Maybe get Guardian:
-    const ankhCol = ankh && (this.ankhPowerTokens.length % 2 as 0 | 1);
-    if (colCont.guardianSlot === ankhCol) {
-      this.takeGuardianIfAble(colCont.rank - 1); // will log the aquisition (or not)
+    if (ankh && colCont.guardianSlot === ankhCol) {
+      this.takeGuardianIfAble(colCont.ndx); // will log the aquisition (or not)
     }
     afterUpdate(this, () => this.player.gamePlay.phaseDone());
   };
 
-  takeGuardianIfAble(rank: number, guard?: Guardian) {
-    const guardian = guard ?? this.table.guardSources[rank].takeUnit();
+  takeGuardianIfAble(ndx: 0 | 1 | 2, guard?: Guardian) {
+    const guardian = guard ?? this.table.guardSources[ndx].takeUnit();
     let slot = -2;
     if (guardian) {
       guardian.setPlayerAndPaint(this.player);
@@ -408,7 +408,7 @@ export class PlayerPanel extends Container {
       const size = guardian.radius;
       slot = this.stableHexes.findIndex((hex, n) => (n > 0) && hex.size === size && !hex.usedBy);
       if (slot >= 0) {
-        guardian.moveTo(this.stableHexes[slot]);
+        guardian.moveTo(this.stableHexes[slot]); // StableHex.set meep(meep) --> stableHex.usedBy & meep.homeHex
       }              // else: slot = -1: Stable is full! (no rings of the right size)
     }                // else: slot = -2: no Guardian to be picked/placed.
     this.table.logText(`${this.player.godName} takes ${guardian ? guardian.name : 'no Guardian'} to slot ${slot}`);
@@ -438,9 +438,10 @@ export class PlayerPanel extends Container {
     // select AnkhPower: onClick->selectAnkhPower(info)
     // Ankh Power line: circle + text; Ankhs
     const { brad, gap, ankhRowy, colWide, dir} = this.metrics;
-    PlayerPanel.ankhPowers.forEach((powerList, colNdx) => {
-      const colCont = new Container() as AnkhPowerCont, rank = colNdx + 1; colCont.name = `colCont-${colNdx}`;
-      colCont.rank = rank;
+    PlayerPanel.ankhPowers.forEach((powerList, colNdx: 0 | 1 | 2) => {
+      const colCont = new Container() as AnkhPowerCont;
+      colCont.name = `colCont-${colNdx}`;
+      colCont.ndx = colNdx;
       colCont.guardianSlot = (colNdx < 2) ? 1 : 0;
       colCont.x = colNdx * colWide + [2 * brad + 3 * gap, 0, 0][1 - dir];
       panel.addChild(colCont);

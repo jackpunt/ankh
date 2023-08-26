@@ -17,7 +17,8 @@ class FileBase {
   /** multi-purpose picker button: (callback arg-type changes) */
   setButton(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
     options: (OpenFilePickerOptions | SaveFilePickerOptions | DirectoryPickerOptions),
-    cb: (fileHandleAry: any) => void, inText = method.substring(4, method.length - 6)) {
+    cb: (fileHandleAry: any) => void, inText = method.substring(4, method.length - 6))
+  {
     const picker = window[method]  // showSaveFilePicker showDirectoryPicker
     const fsOpenButton = document.getElementById(this.buttonId)
     fsOpenButton.innerText = inText
@@ -68,8 +69,8 @@ export class LogWriter extends FileBase implements ILogWriter {
       startIn: 'downloads', // documents, desktop, music, pictures, videos
       suggestedName: name,
       types: [{
-          description: 'Text Files',
-          accept: { 'text/plain': ['.txt'], },
+          description: 'Text/Javascript Files',
+          accept: { 'text/plain': ['.txt', '.js'], },
         }, ],
     };
     // console.log(stime(this, `.new LogWriter:`), { file: this.fileHandle })
@@ -152,7 +153,7 @@ export class LogReader extends FileBase  {
   pickFileToRead() {
     const fsOpenButton = document.getElementById(this.buttonId)
     let fileReadPromise = this.setButtonToReadFile()
-    fsOpenButton.click()
+    fsOpenButton.click();
     return fileReadPromise
   }
 
@@ -165,8 +166,8 @@ export class LogReader extends FileBase  {
     let options: OpenFilePickerOptions = {}
     let fileReadPromise = new EzPromise<File>()
     this.setButton('showOpenFilePicker', options, ([fileHandle]) => {
-        this.fileHandle = fileHandle
-        fileReadPromise.fulfill(fileHandle.getFile())
+        this.fileHandle = fileHandle as FileSystemFileHandle;
+        fileReadPromise.fulfill(fileHandle.getFile());
       })
     return fileReadPromise
   }
