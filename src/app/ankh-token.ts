@@ -1,6 +1,7 @@
 import { C, Constructor } from "@thegraid/common-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import { AnkhMeeple, AnkhSource, Monument } from "./ankh-figure";
+import type { AnkhHex } from "./ankh-map";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
 import { CenterText } from "./shapes";
@@ -61,28 +62,23 @@ export class AnkhToken extends AnkhMeeple {
     }
   }
 
-  nClaimableMonuments(player = this.player) {
+  claimableMonuments(player = this.player) {
     const hexAry = player.gamePlay.hexMap.hexAry;
-    const allMonuments = hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
-    const unClaimedMnts = allMonuments.filter(mon => !mon.player)
+    const montsOnMap = hexAry.filter(hex => hex.isOnMap && (hex.tile instanceof Monument)).map(hex => hex.tile) as Monument[];
+    const unClaimedMnts = montsOnMap.filter(mon => !mon.player)
     const numUnclaimed = unClaimedMnts.length;
 
     const isAdjacentToPlayer = (monument: Monument) => {
-      return !!monument.hex.findLinkHex(hex => hex.meep?.player === player);
+      return !!monument.hex.findAdjHexByRegion(hex => hex.meep?.player === player);
     }
-    const claimable = ((numUnclaimed === 0 ) ? allMonuments : unClaimedMnts).filter(mnt => isAdjacentToPlayer(mnt))
-    return claimable.length;
+    const claimable = ((numUnclaimed === 0 ) ? montsOnMap : unClaimedMnts).filter(mnt => isAdjacentToPlayer(mnt))
+    return claimable;
   }
 
-  override isLegalTarget(hex: Hex1, ctx?: DragContext): boolean {
+  override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
     const tile = hex.tile, player = this.player;
     if (!player.gamePlay.isPhase('Claim') && (this.hex === this.source.hex)) return false;
     if (!(tile instanceof Monument)) return false;
-    const isClaimable = hex.findLinkHex(adj => adj.meep?.player === player);
-    if (!isClaimable) return false;
-    const allMonuments = this.player.gamePlay.hexMap.hexAry.filter(hex => (hex.tile instanceof Monument)).map(hex => hex.tile);
-    const numUnclaimed = allMonuments.filter(mon => !mon.player).length;
-    const canBeClaimed = (numUnclaimed === 0) ? (tile.player !== this.player) : (!tile.player);
-    return canBeClaimed;
+    return this.claimableMonuments(player).includes(tile);
   }
 }

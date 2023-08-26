@@ -89,6 +89,8 @@ export class AnkhHex extends Hex2 {
 
   get figure(): Figure { return (this.meep instanceof Figure) ? this.meep : undefined }
 
+  declare map: AnkhMap<AnkhHex>;
+
   override toString(sc?: string): string {
     return `${this.piece ?? this.Aname}`;
   }
@@ -110,9 +112,15 @@ export class AnkhHex extends Hex2 {
     return this.linkDirs.find((dir: HexDir) => !this.borders[dir] && pred(this.links[dir], dir, this));
   }
 
-  /** select each [Border-adjacent] Hex linked to this that satisfies predicate */
-  filterAdjHex(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
-    return this.linkDirs.filter(dir => !!this.links[dir] && !this.borders[dir]).filter(dir => pred(this.links[dir], dir, this), this);
+  /** select each [in this/same region] Hex linked to this that satisfies predicate */
+  filterAdjHexByRegion(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
+    const region = this.map.regions[this.regionId - 1];
+    return this.linkDirs.filter(dir => !!this.links[dir] && region.includes(this.links[dir])).filter(dir => pred(this.links[dir], dir, this), this);
+  }
+  /** adjHexByRegion allows for Apep in adjacent water. */
+  findAdjHexByRegion(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
+    const region = this.map.regions[this.regionId - 1];
+    return this.linkDirs.filter(dir => !!this.links[dir] && region.includes(this.links[dir])).find(dir => pred(this.links[dir], dir, this), this);
   }
 
   /** returns the dir to hex if there is no border, undefined otherwise */
@@ -403,8 +411,9 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     AnkhMap.wspec.forEach(spec => this.setTerrain(spec, 'w'));
     AnkhMap.wspec.forEach(([r, c]: hexSpec) => {
       const whex = this[r][c];
-      whex.filterAdjHex(ohex => ohex && ohex.terrain !== 'w')
-        .forEach(dir => this.addBorder(whex.links[dir], H.dirRev[dir], false));
+      whex.forEachLinkHex((ohex: AnkhHex, dir) => {
+        if (ohex.terrain !== 'w') this.addBorder(ohex, H.dirRev[dir], false)
+      });
     });
   }
 

@@ -378,6 +378,7 @@ export class Figure extends AnkhMeeple {
     return !hex.piece;
   }
   isAnubisSummon() {
+    // Can Summon from Anumbis special hexes if player can pay the ransom:
     const anubis = God.byName.get('Anubis'), anubisHexes = anubis?.doSpecial() as AnkhHex[];
     return (!!anubisHexes?.includes(this.hex) && this.player.coins > 0);
   }
@@ -417,8 +418,8 @@ export class Figure extends AnkhMeeple {
   get isFromStable() { return false; }
 
   isLegalSummon(hex: AnkhHex, ctx?: DragContext) {
-    // can Summon -on- Portal, but it does not confer Monument adjacency
-    return hex.findAdjHex(adj =>
+    // must be adjacent to Monument or Figure owned by Player:
+    return hex.findAdjHexByRegion(adj =>
       !hex.occupied && (adj.tile instanceof Monument) ? (adj.tile.player === this.player) : (adj.figure?.player === this.player));
   }
 
@@ -703,7 +704,7 @@ export class Mummy extends Guardian2 {
   override sendHome(): void {
     const god = this.player?.god, godFig = god?.figure;
     const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
-    const dir = godFig?.hex.findAdjHex(hex => isLegal(hex));
+    const dir = godFig?.hex.findAdjHex(hex => isLegal(hex)); // not water
     if (dir) {
       const toHex = godFig.hex.links[dir];
       this.moveTo(toHex);

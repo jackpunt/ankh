@@ -299,7 +299,7 @@ export class GameState {
       start: () => {
         const done = () => this.phase('EventDone');
         const ankhToken = this.panel.ankhSource.sourceHexUnit; //takeUnit();
-        if (ankhToken?.nClaimableMonuments(this.panel.player) > 0) {
+        if (ankhToken?.claimableMonuments(this.panel.player).length > 0) {
           this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
           this.table.dragger.dragTarget(ankhToken, { x: 8, y: 8 });
           this.doneButton('Claim done');
@@ -703,7 +703,7 @@ export class GameState {
   // if (winner === undefined): all non-GodFigure are at risk.
   deadFigs(cause: string, winner: God | undefined, rid: RegionId, isBattle = true) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
-    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHex(hex => hex.figure && (hex.meep?.player.godName !== 'Isis'));
+    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHexByRegion(hex => hex.figure && (hex.meep?.player.godName !== 'Isis'));
     const region = this.gamePlay.hexMap.regions[rid - 1];
     const figsInRegion = region.filter(hex => hex?.figure).map(hex => hex.figure);
     const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !(fig.controller === winner));
@@ -730,7 +730,7 @@ export class GameState {
     // Osiris Portal begins offMap.
     const montsOnMap = this.gamePlay.allTiles.filter(tile => (tile.hex?.isOnMap) && (tile instanceof Monument));
     const monts =  montsOnMap.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
-    const adjPlayer = monts.filter(mont => mont.hex.findAdjHex(hex => hex.figure?.player === player));
+    const adjPlayer = monts.filter(mont => mont.hex.findAdjHexByRegion(hex => hex.figure?.player === player));
     const n = adjPlayer.length + (player.god.ankhPowers.includes('Revered') ? 1 : 0);
     return n
   }

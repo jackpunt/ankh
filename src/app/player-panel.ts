@@ -107,7 +107,7 @@ export class PlayerPanel extends Container {
   /** strength from Figures in Region controlled by this.god */
   figStrengthOfGod(regionNdx: number, god = this.god) {
     const figs = this.figsInRegion(regionNdx + 1 as RegionId).filter(fig => fig.controller === god);
-    // remove strength of Figures adjacent to Androsphinx:
+    // remove strength of Figures with an adjacent Androsphinx of other player:
     const figs2 = figs.filter(fig => !fig.hex.findAdjHex(hex => hex?.meep instanceof Androsphinx && hex.meep.controller !== god))
     return figs2.length;
   }
@@ -153,7 +153,7 @@ export class PlayerPanel extends Container {
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
-      const activeTemples = temples.filter(tmpl => tmpl.filterAdjHex(hex => hex.meep?.player == this.player));
+      const activeTemples = temples.filter(tmpl => tmpl.filterAdjHexByRegion(hex => hex.meep?.player == this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
