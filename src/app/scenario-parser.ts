@@ -9,7 +9,7 @@ import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
 import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
-import { AnkhMarker } from "./god";
+import { AnkhMarker, God } from "./god";
 import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
@@ -40,7 +40,7 @@ export type SplitElt = (SplitBid | SplitDir)
 export type SplitSpec = SplitElt[];
 
 type SetupElt = {
-  Aname?: string,        // {orig-scene}#{turn}
+  Aname?: string,        // {orig-scene}@{turn}
   ngods: number,         // == nPlayers (used to select, verify scenario)
   places: PlaceElt[],    // must have some GodFigure on the board!
   splits?: SplitSpec[],  // added camel train borders
@@ -52,11 +52,12 @@ type SetupElt = {
   coins?: number[],      // 1
   scores?: number[],     // 0
   events?: EventElt,
+  actions?: ActionElt,
+  godState?: {},         // objects from God.saveState(), [index: god.name]
+  ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   guards?: GuardIdent,   // Guardian types in use. default to random
   stable?: GuardIdent[], // Guardians in player's stable.
-  actions?: ActionElt,
-  ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
-  turn?: number;   // default to 0; (or 1...)
+  turn?: number;         // default to 0; (or 1...)
 }
 export type StartElt = { start: { time: string, scene: string, turn: number, ngods: 2 | 3 | 4 | 5, gods: string[], guards: GuardIdent } };
 export type LogElts = [ StartElt, ...SetupElt[]];
@@ -159,7 +160,7 @@ export class ScenarioParser {
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, cards, events, actions, stable, ankhs, places } = setup;
+    const { regions, splits, coins, scores, turn, guards, cards, godState, events, actions, stable, ankhs, places } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -176,15 +177,15 @@ export class ScenarioParser {
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     }
-    const states = cardStates, colorForState = PlayerPanel.colorForState;
-    if (cards !== undefined) {
-      table.panelForPlayer.forEach((panel, pi) => {
-        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.colorn = colorForState[states[cards[pi][ndx]]] );
-      })
-    } else {
-      table.panelForPlayer.forEach(panel => {
-        panel.cardSelector.powerLines.forEach((pl, ndx) => pl.button.colorn = colorForState[states[0]] );
-      })
+    const cardstates = cardStates, colorForState = PlayerPanel.colorForState;
+    table.panelForPlayer.forEach((panel, pi) => {
+      panel.cardSelector.powerLines.forEach((pl, ndx) =>
+        pl.button.paint(colorForState[cardstates[cards?.[pi]?.[ndx] ?? 0]]));
+    })
+    if (godState) {
+      Object.keys(godState).forEach((godName: string) => {
+        God.byName.get(godName).parseState(godState[godName]);
+      });
     }
     if (events !== undefined) {
       table.eventCells.forEach((evc, ndx) => table.removeEventMarker(ndx))
@@ -303,6 +304,11 @@ export class ScenarioParser {
     const cards = table.panelForPlayer.map(panel =>
       panel.cardSelector.powerLines.map(pl => indexForColor[pl.button.colorn])
     );
+    const godStates = {}
+    gamePlay.allPlayers.forEach(player => {
+      const godState = player.god.saveState();
+      if (godState !== undefined) godStates[player.god.name] = godState;
+    });
     const stable = table.panelForPlayer.map(panel => {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
@@ -315,7 +321,7 @@ export class ScenarioParser {
       return [row, col, cons, pid, ...elt4] as PlaceElt;
     })
 
-    return { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, cards, stable, ankhs, places } as SetupElt;
+    return { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, cards, godStates, stable, ankhs, places } as SetupElt;
   }
 
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {

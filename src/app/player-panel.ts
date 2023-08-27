@@ -571,7 +571,7 @@ export class PlayerPanel extends Container {
       circle.x = x0 + dir * radi;
       x0 += dir * (2 * radi + sgap);
       stableCont.addChild(circle);
-      const hexC = i==0 ? AnkhHex : StableHex;
+      const hexC = (i == 0) ? AnkhHex : StableHex;
       const hex = table.newHex2(0, 0, `s:${index}-${i}`, hexC) as StableHex;
       hex.size = radi;
       circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
@@ -699,6 +699,7 @@ export class PlayerPanel extends Container {
 
   revealCards(vis = true): void {
     const inBattle = this.cardsInBattle.map(pl => pl.name);
+    this.player.gamePlay.table.logText(`${this.god.name}: ${inBattle}`);
     if (vis) console.log(stime(this, `.showCards: ${this.god.Aname}`), ... inBattle);
     this.showCardSelector(vis);
     this.stage.update();

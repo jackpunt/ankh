@@ -24,7 +24,6 @@ interface Phase {
   panels?: PlayerPanel[],
   players?: Player[],
   deadFigs?: Figure[], // for Plague
-  horusState?: string[], // save state of Horus's cards
 }
 
 export class GameState {
@@ -400,7 +399,6 @@ export class GameState {
       }
     },
     HorusCard: {
-      horusState: [],
       start: () => {
         const horus = God.byName.get('Horus');
         const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
@@ -413,6 +411,7 @@ export class GameState {
         const panel = horus.player.panel;
         const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
         this.bannedCard = cardSelector.cardsInState('inBattle')[0].name;
+        this.table.logText(`Horus banned card: ${this.bannedCard}`);
         this.phase('ChooseCard');
       }
     },
@@ -434,7 +433,6 @@ export class GameState {
         if (panels.length > 0) return; // wait for more panels to signal done
         this.phase('Reveal');
       }
-      // if (Horus) mark excluded card (GREEN to GREY)
       // if Amun-power unused: allow click second card (set Amun-Power used)
       // click Done: phase phase Toth ?? Reveal
     },
@@ -710,19 +708,23 @@ export class GameState {
     const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisProtected(fig)) : deadFigs0;
     const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
     this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
+    this.filterAnubisTrap(deadFigs).forEach(fig => fig.sendHome()); // they all died; some are not sentHome.
+    return deadFigs;
+  }
+
+  filterAnubisTrap(deadFigs: Figure[]) {
     const anubis = God.byName.get('Anubis');
-    const anubisFigs = [], deadFigs2 = deadFigs.concat();
-    deadFigs2.forEach(fig => {
+    const trappedFigs = [];
+    return deadFigs.filter(fig => {
       const slot = anubis?.doSpecial('empty') as AnkhHex;
-      if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !anubisFigs.find(af => af.player === fig.player)) {
-        this.table.logText(`Anubis traps ${fig} of ${fig.player.godName}`);
-        anubisFigs.push(fig);              // prevent 2nd figure from same player.
+      if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !trappedFigs.find(af => af.player === fig.player)) {
+        trappedFigs.push(fig);              // prevent 2nd Figure from same player.
         fig.moveTo(slot);
+        return false;
       } else {
-        fig.sendHome();
+        return true;
       }
     });
-    return deadFigs;
   }
 
 
@@ -745,7 +747,8 @@ export class GameState {
   addFollowers(player: Player, n: number, reason?: string) {
     player.coins += n;
     const verb = (n >= 0) ? 'gains' : 'sacrifices';
-    this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} Followers: ${reason}`);
+    const noun = (n == 1) ? 'Follower' : 'Followers';
+    this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} ${noun}: ${reason}`);
     if (n < 0 && player.godName === 'Hathor') {
       player.panel.highlightStable(true);
     }

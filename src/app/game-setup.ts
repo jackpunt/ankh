@@ -4,7 +4,7 @@ import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
-import { selectN } from "./functions";
+import { selectN, uniq } from "./functions";
 // import { parse as JSON5_parse } from 'json5';
 import json5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";
@@ -91,11 +91,16 @@ export class GameSetup {
     this.fileReadPromise = logReader.setButtonToReadFile();
     const fileHandle = await this.fileReadPromise;
     const fileText = await logReader.readFile(fileHandle);
-    const [fname, turnstr] = document.getElementById('readFileName').getAttribute('value').split('@');
+    const fullName = (fileHandle as any as FileSystemFileHandle).name;
+    const [fileName, ext] = fullName.split('.');
+    const readFileNameElt = document.getElementById('readFileName') as HTMLInputElement;
+    const readFileName = readFileNameElt.value;
+    const [fname, turnstr] = readFileName.split('@');
     const turn = Number.parseInt(turnstr);
     const logArray = json5.parse(fileText) as LogElts;
     const [startelt, ...stateArray] = logArray;
     const state = stateArray.find(state => state.turn === turn);
+    state.Aname = `${fileName}@${turn}`;
     this. setupToReadFileState();   // another thread to wait for next click
     this.restart(state);
   }
@@ -114,7 +119,8 @@ export class GameSetup {
   async startup(qParams: Params = []) {
     //ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom'
     this.godNames = qParams['gods']?.split(',') ?? this.godNames;
-    this.ngods = Number.parseInt(qParams?.['n'] ?? '2') ?? this.ngods;
+    this.ngods = Number.parseInt(qParams?.['n'] ?? uniq(this.godNames)?.length ?? '2') ?? this.ngods;
+    this.ngods = Math.min(5, this.ngods);
     this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
     this.guards = qParams['guards']?.split(',') ?? this.guards;
 
@@ -138,11 +144,6 @@ export class GameSetup {
     this.godNames = scenario.godNames ?? this.godNames;
     const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
 
-    const uniq = <T>(ary: T[]) => {
-      const rv: T[] = [];
-      ary.forEach(elt => rv.includes(elt) || rv.push(elt))
-      return rv;
-    }
     const fillGodNames = (ngods: number, godNames: string[]) => {
       const uniqGods = uniq(godNames);
       const nToFind = (ngods - godNames.length);
@@ -170,6 +171,7 @@ export class GameSetup {
 
     // Inject GamePlay to Table; all the GUI components, makeAllDistricts(), addTerrain, initialRegions
     table.layoutTable(gamePlay);     // mutual injection & make all panelForPlayer
+    gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
 
     this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer or parseScenario
     // Place Pieces and Figures on map:
@@ -177,7 +179,6 @@ export class GameSetup {
     this.gamePlay.logWriterLine0();
 
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
-    gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
     // if (this.stage.canvas) {
     //   console.groupCollapsed('initParamGUI')
     //   // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2

@@ -56,3 +56,9 @@ export function afterUpdate(cont: DisplayObject, after: () => void) {
   cont.stage.on('drawend', after, this, true);
   cont.stage.update();
 }
+
+export function uniq<T>(ary: T[]) {
+  const rv: T[] = [];
+  ary.forEach(elt => rv.includes(elt) || rv.push(elt));
+  return rv;
+}

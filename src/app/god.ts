@@ -2,7 +2,7 @@ import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
-import { AnkhSource, GodFigure, Portal, RadianceMarker } from "./ankh-figure";
+import { AnkhMeeple, AnkhSource, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
@@ -72,12 +72,29 @@ export class God {
   get nCardsAllowedInBattle() { return 1; }
   set nCardsAllowedInBattle(n: number) { }
   figure: GodFigure;
+
+  /** return 'any' (typically [...] or {...}); if (!undefined) it will be JSON'd into SetupElt['special'][godName] = saveState() */
+  saveState(): any { return undefined; }
+  /** restore state as materialized by saveState() */
+  parseState(state: any) {}
 }
 
+class AnubisHex extends SpecialHex {
+  anubis = God.byName.get('Anubis');
+  override get meep(): AnkhMeeple {
+    return super.meep;
+  }
+  override set meep(fig: AnkhMeeple) {
+    if (fig !== undefined) {
+      this.anubis.player.gamePlay.table.logText(`Anubis traps ${fig} of ${fig.player.godName}`);
+    }
+    super.meep = fig;
+  }
+}
 
 class Anubis extends God {
   constructor() { super('Anubis', 'green') }
-  anubisHexes: SpecialHex[] = [];
+  anubisHexes: AnubisHex[] = [];
 
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel);
@@ -91,7 +108,7 @@ class Anubis extends God {
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont2.addChild(circle);
-      const hex = table.newHex2(0, 0, `amun-${i}`, SpecialHex) as SpecialHex;
+      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex) as AnubisHex;
       this.anubisHexes.push(hex);
       hex.cont.visible = false;
       cont2.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
@@ -108,6 +125,22 @@ class Anubis extends God {
       }
     }
     return this.anubisHexes;
+  }
+  /** identify 1--3 Warriors from other Players */
+  override saveState() {
+    // ASSERT: player order will not change.
+    const trapped = this.anubisHexes.map(hex => hex.figure?.player.index)
+      .filter(pid => pid !== undefined);
+    return { trapped };
+  }
+  override parseState(state: { trapped: number[] }): void {
+    const trapped = state.trapped;
+    trapped.forEach((pid, ndx) => {
+      const player = this.player.gamePlay.allPlayers[pid];
+      const source = Warrior.source[player.index]
+      const warrior = source.takeUnit();
+      warrior.moveTo(this.anubisHexes[ndx]);
+    });
   }
 }
 

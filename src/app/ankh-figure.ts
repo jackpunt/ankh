@@ -489,7 +489,7 @@ export class GodFigure extends Figure {
 }
 
 export class Warrior extends Figure {
-  private static source: AnkhSource<Warrior>[][] = [[]];  // makeSource sets
+  static source: AnkhSource<Warrior>[] = [];  // makeSource sets
 
   /**
    * invoke Warrior.makeSource(player, hex, n) to create all the Warriors for Player.
@@ -583,20 +583,20 @@ export class Guardian extends Figure {
   }
 
   override resetTile(): void {
-    if (this.homeHex) {
-      ;(this.homeHex as StableHex).usedBy = undefined;
+    if (this.stableHex) {
+      this.stableHex.usedBy = undefined;
       this.homeHex = undefined;
     }
     super.resetTile()
   }
 
-  get stableHex() { return this.homeHex; } // player.stableHexes.find(hex => hex.usedBy === this)
+  get stableHex() { return this.homeHex as StableHex; } // player.stableHexes.find(hex => hex.usedBy === this)
 
   override sendHome(): void {   // Guardian -> Stable OR Source
     const player = this.player;
-    if (!player) {
+    if (!player) { // same as !this.stableHex
       this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
-      super.sendHome();          // homeHex == source.hex
+      super.sendHome();          // resetTile(); source.availUnit();
       return;
     }
     this.moveTo(this.stableHex); // maybe just set homeHex === stableHex?
