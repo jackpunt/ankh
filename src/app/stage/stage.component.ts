@@ -57,20 +57,21 @@ export class StageComponent implements OnInit {
     TP.ghost = urlParams.get('host') || TP.ghost
     TP.gport = Number.parseInt(urlParams.get('port') || TP.gport.toString(10), 10)
     TP.networkUrl = buildURL(undefined);
-    const {n, gods, scene} = this.qParams;
-    this.titleService.setTitle(`Ankh ${scene?` scene=${scene}`:''}${n?` n=${n}`:''}${gods?` gods=${gods}`:''}`)
+    const {n, gods, scene, file} = this.qParams;
+    document.getElementById('readFileName').setAttribute('value', file ?? '');
+    this.titleService.setTitle(`Ankh ${scene?` scene=${scene}`:''}${n?` n=${n}`:''}${gods?` gods=${gods}`:''}${file?`file=${file}`:''}`)
     new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
   }
   // see: stream-writer.setButton
-  static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
-    options: OpenFilePickerOptions & { multiple?: false; } & SaveFilePickerOptions & DirectoryPickerOptions,
-    cb: (fileHandleAry: any) => void) {
-    const picker = window[method]       // showSaveFilePicker showDirectoryPicker
-    const fsOpenButton = document.getElementById("fsOpenFileButton")
-    fsOpenButton.onclick = async () => {
-      picker(options).then((value: any) => cb(value), (rej: any) => {
-        console.warn(`showOpenFilePicker failed: `, rej)
-      });
-    }
-  }
+  // static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
+  //   options: OpenFilePickerOptions & { multiple?: boolean } & SaveFilePickerOptions & DirectoryPickerOptions,
+  //   cb: (fileHandleAry: any) => void) {
+  //   const picker = window[method]       // showSaveFilePicker showDirectoryPicker
+  //   const fsOpenButton = document.getElementById("fsOpenFileButton")
+  //   fsOpenButton.onclick = async () => {
+  //     picker(options).then((value: any) => cb(value), (rej: any) => {
+  //       console.warn(`showOpenFilePicker failed: `, rej)
+  //     });
+  //   }
+  // }
 }

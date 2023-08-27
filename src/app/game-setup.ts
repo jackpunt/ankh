@@ -5,12 +5,14 @@ import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
 import { selectN } from "./functions";
+// import { parse as JSON5_parse } from 'json5';
+import json5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { GuardIdent, Scenario, ScenarioParser } from "./scenario-parser";
-import { LogWriter } from "./stream-writer";
+import { GuardIdent, LogElts, Scenario, ScenarioParser } from "./scenario-parser";
+import { LogReader, LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
@@ -36,6 +38,7 @@ export class GameSetup {
     stime.fmt = "MM-DD kk:mm:ss.SSSL"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
+    this.setupToReadFileState();              // restart when/if button is clicked
     Tile.loader.loadImages(() => this.startup(qParams));
   }
   _netState = " " // or "yes" or "ref"
@@ -82,20 +85,19 @@ export class GameSetup {
   godNames: string[] = [];
   guards: GuardIdent = [undefined, undefined, undefined];
 
-  fileName: string;
-  fileTurn: number;
-  setScenarioFile(scene: string): Scenario {
-    if (!scene.includes('@')) return undefined;
-    const [fname, turnstr] = scene.split('@'), turn = Number.parseInt(turnstr);
-    this.fileName = fname;
-    this.fileTurn = turn;
-    return undefined;
-  }
-  async scenarioFromFile(scene: string) {
-    const [start, ...scenes] = await ScenarioParser.injestFile(`log/${this.fileName}.js`);
-    const scenario = scenes.find(elt => elt.turn === this.fileTurn);
-    console.log(stime(this, `.scenarioFromFile: ${scene} ngods=${this.ngods} scenario=`), scenario);
-    return scenario;
+  fileReadPromise: Promise<File>;
+  async setupToReadFileState() {
+    const logReader = new LogReader(`log/date_time.js`, 'fsReadFileButton');
+    this.fileReadPromise = logReader.setButtonToReadFile();
+    const fileHandle = await this.fileReadPromise;
+    const fileText = await logReader.readFile(fileHandle);
+    const [fname, turnstr] = document.getElementById('readFileName').getAttribute('value').split('@');
+    const turn = Number.parseInt(turnstr);
+    const logArray = json5.parse(fileText) as LogElts;
+    const [startelt, ...stateArray] = logArray;
+    const state = stateArray.find(state => state.turn === turn);
+    this. setupToReadFileState();   // another thread to wait for next click
+    this.restart(state);
   }
 
   scenarioFromSource(scene: string) {
@@ -116,7 +118,6 @@ export class GameSetup {
     this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
     this.guards = qParams['guards']?.split(',') ?? this.guards;
 
-    this.setScenarioFile(this.scene);
     const scenario = this.scenarioFromSource(this.scene);
     scenario.Aname = scenario?.Aname ?? this.scene;
     console.log(stime(this, `.startup: ${this.scene} ngods=${this.ngods} scenario=`), scenario);

@@ -146,10 +146,10 @@ export class LogWriter extends FileBase implements ILogWriter {
 }
 
 export class LogReader extends FileBase  {
-  constructor(name = 'logFile', buttonId = "fsOpenFileButton") {
+  constructor(name = 'logFile', buttonId = "fsReadFileButton") {
     super(name, buttonId)
-
   }
+
   pickFileToRead() {
     const fsOpenButton = document.getElementById(this.buttonId)
     let fileReadPromise = this.setButtonToReadFile()
@@ -167,8 +167,8 @@ export class LogReader extends FileBase  {
     let fileReadPromise = new EzPromise<File>()
     this.setButton('showOpenFilePicker', options, ([fileHandle]) => {
         this.fileHandle = fileHandle as FileSystemFileHandle;
-        fileReadPromise.fulfill(fileHandle.getFile());
-      })
+        fileReadPromise.fulfill(this.fileHandle.getFile());
+      }, 'LoadFile');
     return fileReadPromise
   }
 

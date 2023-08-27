@@ -304,7 +304,8 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('l', { thisArg: this.logWriter, func: this.logWriter.pickLogFile })
     KeyBinder.keyBinder.setKey('L', { thisArg: this.logWriter, func: this.logWriter.showBacklog })
     KeyBinder.keyBinder.setKey('M-l', { thisArg: this.logWriter, func: () => { this.logWriter.closeFile() } }) // void vs Promise<void>
-    KeyBinder.keyBinder.setKey('C-l', () => this.fileState()) // void vs Promise<void>
+    KeyBinder.keyBinder.setKey('C-l', () => this.readFileState()) // void vs Promise<void>
+    KeyBinder.keyBinder.setKey('r', () => this.readFileState());
 
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
     KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
@@ -316,7 +317,6 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
-    KeyBinder.keyBinder.setKey('r', () => this.fileState());
     KeyBinder.keyBinder.setKey('C', () => {
       const up = (cardSelectorsUp = !cardSelectorsUp);
       this.allPlayers.forEach(player => {
@@ -356,14 +356,23 @@ export class GamePlay extends GamePlay0 {
   override newTurn(): void {
     this.saveState();
   }
-  async fileState() {
-    const [startelt, ...stateArray] = await ScenarioParser.injestFile(this.gameSetup.scene);
-    const state = stateArray.find(state => state.turn === this.gameSetup.fileTurn);
-    this.backStates.length = this.nstate = 0;
-    this.backStates.unshift(state);
-    console.log(stime(this, `.fileState: logArray =\n`), stateArray);
-    this.gameSetup.restart(state);
+
+  readFileState() {
+    document.getElementById('fsReadFileButton').click();
   }
+
+  // async fileState() {
+  //   // Sadly, there is no way to suggest the filename for read?
+  //   // I suppose we could do a openToWrite {suggestedName: ...} and accept the 'already exists'
+  //   // seek to end, ...but not clear we could ever READ from the file handle.
+  //   const turn = this.gameSetup.fileTurn;
+  //   const [startelt, ...stateArray] = await this.gameSetup.injestFile(`log/${this.gameSetup.fileName}.js`, turn);
+  //   const state = stateArray.find(state => state.turn === turn);
+  //   this.backStates.length = this.nstate = 0;
+  //   this.backStates.unshift(state);
+  //   console.log(stime(this, `.fileState: logArray =\n`), stateArray);
+  //   this.gameSetup.restart(state);
+  // }
 
   backStates = [];
   /** setNextPlayer->startTurn (or Key['p']) */

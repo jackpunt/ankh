@@ -3,7 +3,6 @@
 
 import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
-import { parse as JSON5_parse } from 'json5';
 import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, RadianceMarker, Scorpion } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
@@ -15,7 +14,6 @@ import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { PlayerPanel, cardStates } from "./player-panel";
-import { LogReader } from "./stream-writer";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
 
@@ -70,13 +68,6 @@ export class ScenarioParser {
   constructor(public map: AnkhMap<AnkhHex>, public gamePlay: GamePlay) {
 
   }
-  static async injestFile(fname = 'log/log.js') {
-    const logReader = new LogReader(fname, 'fsReadFileButton');
-    const fileText = await logReader.readPickedFile();
-    const logArray = JSON5_parse(fileText) as LogElts;
-    return logArray;
-  }
-
   parseRegions(regionElt: RegionElt[]) {
     const ankhMap = this.map;
     // regions have been split; river splits and given splits
