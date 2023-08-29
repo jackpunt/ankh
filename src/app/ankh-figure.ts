@@ -347,7 +347,7 @@ export class Figure extends AnkhMeeple {
     const ownedBySet = !!setGod
       && this.player.gamePlay.isConflictState
       && !(this instanceof GodFigure)
-      && !!this.hex.findLinkHex(hex => hex?.meep === setGod.figure);
+      && !!this.hex.findAdjHex(hex => hex?.figure === setGod.figure);
     this._lastController = (ownedBySet ? setGod : this.player.god);
     return this.lastController;
   }
@@ -355,13 +355,16 @@ export class Figure extends AnkhMeeple {
   get lastController() { return this._lastController ?? this.player.god; } // for Set
 
   raMarker: RadianceMarker;  // for Ra
-
-  override resetTile(): void {
+  removeRa() {
     if (this.raMarker) {
       this.raMarker.sendHome();
       this.raMarker = undefined;
       this.updateCache();
     }
+  }
+
+  override resetTile(): void {
+    this.removeRa();
     super.resetTile();
   }
 

@@ -153,7 +153,7 @@ export class PlayerPanel extends Container {
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
-      const activeTemples = temples.filter(tmpl => tmpl.filterAdjHexByRegion(hex => hex.meep?.player == this.player));
+      const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.meep?.player == this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
@@ -299,7 +299,8 @@ export class PlayerPanel extends Container {
   }
 
   areYouSure(msg: string, yes: () => void, cancel?: () => void, afterUpdate: () => void = () => {}) {
-    const { panel, table } = this.objects;
+    const { panel, table } = this.objects, doneVis = table.doneButton.visible;
+    table.doneButton.mouseEnabled = table.doneButton.visible = false;
     const conf = this.confirmContainer;
     const button1 = conf.buttonYes;
     const button2 = conf.buttonCan;
@@ -309,7 +310,7 @@ export class PlayerPanel extends Container {
       conf.visible = false;
       button1.removeAllEventListeners();
       button2.removeAllEventListeners();
-      table.doneButton.mouseEnabled = table.doneButton.visible = true;
+      table.doneButton.mouseEnabled = table.doneButton.visible = doneVis;
       button1.updateWait(false, func);
     }
     button2.visible = !!cancel;
@@ -318,10 +319,9 @@ export class PlayerPanel extends Container {
 
     button1.on(S.click, () => clear(yes), this, true);
     button2.on(S.click, () => clear(cancel ?? yes), this, true);
-    console.log(stime(this, `.areYouSure?, ${msg}`));
+    console.log(stime(this, `.areYouSure? [${this.player.godName}], ${msg}`));
     panel.localToLocal(0, 0, table.overlayCont, conf);
     conf.visible = true;
-    table.doneButton.mouseEnabled = table.doneButton.visible = false;
     button1.updateWait(false, afterUpdate);
     // setTimeout(cancel, 500);
   }
@@ -418,11 +418,10 @@ export class PlayerPanel extends Container {
   activateAnkhPowerSelector(colCont?: AnkhPowerCont , activate = true){
     // identify Rank --> colCont
     // in that colCont, mouseEnable Buttons (ie Containers) that do not have AnkhToken child.
-    const findAnhkToken = (c: Container) => c.children.find(ic => ic instanceof AnkhToken);
-    if (!colCont) colCont = this.powerCols.find(findAnhkToken); // first col with AnkhToken; see also ankhArrays.
-    // colCont has: 2 x (MarkerToken, AnkhToken), 4 x PowerLine
-    const powerLines = colCont.children.filter((ch: PowerLine) => (ch instanceof Container) && !(ch instanceof AnkhToken)) as PowerLine[];
-    powerLines.forEach(pl => {
+    const rank = this.nextAnkhRank
+    if (rank > 3) { this.player.gamePlay.gameState.done(); return };
+    if (!colCont) colCont = colCont ?? this.powerCols[rank - 1];
+    colCont?.powerLines?.forEach(pl => {
       const active = (activate && !pl.ankhToken)
       pl.button.paint(active ? 'lightgrey' : C.WHITE);
       pl.button.mouseEnabled = pl.qmark.visible = active; // enable and show qmark:
@@ -430,7 +429,7 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  get nextAnkhRank() { return [1, 1, 2, 2, 3, 3, 3][Math.max(0, 6 - this.ankhPowerTokens.length)] as 1 | 2 | 3 }  // 6,5: 1, 4,3: 2, 0,1: 3
+  get nextAnkhRank() { return [1, 1, 2, 2, 3, 3, 4][Math.max(0, 6 - this.ankhPowerTokens.length)] as 1 | 2 | 3 | 4 }  // 6,5: 1, 4,3: 2, 0,1: 3
   readonly powerCols: AnkhPowerCont[] = [];
   readonly ankhPowerTokens: AnkhToken[] = [];
   makeAnkhPowerGUI() {
@@ -517,7 +516,9 @@ export class PlayerPanel extends Container {
           const pt = text.parent.localToLocal(text.x, text.y, doctext.parent, doctext);
           doctext.x -= dir * (60 + doctext.label.getMeasuredWidth() / 2);
           if (!vis) {
-            panel.table.overlayCont.children.forEach(doctext => doctext.visible = false)
+            panel.table.overlayCont.children.forEach(child => {
+              if (child.name === 'doctext') child.visible = false;
+            });
           } else {
             doctext.visible = true;
           }
@@ -586,16 +587,16 @@ export class PlayerPanel extends Container {
     const { dir, wide, gap, swidth } = this.metrics;
     const { panel, god, table } = this.objects;
     const specl = new Container(); specl.name = `special:${god.name}`
-    specl.y = sy;
+    specl.y = sy - gap;
     specl.x = [gap, wide - (swidth + gap)][(1 + dir) / 2];
     panel.addChild(specl);
-    god.makeSpecial(specl, { width: swidth, height: shigh }, table, this);
+    god.makeSpecial(specl, { width: swidth, height: shigh + 2 * gap }, table, this);
   }
 
   static readonly cardSpecs: CardSpec[] = [
     ['Flood', 'Flood', '+1 Follower for each Figure in fertile space; they cannot be killed in Battle.', 0],
     ['Build', 'Build Monument', 'Build a monument for 3 Followers', 0],
-    ['Plague', 'Plague of Locusts', 'Kill units unless highest bid', 1],
+    ['Plague', 'Plague of Locusts', 'Kill all Figures except of highest bidder', 1],
     ['Chariots','Chariots', '+3 strength in battle resolution', 3],
     ['Miracle', 'Miracle', '+1 devotion for each Figure killed', 0],
     ['Drought','Drought', '+1 devotion per Figure in desert, if you win', 1],
@@ -699,8 +700,7 @@ export class PlayerPanel extends Container {
 
   revealCards(vis = true): void {
     const inBattle = this.cardsInBattle.map(pl => pl.name);
-    this.player.gamePlay.table.logText(`${this.god.name}: ${inBattle}`);
-    if (vis) console.log(stime(this, `.showCards: ${this.god.Aname}`), ... inBattle);
+    if (vis) this.player.gamePlay.table.logText(`${this.god.name}: ${inBattle}`);
     this.showCardSelector(vis);
     this.stage.update();
   }

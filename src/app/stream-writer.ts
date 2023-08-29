@@ -54,7 +54,6 @@ export class LogWriter extends FileBase implements ILogWriter {
   }
 
   /**
-   *
    * @param name suggested name for write file
    * @param atEnd insert at end-of-file; but remove before writeLine. [\n]
    * @param buttonId DOM id of button to click to bring up FilePicker
@@ -75,12 +74,14 @@ export class LogWriter extends FileBase implements ILogWriter {
     };
     // console.log(stime(this, `.new LogWriter:`), { file: this.fileHandle })
     // Note return type changes: [FileHandle], [DirHandle], FileHandle
-    this.setButton('showSaveFilePicker', options, (value: FileSystemFileHandle) => {
-      this.fileHandle = value;
-      console.log(stime(this, `${this.ident('FilePicker')}.picked:`), value)
-      this.openWriteStream(value);
+    this.setButton('showSaveFilePicker', options, (fileHandle: FileSystemFileHandle) => {
+      this.fileHandle = fileHandle;
+      this.fileName = fileHandle.name;
+      console.log(stime(this, `${this.ident('FilePicker')}.picked:`), fileHandle)
+      this.openWriteStream(fileHandle);
     }, 'SaveLog')
   }
+  fileName: string;
 
   backlog: string = ''
   writeLine(text = '') {

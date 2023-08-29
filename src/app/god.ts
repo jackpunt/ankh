@@ -60,11 +60,11 @@ export class God {
 
   makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     const fillc = 'rgb(140,140,140)';
-    const rad = TP.ankhRad, y = wh.height/2 + rad/2;
+    const rad = TP.ankhRad + 4, y = wh.height / 2 + rad / 2;
     const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
     cont.addChild(bg);
-    const tname = new CenterText(this.Aname, rad, this.color );
-    tname.x = wh.width / 2; tname.textBaseline = 'top';
+    const tname = new CenterText(this.Aname, rad, 'white' );
+    tname.x = wh.width / 2; tname.y += 2; tname.textBaseline = 'top';
     cont.addChild(tname);
   }
   doSpecial(...args: any[]): any { return; }
@@ -305,6 +305,14 @@ class Ra extends God {
 
 class SetGod extends God {
   constructor() { super('Set', '#F1C40F') } // ~ C.coinGold
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
+    super.makeSpecial(cont, wh, table, panel);
+    const rad = TP.ankhRad, x = wh.width/2, y = wh.height/2 - 6;// measuredHeight/2...
+    const text = new CenterText(`Set controls adjacent\nWarriors & Guardians\nduring Conflict`, rad, 'white');
+    text.x += x;
+    text.y += y;
+    cont.addChild(text);
+  }
 }
 
 class Toth extends God {

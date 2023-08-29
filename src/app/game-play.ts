@@ -178,7 +178,6 @@ export class GamePlay0 {
     this.preGame = false;
     this.curPlayerNdx = index;
     this.curPlayer = this.allPlayers[index];
-    this.logText(`turnNumber=${turnNumber} ${this.curPlayer.godName}`, `GamePlayer.setNextPlayer`)
     this.curPlayer.newTurn();
   }
 
@@ -222,8 +221,10 @@ export class GamePlay0 {
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.fromHex;
-    const verb = this.gamePhase.Aname, god = this.curPlayer.godName;
-    if (toHex !== fromHex) this.logText(`${god} ${verb}s ${tile} -> ${toHex}`, `gamePlay.placeEither`)
+    const player = tile.player ?? this.gameState.state.panels[0].player; // for Build, tile.player is undefined;
+    const godName = player.godName;
+    const verb = this.gamePhase.Aname;
+    if (toHex !== fromHex) this.logText(`${godName} ${verb}s ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     // if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {
@@ -550,6 +551,8 @@ export class GamePlay extends GamePlay0 {
   override setNextPlayer(turnNumber?: number) {
     this.curPlayer.panel.showPlayer(false);
     super.setNextPlayer(turnNumber); // update player.coins
+    const [logName, ext] = this.gameSetup.logWriter.fileName?.split('.') ?? ['unsaved',''];
+    this.logText(`turnNumber=${logName}@${this.turnNumber} ${this.curPlayer.godName}`, `GamePlay.setNextPlayer`)
     this.curPlayer.panel.showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...

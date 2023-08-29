@@ -87,7 +87,7 @@ export class GameState {
    */
   doneButton(label?: string, color = this.gamePlay.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
     const doneButton = this.table.doneButton;
-    doneButton.visible = true;
+    doneButton.visible = !!label;
     doneButton.label_text = label;
     doneButton.paint(color, true);
     doneButton.updateWait(false, afterUpdate);
@@ -190,9 +190,6 @@ export class GameState {
         this.playerFigures.forEach(fig => fig.faceUp()); // set meep.startHex
         this.doneButton('Summon done');
       },
-      // mouse enable summonable Meeples (Stable)
-      // Mark legal hexes
-      // Drag & Drop;
       done: () => {
         this.highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
         this.phase('EndAction');
@@ -207,11 +204,13 @@ export class GameState {
     Ankh: {
       start: (ok?: boolean) => {
         const panel = this.panel, rank = panel.nextAnkhRank;
-        if (!ok && (panel.player.coins < rank)) {
-          console.log(stime(this, `.Ankh: ays.listeners=`), panel.confirmContainer);
-          panel.areYouSure(`Need ${rank} followers to obtain Anhk power!`,
+        const reason = (rank > 3) ? `No more Ankh Tokens to obtain Ankh power` :
+          (rank > panel.player.coins) ? `Need ${rank} followers to obtain Anhk power!` : undefined;
+        if (!ok && reason) {
+          console.log(stime(this, `.Ankh: Are You sure? [${rank}: ${reason}]`));
+          panel.areYouSure(reason,
             () => {
-              console.log(stime(this, `.Ankh state: yes`));
+              console.log(stime(this, `.Ankh state: yes [${rank}]`));
               this.state.start(true);
             },
             () => {
@@ -228,9 +227,6 @@ export class GameState {
         this.doneButton();
         panel.activateAnkhPowerSelector();
       },
-      // mouseEnable next Upgrades;
-      // on click: move Anhk to button (cover: now unclickable), set bit on Player.
-      // mouse disable button
       done: () => {
         this.doneButton('Done');
         this.phase('EndAction')
@@ -246,7 +242,8 @@ export class GameState {
     },
     Event: {
       start: () => {
-        // console.log(stime(this, `.Event: ${this.eventName}`));
+        const godName = this.gamePlay.curPlayer.godName, action = this.selectedAction;
+        this.table.logText(`${godName}'s ${action} triggers Event: ${this.eventName}`);
         this.phase(this.eventName);  // --> EventDone
       },
     },
@@ -256,7 +253,6 @@ export class GameState {
         this.eventName = undefined;
         this.phase('EndTurn');
       },
-      // phase(EndTurn)
     },
     // Plan: attach a dragable (but mostly invisible?) token to mouse (per click to drag)
     // use normal dragFunc to track it an paint lineTo.
@@ -632,6 +628,7 @@ export class GameState {
       },
       done: () => {
         God.byName.get('Osiris')?.doSpecial(false);  // un-highlight Portal tiles.
+        this.doneButton();
         this.phase('Worshipful');
       }
     },
@@ -720,6 +717,7 @@ export class GameState {
       if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !trappedFigs.find(af => af.player === fig.player)) {
         trappedFigs.push(fig);              // prevent 2nd Figure from same player.
         fig.moveTo(slot);
+        fig.removeRa();
         return false;
       } else {
         return true;
