@@ -5,7 +5,7 @@ import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
 import { afterUpdate } from "./functions";
-import { God } from "./god";
+import { Anubis, Bastet } from "./god";
 import { Player } from "./player";
 import { PowerIdent } from "./scenario-parser";
 import { CenterText, CircleShape, RectShape, UtilButton } from "./shapes";
@@ -61,7 +61,7 @@ export class CardSelector extends Container implements PowerLineCont {
     const color = PlayerPanel.colorForState[state];
     return this.powerLines.filter(pl => pl.button.colorn === color);
   }
-
+  activated = false;
   activateCardSelector(activate = true, done = 'Done', panel: PlayerPanel) {
     const bannedCard = panel?.player.gamePlay.gameState.bannedCard;
     const inHand = PlayerPanel.colorForState['inHand'];
@@ -74,6 +74,7 @@ export class CardSelector extends Container implements PowerLineCont {
       if (powerName === 'Build' && (color === inHand) && !canAfford) { pl.text.color = 'grey'; }
       if (powerName === bannedCard) { button.mouseEnabled = false; pl.text.color = 'darkred'; }
     });
+    this.activated = activate;
     this.showCardSelector(activate, done);
   }
 
@@ -151,6 +152,10 @@ export class PlayerPanel extends Container {
     const cardsInPlay = this.cardsInBattle;
     const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.strength ?? 0] as [string, number]);
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
+    if (this.god.name === 'Bastet') {
+      const bmark = Bastet.instance.bastetMarks.find(bmark => bmark.regionId === regionNdx + 1);
+      if (bmark) addStrength(bmark.strength, `Bastet[${bmark.strength}]`);
+    }
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
       const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.meep?.player == this.player));
@@ -158,7 +163,7 @@ export class PlayerPanel extends Container {
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
     if (this.player.godName === 'Anubis' && this.figuresInRegion(regionNdx + 1 as RegionId, this.player).includes(this.god.figure)) {
-      addStrength(this.god.doSpecial('occupied').length, `Anubis`)
+      addStrength(Anubis.instance.occupiedSlots.length, `Anubis`)
     }
     // TODO: add Bastet-Cats
     return this.strength;
@@ -330,7 +335,7 @@ export class PlayerPanel extends Container {
     // we want to HIGHLIGHT when 'Summon' action is choosen.
     // if stable is normally faceDown, then we can face them up when activated !?
     const stableFigs = this.stableHexes.map(hex => hex.figure).filter(fig => !!fig);
-    const anubisHexes = (God.byName.get('Anubis')?.doSpecial('occupied') ?? []) as AnkhHex[];
+    const anubisHexes = Anubis.instance?.anubisHexes;
     const anubisFigs = anubisHexes.map(hex => hex.figure).filter(fig => fig.player === this.player);
     const summonFigs = stableFigs.concat(anubisFigs);
     return summonFigs.filter(fig => fig.highlight(show, C.BLACK))
@@ -649,7 +654,7 @@ export class PlayerPanel extends Container {
       doneButton.on(S.click, () => {
         if (doneButton.label_text !== 'Teleport') {
           const nSelected = cardSelector.cardsInState('inBattle').length;
-          if (nSelected === 0) {
+          if (this.cardSelector.activated && nSelected === 0) {
             this.blink(doneButton, 80, true);
             return; // you must select a card
           }
@@ -657,7 +662,7 @@ export class PlayerPanel extends Container {
         cardSelector.showCardSelector(false);
         cardSelector.bidCounter.visible = false;
         doneButton.updateWait(false, () => { gamePlay.phaseDone(panel); }, gamePlay);
-      });
+      }, this);
     }
     // add Plague Counter:
     {

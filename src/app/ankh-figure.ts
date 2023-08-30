@@ -1,10 +1,10 @@
 import { C, Constructor, XY, className } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
+import { AnkhHex, AnkhMap, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
-import { God } from "./god";
+import { Anubis, Bastet, God, SetGod } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -328,6 +328,78 @@ export class AnkhMeeple extends Meeple {
 
 }
 
+/** a marker, associated with a Hex, but not the hex.meep */
+export class BastetMark extends AnkhMeeple {
+  declare homeHex: AnkhHex;
+  bastHex: AnkhHex; // where this bmark is deployed.
+  get bastetHexes() { return Bastet.instance.bastetHexes; }
+  get bastetMarks() { return Bastet.instance.bastetHexes.map(hex => hex.bmark) }
+  get regionId() { return this.bastHex ? this.bastHex.regionId : undefined }
+
+  constructor(player: Player, index: number, public strength: number) {
+    super(player, index, 'B-Cat');
+    this.baseShape.cgf = this.bmcgf;
+  }
+
+  bmcgf(color: string) {
+    return new Graphics().f(color).ss(2).s('black').dc(0, 0, this.radius - 1);
+  }
+
+  setOn(hex: AnkhHex) {
+    const bastHex = this.bastHex = hex ?? this.homeHex;
+    const cont = bastHex.map.mapCont.markCont;
+    cont.addChild(this);
+    this.x = bastHex.x - TP.ankh1Rad / 2; this.y = bastHex.y;
+    bastHex.map.update();
+  }
+
+  override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
+    if (player !== this.player.gamePlay.curPlayer) return 'not your turn';
+    if (player === this.player && !ctx.lastShift) return 'only during BastetDeploy';
+    return undefined;
+  }
+
+  override dropFunc(targetHex: AnkhHex, ctx: DragContext): void {
+    // super.dropFunc(targetHex, ctx);
+    if (ctx.phase === 'BastetDeploy' || ctx.lastShift) {
+      this.setOn(targetHex);
+      this.player.gamePlay.logText(`Bastet[${this.strength}] deployed to ${this.bastHex}`);
+    } else {
+      // self-drop or drop on adj Figure of curPlayer.
+      if (!targetHex || targetHex === this.bastHex) {
+        this.setOn(this.bastHex)
+      } else {
+        const fig = targetHex.figure;
+        if (this.strength === 0 && !(fig instanceof GodFigure)) {
+          // bmark explodes, killing targetHex.Figure
+          this.player.gamePlay.logText(`Bastet[${this.strength}] explodes, killing ${fig}`);
+          fig.sendHome();
+        } else {
+          // bmark is disarmed, return to bastetHexes:
+          this.player.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
+        }
+        this.bastHex = undefined;
+        this.sendHome();
+        this.gamePlay.gameState.setBastetDone();
+      }
+    }
+  }
+
+  override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
+    if (ctx.phase === 'BastetDeploy' || ctx.lastShift) {
+      if (!(hex?.isOnMap && (hex.regionId >= 1))) return false;
+      if (!(hex.tile instanceof Monument)) return false;
+      const deployedHexes = this.bastetHexes.filter(hex => !!hex && hex !== this.bastHex);
+      const isBastetInRegion = deployedHexes.find(ohex => (ohex.regionId === hex.regionId));
+      return !isBastetInRegion;
+    } else {
+      const player = this.player.gamePlay.curPlayer;
+      const isAdj = hex.findAdjHex(adj => adj === this.bastHex);
+      return isAdj && hex.figure?.player === player;
+    }
+  }
+}
+
 export class Figure extends AnkhMeeple {
 
   static get allFigures() { return Meeple.allMeeples.filter(meep => meep instanceof Figure) as Figure[] }
@@ -343,7 +415,7 @@ export class Figure extends AnkhMeeple {
 
   /** Check for adjacent Set durning Conflict. */
   get controller() {
-    const setGod = God.byName.get('Set');  // Special treatment when Set is on the table
+    const setGod = SetGod.instance;  // Special treatment when Set is on the table
     const ownedBySet = !!setGod
       && this.player.gamePlay.isConflictState
       && !(this instanceof GodFigure)
@@ -382,8 +454,8 @@ export class Figure extends AnkhMeeple {
   }
   isAnubisSummon() {
     // Can Summon from Anumbis special hexes if player can pay the ransom:
-    const anubis = God.byName.get('Anubis'), anubisHexes = anubis?.doSpecial() as AnkhHex[];
-    return (!!anubisHexes?.includes(this.hex) && this.player.coins > 0);
+    const isFromAnubisHex = Anubis.instance?.isAnubisHex(this.hex);
+    return (isFromAnubisHex && this.player.coins > 0);
   }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
@@ -488,7 +560,6 @@ export class GodFigure extends Figure {
   override isLegalRecycle(ctx: DragContext): boolean {
     return false;
   }
-
 }
 
 export class Warrior extends Figure {
@@ -515,8 +586,8 @@ export class Warrior extends Figure {
   }
 
   override placeTile(toHex: Hex1, payCost?: boolean): void {
-    const anubisHexes = God.byName.get('Anubis')?.doSpecial('all') as Hex2[];
-    if (anubisHexes?.includes(this.fromHex) && toHex.isOnMap) {
+    const isFromAnubisHex = (God.byName.get('Anubis') as Anubis)?.isAnubisHex(this.fromHex);
+    if (isFromAnubisHex && toHex.isOnMap) {
       this.player.gamePlay.gameState.addFollowers(this.player, -1, `Ransom to Amun for ${this.Aname}`);
     }
     super.placeTile(toHex, payCost);

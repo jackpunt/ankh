@@ -61,7 +61,6 @@ export class AnkhMapSplitter {
 
     let target: { mx: number, my: number, hex: AnkhHex, ewDir: EwDir, cxy: XY, cid: string } = undefined;
     const path = [] as (typeof target)[];
-    let pathN: typeof target = undefined; // the final element of path
     const pathShape = this.pathShape; // real segment, on Path
     const lineShape = this.lineShape; // temp segment, pathN to mouse.
     pathShape.reset(); lineShape.reset();
@@ -225,7 +224,7 @@ export class AnkhMapSplitter {
       this.table.setRegionMarker(newRid);   // runSplitter.finalize
       hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
       hexMap.update();
-      this.checkRegionSizes('Swap')
+      this.checkRegionSizes('Swap');
     }
 
     const dragSplitter = () => {
@@ -243,7 +242,7 @@ export class AnkhMapSplitter {
     const l1 = hexMap.regions[rid1 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
     const l2 = hexMap.regions[rid2 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
     const OhWell = () => this.gameState.phase(nextPhase);
-    const UndoIt = () => this.removeLastSplit();
+    const UndoIt = () => this.removeLastSplit('Split');
     if (l1 < 6 || l2 < 6) {
       this.gameState.panel.areYouSure(`Region is too small`, OhWell, UndoIt);
       return;
@@ -251,7 +250,7 @@ export class AnkhMapSplitter {
     this.gameState.phase(nextPhase);
   }
 
-  removeLastSplit() {
+  removeLastSplit(nextPhase: string) {
     const hexMap = this.gamePlay.hexMap;
     const splitsX = this.gamePlay.hexMap.splits.slice(2); // not the rivers!
     const splitSpec = splitsX.pop();
@@ -290,6 +289,7 @@ export class AnkhMapSplitter {
     const rmN = this.table.regionMarkers[ridN - 1];
     rmN.x = rmN.y = 0; // TODO ??
     hexMap.update();
+    this.gameState.phase(nextPhase);
   }
 
   newRegionIds = [];

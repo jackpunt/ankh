@@ -21,10 +21,10 @@ export class TP {
   static cacheTiles = 2;
   static snapToPixel = true;
   static useEwTopo = false;
-  static ankhRad = 20;
-  static ankh1Rad = 36;
-  static ankh2Rad = 42;
-  static hexRad = 60;
+  static ankhRad = 20;  // AnkhToken
+  static ankh1Rad = 36; // Warrior, Rank 1 Guardian
+  static ankh2Rad = 42; // Rank 2,3 Guardian; GodFigure
+  static hexRad = 60;   // full size Hex
   static meepleRad = TP.hexRad * .4;
   static meepleY0 = 0;//TP.hexRad * .25;
   static warriorPerPlayer = 6;

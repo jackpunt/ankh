@@ -61,9 +61,6 @@ export class GamePlay0 {
 
   get allPlayers() { return Player.allPlayers; }
   get allTiles() { return Tile.allTiles; }
-  selectedActionIndex: number;
-  selectedAction: ActionIdent; // set when click on action panel or whatever. read by ActionPhase;
-  eventName: EventName;
 
   readonly hexMap = new AnkhMap<AnkhHex>(); // create base map; no districts until Table.layoutTable!
   readonly history: Move[] = []          // sequence of Move that bring board to its state
@@ -221,10 +218,10 @@ export class GamePlay0 {
   placeEither(tile: Tile, toHex: Hex1, payCost = true) {
     if (!tile) return;
     const fromHex = tile.fromHex;
-    const player = tile.player ?? this.gameState.state.panels[0].player; // for Build, tile.player is undefined;
-    const godName = player.godName;
+    const player = tile.player ?? this.gameState.state.panels?.[0].player; // for Build, tile.player is undefined;
+    const godName = player?.godName ?? '??';
     const verb = this.gamePhase.Aname;
-    if (toHex !== fromHex) this.logText(`${godName} ${verb}s ${tile} -> ${toHex}`, `gamePlay.placeEither`)
+    if (toHex !== fromHex && player) this.logText(`${godName} ${verb}s ${tile} -> ${toHex}`, `gamePlay.placeEither`)
     // if (toHex !== fromHex) console.log(stime(this, `.placeEither:`), info);
     tile.moveTo(toHex);  // placeEither(tile, hex) --> moveTo(hex)
     if (toHex === this.recycleHex) {
@@ -319,9 +316,13 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
     KeyBinder.keyBinder.setKey('C', () => {
-      const up = (cardSelectorsUp = !cardSelectorsUp);
+      const vis = (cardSelectorsUp = !cardSelectorsUp);
+      this.table.panelForPlayer.forEach(panel => {
+
+      })
       this.allPlayers.forEach(player => {
-        player.panel.activateCardSelector(up);
+        if (!player.panel.cardSelector.activated)
+          player.panel.showCardSelector(vis, 'X');
       })
     })
     KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START
@@ -349,7 +350,7 @@ export class GamePlay extends GamePlay0 {
     console.log(stime(this, `.runSplitter`), this.hexMap.regions);
   }
   undoSplit() {
-    this.gameState.ankhMapSplitter.removeLastSplit();
+    this.gameState.ankhMapSplitter.removeLastSplit(this.gameState.state.Aname); // return to same/current phase?
     console.log(stime(this, `.undoSplit`), this.hexMap.regions);
   }
 

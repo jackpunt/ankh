@@ -2,9 +2,9 @@ import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
-import { AnkhMeeple, AnkhSource, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
+import { AnkhMeeple, AnkhSource, BastetMark, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
-import { Hex2 } from "./hex";
+import type { Hex, Hex2, HexMap } from "./hex";
 import { Player } from "./player";
 import { CardSelector, PlayerPanel } from "./player-panel";
 import { PowerIdent } from "./scenario-parser";
@@ -67,7 +67,6 @@ export class God {
     tname.x = wh.width / 2; tname.y += 2; tname.textBaseline = 'top';
     cont.addChild(tname);
   }
-  doSpecial(...args: any[]): any { return; }
 
   get nCardsAllowedInBattle() { return 1; }
   set nCardsAllowedInBattle(n: number) { }
@@ -80,7 +79,7 @@ export class God {
 }
 
 class AnubisHex extends SpecialHex {
-  anubis = God.byName.get('Anubis');
+  anubis = Anubis.instance;
   override get meep(): AnkhMeeple {
     return super.meep;
   }
@@ -92,7 +91,8 @@ class AnubisHex extends SpecialHex {
   }
 }
 
-class Anubis extends God {
+export class Anubis extends God {
+  static get instance() { return God.byName.get('Anubis') as Anubis }
   constructor() { super('Anubis', 'green') }
   anubisHexes: AnubisHex[] = [];
 
@@ -115,16 +115,16 @@ class Anubis extends God {
       hex.legalMark.setOnHex(hex);
     });
   }
-  override doSpecial(query: string) {
-    switch (query) {
-      case 'empty': {
-        return this.anubisHexes.find(ah=> ah.figure === undefined);
-      }
-      case 'occupied': {
-        return this.anubisHexes.filter(ah => ah.figure !== undefined);
-      }
-    }
-    return this.anubisHexes;
+  // findHex matching given hex
+  isAnubisHex(hex: Hex) {
+    // return (hex instanceof AnubisHex); // ??
+    return this.anubisHexes.includes(hex as AnubisHex);
+  }
+  occupiedSlots() {
+    return this.anubisHexes.find(ah => ah.figure !== undefined);
+  }
+  emptySlot() {
+    return this.anubisHexes.find(ah => ah.figure === undefined);
   }
   /** identify 1--3 Warriors from other Players */
   override saveState() {
@@ -144,7 +144,9 @@ class Anubis extends God {
   }
 }
 
-class Amun extends God {
+export class Amun extends God {
+  static get instance() { return God.byName.get('Amun') as Amun }
+
   _tokenFaceUp = true;
   get tokenFaceUp() { return this._tokenFaceUp; }
   set tokenFaceUp(v: boolean) {
@@ -152,6 +154,9 @@ class Amun extends God {
     this.token.label_text = v ? 'Two Cards' : 'Face Down';
     this.token.paint(v ? C.legalRed : C.grey );
   }
+  /** as method for conditional execetion: Amun.instance?.setTokenFactUp(true) */
+  setTokenFaceUp(faceUp: boolean): void { this.tokenFaceUp = faceUp; }
+
   constructor() { super('Amun', 'red') }
 
   override get nCardsAllowedInBattle(): number {
@@ -159,9 +164,6 @@ class Amun extends God {
   }
   token = new UtilButton(C.legalRed, 'Two Cards', TP.ankh1Rad);
 
-  override doSpecial(faceUp: boolean): void {
-    this.tokenFaceUp = faceUp;
-  }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel);
     const token = this.token;
@@ -170,11 +172,51 @@ class Amun extends God {
   }
 }
 
-class Bastet extends God {
-  constructor() { super('Bastet', 'orange') }
+
+/** a SpecialHex that retains a reference to its BastetMark. */
+class BastetHex extends SpecialHex {
+  bmark: BastetMark;
+  constructor(map: HexMap<AnkhHex>, row = 0, col = 0, name = 'bm') {
+    super(map, row, col, name);
+  }
 }
 
-class Hathor extends God {
+export class Bastet extends God {
+  static get instance() { return God.byName.get('Bastet') as Bastet }
+  bastetHexes: BastetHex[] = [];
+  get bastetMarks() { return this.bastetHexes.map(bhex => bhex.bmark) }
+
+  constructor() { super('Bastet', 'orange') }
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
+    super.makeSpecial(cont, wh, table, panel);
+    const cont2 = new Container(), sc = cont2.scaleX = cont2.scaleY = SpecialHex.scale;
+    cont2.name = 'AnubisCont';
+    cont.addChild(cont2);
+    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
+    const sgap = (wh.width / sc - 6 * rad) / 4;
+    [rad, rad, rad].forEach((radi, i) => {
+      const circle = new CircleShape('lightgrey', radi, this.color);
+      circle.x = sgap + radi + i * (2 * radi + sgap);
+      circle.y = y;
+      cont2.addChild(circle);
+      const hex = table.newHex2(0, 0, `bastet-${i}`, BastetHex) as BastetHex;
+      this.bastetHexes.push(hex);
+      hex.cont.visible = false;
+      cont2.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      hex.legalMark.setOnHex(hex);
+    })
+    const strength = [0, 1, 3];
+    this.bastetHexes.forEach((hex, ndx) => {
+      const bmark = new BastetMark(this.player, ndx, strength[ndx]);
+      hex.bmark = bmark;
+      bmark.homeHex = hex;
+      bmark.moveTo(hex);
+    })
+  }
+}
+
+export class Hathor extends God {
+  static get instance() { return God.byName.get('Hathor') as Hathor }
   constructor() { super('Hathor', 'magenta') }
   // constructor() { super('Hathor', 'rgb(74,35,90)') }
 }
@@ -232,10 +274,11 @@ class HorusMarker extends RegionMarker {
 }
 
 
-class Horus extends God {
+export class Horus extends God {
+  static get instance() { return God.byName.get('Horus') as Horus }
   specialHex: SpecialHex;
   specialSource: AnkhSource<HorusMarker>;
-  cardSelector: CardSelector;
+  _cardSelector: CardSelector;
   constructor() { super('Horus', 'darkred') }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel); cont.name = 'Horus-Special'
@@ -246,24 +289,27 @@ class Horus extends God {
     source.counter.y -= TP.ankh2Rad * .3;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
-    this.cardSelector = panel.makeCardSelector(`cs:Horus`);
-    this.cardSelector.activateCardSelector(false, 'Ban Card', undefined);
+    this._cardSelector = panel.makeCardSelector(`cs:Horus`);
+    this._cardSelector.activateCardSelector(false, 'Ban Card', undefined);
   }
-  override doSpecial(regionId?: RegionId | 'cardSelector') {
-    if (regionId === 'cardSelector') {
-      return this.cardSelector;
-    }
-    if (!regionId) return HorusMarker.source.filterUnits(hm => true).map(hm => hm.regionId);
-    const inRegion = HorusMarker.source.filterUnits(hm => hm.regionId === regionId);
-    return (inRegion[0] as HorusMarker);
+  get cardSelector() { return this._cardSelector;}
+
+  get regionIds() {
+    return HorusMarker.source.filterUnits(hm => true).map(hm => hm.regionId);
+  }
+
+  getRegionId(regionId: RegionId) {
+    return HorusMarker.source.filterUnits(hm => hm.regionId === regionId)[0];
   }
 }
 
-class Isis extends God {
+export class Isis extends God {
+  static get instance() { return God.byName.get('Isis') as Isis }
   constructor() { super('Isis', 'lightblue') }
 }
 
-class Osiris extends God {
+export class Osiris extends God {
+  static get instance() { return God.byName.get('Osiris') as Osiris }
   constructor() { super('Osiris', 'lightgreen') }
   specialHex: SpecialHex;
   specialSource: AnkhSource<Portal>;
@@ -279,12 +325,13 @@ class Osiris extends God {
     table.sourceOnHex(source, hex);
   }
 
-  override doSpecial(vis = true) {
+  highlight(vis = true) {
     this.specialSource.filterUnits(unit => (unit.highlight(vis), false));
   }
 }
 
-class Ra extends God {
+export class Ra extends God {
+  static get instance() { return God.byName.get('Ra') as Ra }
   constructor() { super('Ra', 'yellow') }
 
   specialCont: Container;
@@ -303,7 +350,8 @@ class Ra extends God {
   }
 }
 
-class SetGod extends God {
+export class SetGod extends God {
+  static get instance() { return God.byName.get('Set') as SetGod }
   constructor() { super('Set', '#F1C40F') } // ~ C.coinGold
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
@@ -315,7 +363,8 @@ class SetGod extends God {
   }
 }
 
-class Toth extends God {
+export class Toth extends God {
+  static get instance() { return God.byName.get('Toth') as Toth }
   constructor() { super('Toth', 'cyan') }
 }
 

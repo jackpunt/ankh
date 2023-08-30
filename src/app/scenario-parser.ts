@@ -164,15 +164,13 @@ export class ScenarioParser {
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
-    const turnSet = (turn !== undefined); // indicates a Saved Scenario.
+    const turnSet = (turn !== undefined); // indicates a Saved Scenario: assign & place everything
     if (turnSet) {
       gamePlay.turnNumber = turn;
       table.logText(`turn = ${turn}`, `parseScenario`);
       table.guardSources.forEach(source => {
-        // retrieve Units from board or stables; return to source:
-        source.filterUnits(u => true).forEach(unit =>
-          (unit.setPlayerAndPaint(undefined), unit.resetTile(), unit.moveTo(undefined), source.availUnit(unit))
-          );
+        // retrieve Guardians from board or stables; return to source:
+        source.filterUnits(unit => (unit.player = undefined, unit.sendHome(), false));
         source.nextUnit();
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
@@ -192,7 +190,7 @@ export class ScenarioParser {
       events.forEach((pid, ndx) => {
         table.setEventMarker(ndx, this.gamePlay.allPlayers[pid]);
       })
-      gamePlay.eventName = undefined;
+      gamePlay.gameState.eventName = undefined;
       map.update();
     }
     if (actions !== undefined) {

@@ -11,7 +11,7 @@ import { H, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
 import { RegionMarker } from "./RegionMarker";
-import { ActionIdent, Scenario, ScenarioParser } from "./scenario-parser";
+import { ActionIdent, Scenario } from "./scenario-parser";
 import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
@@ -559,8 +559,8 @@ export class Table extends EventDispatcher  {
   /** onClick: mark Action as selected, inform GamePlay & phaseDone() */
   selectAction (id: ActionIdent, button: ActionButton, cn: number) {
     ;(button.parent as ActionContainer).rollover?.(button, false);  // implicit 'rollout'
-    this.gamePlay.selectedAction = id;
-    this.gamePlay.selectedActionIndex = cn;
+    this.gamePlay.gameState.selectedAction = id;
+    this.gamePlay.gameState.selectedActionIndex = cn;
     if (button.isEvent) {
       this.setEventMarker(this.nextEventIndex);
     }
@@ -700,7 +700,7 @@ export class Table extends EventDispatcher  {
     const cell = this.eventCells[index];
     cell.pid = player.index;
     cell.addChild(player.god.getAnkhMarker(TP.ankhRad));
-    this.gamePlay.eventName = cell.eventName;
+    this.gamePlay.gameState.eventName = cell.eventName;
   }
 
   readonly emptyColor = 'rgb(240,240,240)';

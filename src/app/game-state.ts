@@ -1,14 +1,13 @@
 import { C, stime } from "@thegraid/common-lib";
-import { RegionMarker } from "./RegionMarker";
 import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
 import { json } from "./functions";
 import type { GamePlay } from "./game-play";
-import { God } from "./god";
+import { Amun, Anubis, Bastet, God, Horus, Osiris } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
-import { CardSelector, PlayerPanel, PowerLine } from "./player-panel";
+import { PlayerPanel, PowerLine } from "./player-panel";
 import type { ActionIdent } from "./scenario-parser";
 import { HexShape, PaintableShape } from "./shapes";
 import { DragContext, EventName } from "./table";
@@ -24,6 +23,7 @@ interface Phase {
   panels?: PlayerPanel[],
   players?: Player[],
   deadFigs?: Figure[], // for Plague
+  nextPhase?: string,
 }
 
 export class GameState {
@@ -36,17 +36,24 @@ export class GameState {
 
   state: Phase;
   get table() { return this.gamePlay?.table; }
+  get curPlayer() { return this.gamePlay.curPlayer; }
   get panel() { return this.gamePlay.curPlayer.panel; }
 
-  get eventName() { return this.gamePlay.eventName; }
-  set eventName(eventName: EventName) { this.gamePlay.eventName = eventName; }
-  get selectedAction() { return this.gamePlay.selectedAction; }
-  set selectedAction(val) { this.gamePlay.selectedAction = val; }
-  get selectedActionIndex() { return this.gamePlay.selectedActionIndex; }
-  readonly selectedActions: ActionIdent[] = [];
-  areActiveActions: boolean;
+  selectedActionIndex: number; // where in the row [0..n] to place an AnkhMarker
+  selectedAction: ActionIdent; // set when click on action panel or whatever. read by ActionPhase;
+  eventName: EventName;
 
-  get playerFigures() { const plyr = this.gamePlay.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
+  readonly selectedActions: ActionIdent[] = [];
+
+  bastetPlayer = undefined;
+  bastetDone = true;
+  setBastetDone() {
+    this.bastetDone = true;
+    if (this.table.doneButton.label_text === 'Disarm Bastet?')
+      this.done(this.state.nextPhase); // supply nextPhase just in case... ??
+  }
+
+  get playerFigures() { const plyr = this.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
 
   highlights: Figure[];
   conflictRegion: RegionId = undefined;
@@ -60,18 +67,13 @@ export class GameState {
   battleResults: any; // TODO: record winner, who lost units, etc for use by special powers (Osiris move) and Cards.
   bannedCard: string; // keyof PlayerPanel.colorForState
 
-  actionsDone = 0;
-  bastetEnabled = false;
-  chooseAction(val = 0) {
-    this.actionsDone = val;
-    return 'ChooseAction';
-  }
+  get actionsDone() { return this.selectedActions.length};
 
   findGod(name: string) {
     return this.gamePlay.allPlayers.find(p => p.god.Aname == name);
   }
 
-  start(phase = 'BeginTurn') {
+  start(phase = 'StartGame') {
     this.phase(phase);
   }
 
@@ -85,7 +87,7 @@ export class GameState {
    * empty label hides & disables.
    * optional continuation function on 'drawend'.
    */
-  doneButton(label?: string, color = this.gamePlay.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
+  doneButton(label?: string, color = this.curPlayer.color, afterUpdate: ((evt?: Object, ...args: any[]) => void) = undefined) {
     const doneButton = this.table.doneButton;
     doneButton.visible = !!label;
     doneButton.label_text = label;
@@ -115,33 +117,65 @@ export class GameState {
  }
 
   readonly states: { [index: string]: Phase } = {
+    StartGame: {
+      start: () => {
+        this.bastetPlayer = this.findGod('Bastet'); // const
+        this.phase(this.bastetPlayer ? 'BastetDeploy' : 'BeginTurn', 'BeginTurn');
+      }
+    },
+    BastetDeploy: {
+      nextPhase: 'ChooseAction',
+      // after Setup and after each Conflict, Bastet deploys all three 'cats'.
+      // Once per turn, player can click on a Bastet Cat (adjacent to their Figure)
+      // (drag Cat onto adjacent Figure)
+      // if '1' | '3' return it (deactivated) to Bastet.
+      // if '*', it explodes, killing the adjacent Figure (unless it's a God)
+      // and Bastet redeploys all the 'cats'.
+      // when Bastet is in Battle and there is a cat, it is revealed ('Revaal' phase)
+      // and '1' | '3' is added to Bastet's strength.
+      start: (phase: string) => {
+        this.state.nextPhase = phase;
+        // enable Cats on the board; onClick-> {gamePlay.bastetCat(cat); curState.done()}
+        Bastet.instance.bastetMarks.forEach(bmark => bmark.highlight(true));
+        this.doneButton('Bastet Deploy', this.bastetPlayer.color);
+      },
+      done: () =>  {
+        const bmarks = Bastet.instance.bastetMarks;
+        if (bmarks.find(bm => !bm.bastHex)) {
+          setTimeout(() => this.phase('BastetDeploy', this.state.nextPhase), 4);
+          return; // must deploy all BastetMarks
+        }
+        bmarks.forEach(bmark => bmark.highlight(false));
+        this.doneButton();
+        this.phase(this.state.nextPhase);
+      }
+    },
     BeginTurn: {
       start: () => {
-        this.bastetEnabled = !!this.findGod('Bastet');
         this.selectedAction = undefined;
-        this.actionsDone = 0;
         this.selectedActions.length = 0;
+        this.bastetDone = this.bastetPlayer && (this.bastetPlayer !== this.curPlayer) ? false : true;
         this.phase('ChooseAction');
       },
     },
+    // ChooseAction:
+    // if (2 action done || no actions to activate || Event) phase(EndTurn)
+    // else { place AnkhMarker, phase(actionName) }
     ChooseAction: {
       start: () => {
-        if (this.bastetEnabled) {
-          /* enable 'Cats' button; onClick --> phase('Bastet') */
-        }
         if (this.actionsDone >= 2) this.phase('EndTurn');
         // enable and highlight open spots on Action Panel
-        const lastAction = this.selectedActions[0], n = this.actionsDone + 1;
-        const active = this.areActiveActions = this.table.activateActionSelect(true, lastAction);
+        const lastAction = this.selectedActions[0], n = this.selectedActions.length + 1;
+        const active = this.table.activateActionSelect(true, lastAction);
         if (!active) {
           this.phase('EndTurn');  // assert: selectedActions[0] === 'Ankh'
         } else {
           this.selectedAction = undefined;
-          this.doneButton(`Choice ${n} Done`);
+          this.doneButton(`Choice ${n} Done`); // ???
          }
       },
       done: (ok?: boolean) => {
-        const action = this.selectedAction;
+        const action = this.selectedAction; // set by dropFunc() --> state.done()
         if (!ok && !action) {
           this.panel.areYouSure('You have an unused action.', () => {
             setTimeout(() => this.state.done(true), 50);
@@ -150,17 +184,8 @@ export class GameState {
           });
           return;
         }
-        this.selectedActions.unshift(action);
+        this.selectedActions.unshift(action); // may unshift(undefined)
         this.phase(action ?? 'EndTurn');
-      }
-    },
-    Bastet: {
-      start: () => {
-        // enable Cats on the board; onClick-> {gamePlay.bastetCat(cat); curState.done()}
-      },
-      done: () =>  {
-        this.bastetEnabled = false;
-        this.phase('ChooseAction');
       }
     },
     Move: {
@@ -220,7 +245,7 @@ export class GameState {
               this.selectedActions.shift();     // action1 or undefined
               const active = this.table.activateActionSelect(true, this.selectedActions[0]); // true.
               if (!active) debugger;
-              this.state = this.states['ChooseAction'];
+              this.state = this.states['ChooseAction']; // set state, but do not start()
             });
           return;
         }
@@ -228,41 +253,33 @@ export class GameState {
         panel.activateAnkhPowerSelector();
       },
       done: () => {
-        this.doneButton('Done');
         this.phase('EndAction')
       },
     },
     EndAction: {
       start: () => {
-        // [player can select Bastet Cat for disarming]
-        this.actionsDone += 1;
-        if (!!this.eventName) this.phase('Event');
-        else this.phase('ChooseAction');
+        // [player can select Bastet Cat for disarming] if any BastetMark is adj to Figure(this.curPlayer)
+        const bms = Bastet.instance?.bastetMarks.filter(bm => bm.bastHex);
+        const adj = bms?.find(bmark => bmark.bastHex.findAdjHexByRegion((hex => hex.figure?.player === this.curPlayer)));
+        if (!this.bastetDone && adj) this.doneButton('Disarm Bastet?');
+        else this.done();
       },
+      done: () => {
+        this.phase(!!this.eventName ? 'Event' : 'ChooseAction');
+      }
     },
     Event: {
       start: () => {
-        const godName = this.gamePlay.curPlayer.godName, action = this.selectedAction;
+        const godName = this.curPlayer.godName, action = this.selectedAction;
         this.table.logText(`${godName}'s ${action} triggers Event: ${this.eventName}`);
-        this.phase(this.eventName);  // --> EventDone
+        this.phase(this.eventName); // Split/Swap, Claim, Conflict:
+        // ChooseCard, Reveal, BuildMonument, Plague, ScoreMonument, BattleResolution)
       },
     },
-    EventDone: {
-      start: () => {
-        console.log(stime(this, `.EventDone: ${this.eventName}`))
-        this.eventName = undefined;
-        this.phase('EndTurn');
-      },
-    },
-    // Plan: attach a dragable (but mostly invisible?) token to mouse (per click to drag)
-    // use normal dragFunc to track it an paint lineTo.
-    // on click: mark target or add point to path.
-    // click on last path point to finalize. (addEdges)
     Split: {
       start: () => {
-        // todo: disable table.dragger!
         console.log(stime(this, `.Split:`));
-        this.table.logText(`${this.gamePlay.curPlayer.godName} makes Split [${this.gamePlay.hexMap.regions.length}]`);
+        this.table.logText(`${this.curPlayer.godName} makes Split [${this.gamePlay.hexMap.regions.length}]`);
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
         this.ankhMapSplitter.runSplitShape();
         this.doneButton();
@@ -275,7 +292,7 @@ export class GameState {
     Swap: {
       start: () => {
         console.log(stime(this, `Swap:`));
-        this.table.logText(`${this.gamePlay.curPlayer.godName} does Swap [${this.gamePlay.hexMap.regions.length}]`);
+        this.table.logText(`${this.curPlayer.godName} does Swap [${this.gamePlay.hexMap.regions.length}]`);
         this.ankhMapSplitter.runSwap();
         // TODO: no Button until 'finalize'
         this.doneButton('Swap done');
@@ -283,12 +300,6 @@ export class GameState {
       done: () => {
         this.phase('EventDone');
       }
-
-      // after Split
-      // mark startRegion of each marker
-      // mouse enable all region markers
-      // dragStart: mark legal (either of 2 split regions that contain new/old markers)
-      // click Done(phase(EventDone))
     },
     Claim: {
       start: () => {
@@ -304,8 +315,9 @@ export class GameState {
           this.panel.areYouSure(`No Ankh Tokens for claim.`, done);
         }
       },
+      // invoked AnkhToken.dropFunc()
       done: (hex: AnkhHex) => {
-        this.table.logText(`${this.gamePlay.curPlayer.godName} Claimed ${hex}`)
+        this.table.logText(`${this.curPlayer.godName} Claimed ${hex}`)
         this.phase('EventDone');
       }
     },
@@ -326,7 +338,7 @@ export class GameState {
           }
         });
 
-        this.phase(God.byName.get('Horus') ? 'Horus' : 'ConflictNextRegion', 1);
+        this.phase(Horus.instance ? 'Horus' : 'ConflictNextRegion', 1);
       },
     },
     Horus: {
@@ -334,7 +346,7 @@ export class GameState {
         this.doneButton('Horus Eyes', 'darkred');
       },
       done: () => {
-        const regionIds = God.byName.get('Horus').doSpecial() as RegionId[];
+        const regionIds = Horus.instance.regionIds;
         this.table.logText(`Horus Eyes to ${regionIds}`)
         this.phase('ConflictNextRegion', 1); // AKA: Conflict FIRST Region
       }
@@ -396,16 +408,16 @@ export class GameState {
     },
     HorusCard: {
       start: () => {
-        const horus = God.byName.get('Horus');
-        const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
+        const horus = Horus.instance;
+        const cardSelector = horus.cardSelector;
         const panel = horus.player.panel;
         this.bannedCard = 'Cycle';
         cardSelector.activateCardSelector(true, 'Ban Card', panel);
       },
       done: () => {
-        const horus = God.byName.get('Horus');
+        const horus = Horus.instance;
         const panel = horus.player.panel;
-        const cardSelector = horus.doSpecial('cardSelector') as CardSelector;
+        const cardSelector = horus.cardSelector;
         this.bannedCard = cardSelector.cardsInState('inBattle')[0].name;
         this.table.logText(`Horus banned card: ${this.bannedCard}`);
         this.phase('ChooseCard');
@@ -453,7 +465,7 @@ export class GameState {
             const nFlood = inRegion.filter(fig => fig.hex.terrain === 'f').length;
             this.addFollowers(panel.player, nFlood, 'Flood');
           }
-          if (panel.cardsInBattle.length === 2) panel.player.god.doSpecial(false); // must be Amun:Two Cards used
+          if (panel.cardsInBattle.length === 2) Amun.instance.setTokenFaceUp(false); // must be Amun:Two Cards used
         });
         this.gamePlay.hexMap.update();
         this.doneButton('Reveal Done', C.grey);
@@ -571,7 +583,7 @@ export class GameState {
         const d = panels[0].strength - (panels[1]?.strength ?? 0) // after Plague, only one Player...
         let winner = (d > 0) ? panels[0] : undefined;
         if (d == 0) {          // consider tiebreaker;
-          const curPanel = this.gamePlay.curPlayer.panel;
+          const curPanel = this.panel;
           const contenders = panels.filter(panel => panel.strength === panels[0].strength);
           // TODO: offer curPanel a choice, mark choice used.
           if (contenders.includes(curPanel)) {
@@ -623,11 +635,11 @@ export class GameState {
     Osiris: {
       start: () => {
         // highlight empty cells of conflictRegion
-        God.byName.get('Osiris').doSpecial(true);// highlight Portal tiles.
+        Osiris.instance.highlight(true);   // highlight Portal tiles.
         this.doneButton('Place Portal', God.byName.get('Osiris').color);
       },
       done: () => {
-        God.byName.get('Osiris')?.doSpecial(false);  // un-highlight Portal tiles.
+        Osiris.instance.highlight(false);  // un-highlight Portal tiles.
         this.doneButton();
         this.phase('Worshipful');
       }
@@ -671,17 +683,19 @@ export class GameState {
       start: () => {
         this.conflictRegion = undefined;
         this.highlightRegions(false);
-        God.byName.get('Amun')?.doSpecial(true); // reset 'Two Cards' token.
-        this.phase('EventDone');
+        Amun.instance?.setTokenFaceUp(true); // reset 'Two Cards' token.
+        this.phase(this.bastetPlayer ? 'BastetDeploy' : 'EventDone', 'EventDone');
       },
       // TODO: coins from Scales to Toth, add Devotion(Scales)
     },
+    EventDone: {
+      start: () => {
+        console.log(stime(this, `.EventDone: ${this.eventName}`))
+        this.eventName = undefined;
+        this.phase('EndTurn');
+      },
+    },
     EndTurn: {
-      // TODO: I suspect that setNextPlayer -> saveState is happening *before*
-      // the Event --> resetAction, so the representation in saveState looks funny.
-      // that would be ok IF on restoration, it auto-resets.
-      // but in turn 27; Osiris takes an Ankh power, but the Ankk: [3,0,1,2] does not incr to [3,0,1,2,3] !!
-      // Also: maybe something about 'selected:' action not being reset?
       start: () => {
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
@@ -710,10 +724,10 @@ export class GameState {
   }
 
   filterAnubisTrap(deadFigs: Figure[]) {
-    const anubis = God.byName.get('Anubis');
+    const anubis = Anubis.instance;
     const trappedFigs = [];
     return deadFigs.filter(fig => {
-      const slot = anubis?.doSpecial('empty') as AnkhHex;
+      const slot = anubis?.emptySlot();
       if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !trappedFigs.find(af => af.player === fig.player)) {
         trappedFigs.push(fig);              // prevent 2nd Figure from same player.
         fig.moveTo(slot);
@@ -726,7 +740,7 @@ export class GameState {
   }
 
 
-  countCurrentGain(player = this.gamePlay.curPlayer) {
+  countCurrentGain(player = this.curPlayer) {
     // Osiris Portal begins offMap.
     const montsOnMap = this.gamePlay.allTiles.filter(tile => (tile.hex?.isOnMap) && (tile instanceof Monument));
     const monts =  montsOnMap.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
@@ -736,7 +750,7 @@ export class GameState {
   }
 
   gainFollowersAction() {
-    const player = this.gamePlay.curPlayer;
+    const player = this.curPlayer;
     const n = this.countCurrentGain(player);
     const revered = player.god.ankhPowers.includes('Revered') ? ' (Revered)' : '';
     this.addFollowers(player, n, `Gain Followers action${revered}`);
@@ -768,7 +782,7 @@ export class GameState {
   }
 
   horusInRegion(rid: RegionId) {
-    return God.byName.get('Horus')?.doSpecial(rid) as RegionMarker;
+    return Horus.instance?.getRegionId(rid);
   }
 
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
