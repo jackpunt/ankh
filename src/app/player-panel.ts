@@ -1,6 +1,6 @@
 import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
-import { Androsphinx, AnkhSource, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
+import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
@@ -103,11 +103,10 @@ export class PlayerPanel extends Container {
     return region.filter(hex => hex.tile instanceof Temple && hex.tile?.player === this.player);
   }
   figsInRegion(regionId: RegionId) {
-    return this.hexMap.regions[regionId - 1].filter(hex => hex.figure).map(hex => hex.figure);
+    return this.hexMap.regions[regionId - 1].filter(hex => hex.figure).map(hex => hex.figure).filter(fig => fig.controller === this.god);
   }
   /** strength from Figures in Region controlled by this.god */
-  figStrengthOfGod(regionNdx: number, god = this.god) {
-    const figs = this.figsInRegion(regionNdx + 1 as RegionId).filter(fig => fig.controller === god);
+  figStrengthOfGod(figs: Figure[], god = this.god) {
     // remove strength of Figures with an adjacent Androsphinx of other player:
     const figs2 = figs.filter(fig => !fig.hex.findAdjHex(hex => hex?.meep instanceof Androsphinx && hex.meep.controller !== god))
     return figs2.length;
@@ -140,7 +139,7 @@ export class PlayerPanel extends Container {
   strength = 0;
   reasons: { name: string, total: number, cards?, Chariots?, Temple?, Resplendent?};
   /** BattleResolution phase */
-  strengthInRegion(regionNdx: number) {
+  strengthInRegion(regionId: RegionId) {
     this.reasons = { name: this.name, total: 0 };
     this.strength = 0;
     const addStrength = (val: number, why: string) => {
@@ -148,24 +147,27 @@ export class PlayerPanel extends Container {
       this.reasons[why] = val;
       this.reasons.total = this.strength;
     }
-    const nFigures = this.nFigsInBattle = this.figStrengthOfGod(regionNdx); addStrength(nFigures, 'Figures');
+    const figsInBattle = this.figsInRegion(regionId);
+    this.nFigsInBattle = figsInBattle.length;
+    if (this.nFigsInBattle === 0) { addStrength(0, 'noFigures'); return 0; }
+    const figStrength = this.figStrengthOfGod(figsInBattle); addStrength(figStrength, 'Figures');
     const cardsInPlay = this.cardsInBattle;
     const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.strength ?? 0] as [string, number]);
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.god.name === 'Bastet') {
-      const bmark = Bastet.instance.bastetMarks.find(bmark => bmark.regionId === regionNdx + 1);
+      const bmark = Bastet.instance.bastetMarks.find(bmark => bmark.regionId === regionId);
       if (bmark) {
         addStrength(bmark.strength, `Bastet[${bmark.strength}]`);
         bmark.sendHome();
       }
     }
     if (this.hasAnkhPower('Temple')) {
-      const temples = this.templeHexesInRegion(regionNdx);
+      const temples = this.templeHexesInRegion(regionId - 1);
       const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.meep?.player == this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
-    if (this.player.godName === 'Anubis' && this.figuresInRegion(regionNdx + 1 as RegionId, this.player).includes(this.god.figure)) {
+    if (this.player.godName === 'Anubis' && this.figuresInRegion(regionId, this.player).includes(this.god.figure)) {
       addStrength(Anubis.instance.occupiedSlots.length, `Anubis`)
     }
     // TODO: add Bastet-Cats

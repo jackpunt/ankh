@@ -413,16 +413,16 @@ export class Table extends EventDispatcher  {
     return { row, col };
   }
 
-  readonly panelForPlayer: PlayerPanel[] = [];
+  readonly allPlayerPanels: PlayerPanel[] = [];
   makePerPlayer(c0 = -7.4, c1 = TP.nHexes + .9, r0 = -.3, dr = 3.4) {
     const panelLocs = [[r0, c0], [r0 + dr, c0], [r0 + 2 * dr, c0], [r0, c1], [r0 + dr, c1]];
     const seq = [[], [0], [0, 3], [0, 3, 1], [0, 3, 4, 1], [0, 3, 4, 2, 1]];
     const np = Player.allPlayers.length, seqn = seq[np];
-    this.panelForPlayer.length = 0; // TODO: maybe deconstruct
+    this.allPlayerPanels.length = 0; // TODO: maybe deconstruct
     Player.allPlayers.forEach((player, pIndex) => {
       const ndx = seqn[pIndex];
       const [row, col] = panelLocs[ndx];
-      this.panelForPlayer[pIndex] = player.panel = new PlayerPanel(this, player, row, col, ndx < 3 ? -1 : 1);
+      this.allPlayerPanels[pIndex] = player.panel = new PlayerPanel(this, player, row, col, ndx < 3 ? -1 : 1);
       player.makePlayerBits();
     });
   }
@@ -760,9 +760,10 @@ export class Table extends EventDispatcher  {
     // return this.scoreMarks.map(pm => pm.score + pm.rank/10);
     return this.scoreMarks.map(pm => pm.score + this.scoreStacks[pm.score].indexOf(pm)/10);
   }
-  get panelsInRank() {
+  get panelsInRank() { return this.panelsByScore(); }
+  panelsByScore(panels = this.allPlayerPanels) {
     const scores = this.playerScores
-    return this.panelForPlayer.sort((pa, pb) => scores[pa.player.index] - scores[pb.player.index]);
+    return panels.sort((pa, pb) => scores[pa.player.index] - scores[pb.player.index]);
   }
 
   // TODO: AnkhTable extends Table { override hexMap: HexMap<AnkhHex> }

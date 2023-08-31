@@ -176,7 +176,7 @@ export class ScenarioParser {
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
     }
     const cardstates = cardStates, colorForState = PlayerPanel.colorForState;
-    table.panelForPlayer.forEach((panel, pi) => {
+    table.allPlayerPanels.forEach((panel, pi) => {
       panel.cardSelector.powerLines.forEach((pl, ndx) =>
         pl.button.paint(colorForState[cardstates[cards?.[pi]?.[ndx] ?? 0]]));
     })
@@ -299,7 +299,7 @@ export class ScenarioParser {
     })
     actions.selected = this.gamePlay.gameState.selectedActions;
     const indexForColor = PlayerPanel.indexForColor;
-    const cards = table.panelForPlayer.map(panel =>
+    const cards = table.allPlayerPanels.map(panel =>
       panel.cardSelector.powerLines.map(pl => indexForColor[pl.button.colorn])
     );
     const godStates = {}
@@ -307,7 +307,7 @@ export class ScenarioParser {
       const godState = player.god.saveState();
       if (godState !== undefined) godStates[player.god.name] = godState;
     });
-    const stable = table.panelForPlayer.map(panel => {
+    const stable = table.allPlayerPanels.map(panel => {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
     const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());

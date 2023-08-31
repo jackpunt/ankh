@@ -883,6 +883,11 @@ export class Androsphinx extends Guardian3 {
   }
 }
 
+// Petsucho: strength=3; after conflict goes to 'pool' of player with least devotion; occupies 2 adj hexes!
+// if control did not change, leave it on the board.
+
+// Pharoh-Mummy: auto-Cycle battle cards
+
 // List all the God constructors:
 const guardianConstructors: Constructor<Guardian>[] = [Satet, CatMum, Mummy, Apep, Scorpion, Androsphinx];
 // godSpecs.forEach(god => new god());

@@ -45,6 +45,7 @@ export class GameState {
 
   readonly selectedActions: ActionIdent[] = [];
 
+  osirisPlayer = undefined;
   bastetPlayer = undefined;
   bastetDone = true;
   setBastetDone() {
@@ -119,8 +120,9 @@ export class GameState {
   readonly states: { [index: string]: Phase } = {
     StartGame: {
       start: () => {
-        this.hathorPlayer = this.findGod('Hathor'); // const
-        this.bastetPlayer = this.findGod('Bastet'); // const
+        this.hathorPlayer = this.findGod('Hathor'); // Hathor.instance?.player
+        this.bastetPlayer = this.findGod('Bastet'); // Bastet.instance?.player
+        this.osirisPlayer = this.findGod('Osiris'); // Osiris.instance?.player
         this.phase(this.bastetPlayer ? 'BastetDeploy' : 'BeginTurn', 'BeginTurn');
       }
     },
@@ -586,71 +588,82 @@ export class GameState {
         const panels = panels0.concat();
         this.table.logText(`${this.state.Aname}[${rid}]`);
         if (panels.length === 0) {
-          // wtf? plague killed the all?
+          // wtf? plague killed them all? maybe use tiebreaker to get a winner...
           this.table.logText(`Battle[${rid}]: no Figures in Battle[${rid}]`);
-          this.phase('ConflictRegionDone'); return;
+          // this.phase('ConflictRegionDone'); return;
         }
-        panels.forEach(panel => panel.strength = panel.strengthInRegion(rid - 1));
+        // After Plague, nFigsInRegion may be 0!
+        panels.forEach(panel => panel.strength = panel.strengthInRegion(rid));
         panels.sort((a, b) => b.strength - a.strength);
         panels.forEach(panel => this.table.logText(`Battle[${rid}] ${json(panel.reasons)}`))
 
         const d = panels[0].strength - (panels[1]?.strength ?? 0) // after Plague, only one Player...
         let winner = (d > 0) ? panels[0] : undefined;
+        const resolution = () => {
+          if (winner) {
+            const winPlyr = winner.player, powers = winPlyr.god.ankhPowers;
+            if (powers.includes('Commanding')) this.addFollowers(winPlyr, 3, `Commanding[${rid}]`);
+            let dev = 0, reasons = '';
+            const devReason = (n, reason: string) => { dev += n, reasons = `${reasons} ${reason}:${n}` }
+            devReason(1, 'Win');
+            if (winner.hasCardInBattle('Drought')) {
+              const inDesert = winner.figuresInRegion(rid, winPlyr).filter(fig => fig.hex.terrain === 'd').length;
+              devReason(inDesert, 'Drought');
+            }
+            if (powers.includes('Glorious') && d >= 3) devReason(3, 'Glorious');
+            if (this.hasRadiance(winner)) devReason(1, `Radiance`);
+            this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`); //slice initial SPACE
+            this.addDevotion(winPlyr, dev, `Battle[${rid}]:${dev}`);
+            panels.splice(0, 1); // remove winner, panels now has all the losers.
+          }
+
+          const deadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
+
+          // ----------- After Battle Resolution: panels contains losers --------------
+          // no need to re-sort: only winner has changed score [?]
+          panels.forEach(panel => {
+            if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
+              this.addDevotion(panel.player, 2, `Magnanimous[${rid}]:2`);
+            }
+          });
+
+          // Resolve Miracle cards:
+          panels0.filter(panel => panel.hasCardInBattle('Miracle')).forEach(panel => {
+            const player = panel.player, ofPlayer = (fig: Figure) => fig.lastController === player.god;
+            const nPlague = this.states['PlagueResolution'].deadFigs.filter(ofPlayer).length;
+            const nBattle = deadFigs.filter(ofPlayer).length;
+            const nKilled = nPlague + nBattle;
+            if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
+          })
+          this.phase(this.osirisPlayer ? 'Osiris' : 'Worshipful')
+        }
+
         if (d == 0) {          // consider tiebreaker;
           const curPanel = this.panel;
           const contenders = panels.filter(panel => panel.strength === panels[0].strength);
-          // TODO: offer curPanel a choice, mark choice used.
-          if (contenders.includes(curPanel)) {
-            winner = curPanel;
-            this.table.logText(`${winner.name} uses tiebreaker: +1 strength`)
-            console.log(stime(this, `Battle[${rid}]: ${winner.name} uses tiebreaker (${d})`));
-            curPanel.canUseTiebreaker = false
+          if (contenders.includes(curPanel) && curPanel.canUseTiebreaker) {
+            curPanel.areYouSure(`Use tiebreaker to win?`,
+              () => {
+                winner = curPanel;
+                this.table.logText(`${winner.name} uses tiebreaker: +1 strength`)
+                console.log(stime(this, `Battle[${rid}]: ${winner.name} uses tiebreaker (${d})`));
+                curPanel.canUseTiebreaker = false;
+                resolution();
+              },
+              () => {
+                resolution();
+              })
+          } else {
+            resolution();
           }
         }
-        if (winner) {
-          const winPlyr = winner.player, powers = winPlyr.god.ankhPowers;
-          if (powers.includes('Commanding')) this.addFollowers(winPlyr, 3, `Commanding[${rid}]`);
-          let dev = 0, reasons = '';
-          const devReason = (n, reason: string) => {dev += n, reasons = `${reasons} ${reason}:${n}`}
-          devReason(1, 'Win');
-          if (winner.hasCardInBattle('Drought')) {
-            const inDesert = winner.figuresInRegion(rid, winPlyr).filter(fig => fig.hex.terrain === 'd').length;
-            devReason(inDesert, 'Drought');
-          }
-          if (powers.includes('Glorious') && d >= 3) devReason(3, 'Glorious');
-          if (this.hasRadiance(winner)) devReason(1, `Radiance`);
-          this.table.logText(`Battle[${rid}]: ${winner.name} Wins! {${reasons.slice(1)}}`); //slice initial SPACE
-          this.addDevotion(winPlyr, dev, `Battle[${rid}]:${dev}`);
-          panels.splice(0, 1); // remove winner, panels now has all the losers.
-        }
-
-        const deadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
-
-        // ----------- After Battle Resolution: panels contains losers --------------
-
-        panels.forEach(panel => {
-          if (panel.hasAnkhPower('Magnanimous') && panel.nFigsInBattle >= 2) {
-            this.addDevotion(panel.player, 2, `Magnanimous[${rid}]:2`);
-          }
-        });
-
-        // Resolve Miracle cards:
-        panels0.filter(panel => panel.hasCardInBattle('Miracle')).forEach(panel => {
-          const player = panel.player, ofPlayer = (fig: Figure) => fig.lastController === player.god;
-          const nPlague = this.states['PlagueResolution'].deadFigs.filter(ofPlayer).length;
-          const nBattle = deadFigs.filter(ofPlayer).length;
-          const nKilled = nPlague + nBattle;
-          if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
-        })
-        const doOsiris = panels.find(panel => panel.player.godName === 'Osiris')
-        this.phase(doOsiris ? 'Osiris' : 'Worshipful')
       },
     },
     Osiris: {
       start: () => {
-        // highlight empty cells of conflictRegion
+        // isLegalTarget marks empty hexes in conflictRegion
         Osiris.instance.highlight(true);   // highlight Portal tiles.
-        this.doneButton('Place Portal', God.byName.get('Osiris').color);
+        this.doneButton('Place Portal', Osiris.instance.color);
       },
       done: () => {
         Osiris.instance.highlight(false);  // un-highlight Portal tiles.

@@ -345,6 +345,7 @@ export class Osiris extends God {
   }
 
   highlight(vis = true) {
+    // can move any of the Portal units:
     this.specialSource.filterUnits(unit => (unit.highlight(vis), false));
   }
 }

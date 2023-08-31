@@ -317,7 +317,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
     KeyBinder.keyBinder.setKey('C', () => {
       const vis = (cardSelectorsUp = !cardSelectorsUp);
-      this.table.panelForPlayer.forEach(panel => {
+      this.table.allPlayerPanels.forEach(panel => {
 
       })
       this.allPlayers.forEach(player => {
