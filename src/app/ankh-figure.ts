@@ -251,7 +251,7 @@ export class RadianceMarker extends AnkhPiece {
   }
 
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
-    if (!(ctx.phase === 'Summon' || ctx.lastShift)) return false;
+    if (!(ctx.phase === 'Summon' || ctx.phase === 'HathorSummon' || ctx.lastShift)) return false;
     const figure = (toHex instanceof AnkhHex) && toHex.figure;
     return toHex.isOnMap
       && figure
@@ -517,7 +517,7 @@ export class Figure extends AnkhMeeple {
     if (!this.isLegalWater(hex)) return false;              // Apep can Summon to water!
 
     // isSummon: adjacent to existing, player-owned Figure or Monument.
-    if ((this.isFromStable || this.isAnubisSummon() ) && (ctx.phase === ('Summon') || ctx.lastShift)) {
+    if ((this.isFromStable || this.isAnubisSummon() ) && (ctx.phase === 'Summon' || ctx.phase === 'HathorSummon' || ctx.lastShift)) {
       return this.isLegalSummon(hex, ctx);
       // TODO: account for Pyramid power: after a non-Pyramid placement, only adj-Pyramid is legal.
     }

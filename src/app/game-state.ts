@@ -257,7 +257,7 @@ export class GameState {
         panel.activateAnkhPowerSelector();
       },
       done: () => {
-        this.phase('EndAction')
+        this.phase(!this.hathorSummon ? 'EndAction' : 'HathorSummon', 'EndAction');
       },
     },
     EndAction: {
@@ -487,9 +487,10 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const buildPanels = []; let t: PowerLine;
+        const buildPanels = []; let pl: PowerLine;
+        if (this.state.panels?.length ?? 0 === 0) {}
         const panels = this.state.panels = this.panelsInConflict.filter(panel =>
-          (t = panel.hasCardInBattle('Build'), buildPanels.push(t), t) && (panel.canAffordMonument));
+          (pl = panel.hasCardInBattle('Build'), buildPanels.push(pl), pl) && (panel.canAffordMonument));
         if (panels.length === 0) {
           console.log(stime(this, `.BuildMonument: no panels will Build ()`), ...buildPanels.map(p=>p ?p.name : ''));
           this.phase('Plague');
@@ -500,12 +501,19 @@ export class GameState {
         this.doneButton('Build Done', panels[0].player.color);
       },
       // Triggered by 'Build Done' button OR 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
-      done: (panel: PlayerPanel = this.state.panels[0], monument: Monument) => {
+      done: (panel: PlayerPanel = this.state.panels[0], monument?: Monument) => {
         if (panel && monument) {
           this.table.logText(`${panel.player.godName} built Monument: ${monument?.hex.toString()}`);
           // no cost if Done *without* building (cbir>0)
           if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
             this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
+            if (this.hathorSummon) {
+              this.phase('HathorSummon', () => {
+                // return to BuildMonument.done(panel);
+                ; (this.state = this.states['BuildMonument']).done(panel);
+              });
+              return;
+            }
           }
         }
         const panels = this.state.panels;
@@ -658,19 +666,22 @@ export class GameState {
         this.state.panels = panels0.filter(panel => panel.hasAnkhPower('Worshipful') && panel.player.coins >= 2);
         this.done();
       },
-      done: (p: PlayerPanel) => {
+      done: (panel: PlayerPanel) => {
         const panels = this.state.panels, rid = this.conflictRegion;
-        if (p) {
-          const ndx = panels.indexOf(p);
-          panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
+        if (panel) {
+          const ndx = panels.indexOf(panel);
+          panels.splice(ndx, 1);
         }
-        if (panels.length === 0) { this.phase('ConflictRegionDone'); return }
-        const panel = panels[0];
-        panel.areYouSure('Sacrifice 2 for Worshipful?', () => {
-          this.addFollowers(panel.player, -2, `Worshipful[${rid}]`); // assume yes: they want Devotion
-          this.addDevotion(panel.player, 1, `Worshipful[${rid}]:1`);
-          this.done(panel)
-        }, () => { this.done(panel) })
+        if (panels.length === 0) {
+          this.phase(!this.hathorSummon ? 'ConflictRegionDone' : 'HathorSummon', 'ConflictRegionDone');
+          return;
+        }
+        const panel0 = panels[0];
+        panel0.areYouSure('Sacrifice 2 for Worshipful?', () => {
+          this.addFollowers(panel0.player, -2, `Worshipful[${rid}]`); // assume yes: they want Devotion
+          this.addDevotion(panel0.player, 1, `Worshipful[${rid}]:1`);
+          this.done(panel0);
+        }, () => { this.done(panel0) })
       }
     },
     ConflictRegionDone: {
@@ -708,25 +719,26 @@ export class GameState {
         this.phase('BeginTurn');
       },
     },
+    /** Hathor: after addFollowers() Ankh-Event, BuildMonument, Worshipful, Summon-AnubisRansom */
     HathorSummon: {
-      nextPhase: 'required',
-      start: (nextPhase: string) => {
+      start: (nextPhase: string | (() => void)) => {
         if (!nextPhase) debugger;
-        this.state.nextPhase = nextPhase;
+        const next = (typeof nextPhase === 'function') ? nextPhase : () => this.phase(nextPhase);
         const player = this.hathorPlayer;
         const highlights = player.panel.highlightStable(true);
         // const playerFigs = Figure.allFigures.filter(fig => fig.player === player);
         // playerFigs.forEach(fig => fig.faceUp());   // set meep.startHex
         this.state.done = () => {
           highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
-          this.phase(nextPhase); // with no 'panel' arg
+          this.hathorSummon = false;
+          next();
         }
         this.doneButton('Hathor Summon');
       },
       done: () => {
         // dyna-set above with highlights & nextPhase
       },
-    }
+    },
   };
 
   setup() {
