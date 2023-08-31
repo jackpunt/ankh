@@ -39,7 +39,7 @@ export type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: 
 export type SplitElt = (SplitBid | SplitDir)
 export type SplitSpec = SplitElt[];
 
-type SetupElt = {
+export type SetupElt = {
   Aname?: string,        // {orig-scene}@{turn}
   ngods: number,         // == nPlayers (used to select, verify scenario)
   places: PlaceElt[],    // must have some GodFigure on the board!

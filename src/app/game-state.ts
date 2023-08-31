@@ -119,6 +119,7 @@ export class GameState {
   readonly states: { [index: string]: Phase } = {
     StartGame: {
       start: () => {
+        this.hathorPlayer = this.findGod('Hathor'); // const
         this.bastetPlayer = this.findGod('Bastet'); // const
         this.phase(this.bastetPlayer ? 'BastetDeploy' : 'BeginTurn', 'BeginTurn');
       }
@@ -136,7 +137,10 @@ export class GameState {
       start: (phase: string) => {
         this.state.nextPhase = phase;
         // enable Cats on the board; onClick-> {gamePlay.bastetCat(cat); curState.done()}
-        Bastet.instance.bastetMarks.forEach(bmark => bmark.highlight(true));
+        Bastet.instance.bastetMarks.forEach(bmark => {
+          bmark.sendHome();
+          bmark.highlight(true);
+        });
         this.doneButton('Bastet Deploy', this.bastetPlayer.color);
       },
       done: () =>  {
@@ -154,7 +158,7 @@ export class GameState {
       start: () => {
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
-        this.bastetDone = this.bastetPlayer && (this.bastetPlayer !== this.curPlayer) ? false : true;
+        this.bastetDone = !this.bastetPlayer || (this.bastetPlayer === this.curPlayer);
         this.phase('ChooseAction');
       },
     },
@@ -495,22 +499,24 @@ export class GameState {
         this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
         this.doneButton('Build Done', panels[0].player.color);
       },
-      // *should* be triggered by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
+      // Triggered by 'Build Done' button OR 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
       done: (panel: PlayerPanel = this.state.panels[0], monument: Monument) => {
-        this.table.logText(`${panel.player.godName} built Monument: ${monument.hex.toString()}`);
-        // no cost if Done *without* building (cbir>0)
-        if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
-          this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
+        if (panel && monument) {
+          this.table.logText(`${panel.player.godName} built Monument: ${monument?.hex.toString()}`);
+          // no cost if Done *without* building (cbir>0)
+          if (!panel.canBuildInRegion && !panel.hasAnkhPower('Inspiring')) {
+            this.addFollowers(panel.player, -3, `Build Monument[${this.conflictRegion}]`);
+          }
         }
-
         const panels = this.state.panels;
         const ndx = panels.indexOf(panel);
-        if (ndx < 0) return;    // spurious doneification
-        panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
-        if (panels.length === 0) {
-          this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
-          this.doneButton('', C.grey, () => this.phase('Plague'));
-          return;
+        if (ndx >= 0) {           // vs repeated or undefined panel
+          panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
+          if (panels.length === 0) {
+            this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
+            this.doneButton('', C.grey, () => this.phase('Plague'));
+            return;
+          }
         }
         // console.log(stime(this, `Build.done: return NOT done...`))
         panels[0].enableBuild(this.conflictRegion); // Monument.dropFunc() --> buildDone --> panel.enableBuild
@@ -648,7 +654,6 @@ export class GameState {
       panels: [],
       start: () => {
         const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
-        const rid = this.conflictRegion;
         // ASSERT: panels0 is [still] sorted by player rank.
         this.state.panels = panels0.filter(panel => panel.hasAnkhPower('Worshipful') && panel.player.coins >= 2);
         this.done();
@@ -703,7 +708,25 @@ export class GameState {
         this.phase('BeginTurn');
       },
     },
-
+    HathorSummon: {
+      nextPhase: 'required',
+      start: (nextPhase: string) => {
+        if (!nextPhase) debugger;
+        this.state.nextPhase = nextPhase;
+        const player = this.hathorPlayer;
+        const highlights = player.panel.highlightStable(true);
+        // const playerFigs = Figure.allFigures.filter(fig => fig.player === player);
+        // playerFigs.forEach(fig => fig.faceUp());   // set meep.startHex
+        this.state.done = () => {
+          highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
+          this.phase(nextPhase); // with no 'panel' arg
+        }
+        this.doneButton('Hathor Summon');
+      },
+      done: () => {
+        // dyna-set above with highlights & nextPhase
+      },
+    }
   };
 
   setup() {
@@ -764,7 +787,13 @@ export class GameState {
     if (n < 0 && player.godName === 'Hathor') {
       player.panel.highlightStable(true);
     }
+    this.hathorSummon = (player === this.hathorPlayer) && (n < 0) && (player.coins > 0);
   }
+  // TODO: check that plague kills mummy before battle resolution (so can be in Drought or adj-Temple)
+  // after Ankh(Event), (BuildMonument)BuildMonument, (Worshipful)Worshipful, (Summon)AnubisRansom
+  /** true when Hathor gets a free Summon (due to sacrificing a Follower) */
+  hathorSummon = false;
+  hathorPlayer: Player = undefined;
 
   addDevotion(player: Player, n: number, reason?: string) {
     const score0 = player.score;

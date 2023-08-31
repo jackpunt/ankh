@@ -11,7 +11,7 @@ import { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
-import { GuardIdent, LogElts, Scenario, ScenarioParser } from "./scenario-parser";
+import { GuardIdent, LogElts, Scenario, ScenarioParser, SetupElt } from "./scenario-parser";
 import { LogReader, LogWriter } from "./stream-writer";
 import { Table } from "./table";
 import { TP } from "./table-params";
@@ -38,6 +38,7 @@ export class GameSetup {
     stime.fmt = "MM-DD kk:mm:ss.SSSL"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
+    this.setupToParseState();                 // restart when/if button is clicked
     this.setupToReadFileState();              // restart when/if button is clicked
     Tile.loader.loadImages(() => this.startup(qParams));
   }
@@ -85,6 +86,17 @@ export class GameSetup {
   godNames: string[] = [];
   guards: GuardIdent = [undefined, undefined, undefined];
 
+  setupToParseState() {
+    const parseStateButton = document.getElementById('parseStateButton');
+    const parseStateText = document.getElementById('parseStateText') as HTMLInputElement;
+    parseStateButton.onclick = () => {
+      const stateText = parseStateText.value;
+      const state = json5.parse(stateText) as SetupElt;
+      state.Aname = state.Aname ?? `parseStateText`;
+      this.restart(state);
+    }
+  }
+
   fileReadPromise: Promise<File>;
   async setupToReadFileState() {
     const logReader = new LogReader(`log/date_time.js`, 'fsReadFileButton');
@@ -101,7 +113,7 @@ export class GameSetup {
     const [startelt, ...stateArray] = logArray;
     const state = stateArray.find(state => state.turn === turn);
     state.Aname = `${fileName}@${turn}`;
-    this. setupToReadFileState();   // another thread to wait for next click
+    this.setupToReadFileState();   // another thread to wait for next click
     this.restart(state);
   }
 
@@ -116,16 +128,17 @@ export class GameSetup {
    * Make new Table/layout & gamePlay/hexMap & Players.
    * @param qParams from URL
    */
-  async startup(qParams: Params = []) {
+  startup(qParams: Params = []) {
     //ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom'
     this.godNames = qParams['gods']?.split(',') ?? this.godNames;
-    this.ngods = Number.parseInt(qParams?.['n'] ?? uniq(this.godNames)?.length ?? '2') ?? this.ngods;
+    this.ngods = qParams?.['n'] ? Number.parseInt(qParams?.['n'])
+      : (this.godNames.length > 1) ? this.godNames.length : 2;
     this.ngods = Math.min(5, this.ngods);
     this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
     this.guards = qParams['guards']?.split(',') ?? this.guards;
 
     const scenario = this.scenarioFromSource(this.scene);
-    scenario.Aname = scenario?.Aname ?? this.scene;
+    if (scenario) scenario.Aname = scenario.Aname ?? this.scene;
     console.log(stime(this, `.startup: ${this.scene} ngods=${this.ngods} scenario=`), scenario);
     this.startScenario(scenario);
   }

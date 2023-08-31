@@ -1,6 +1,6 @@
 import { C, Constructor, XY, className } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
-import { AnkhHex, AnkhMap, RegionId, StableHex } from "./ankh-map";
+import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
@@ -121,7 +121,7 @@ export class Monument extends AnkhPiece {
   }
 
   override resetTile(): void {      // Monument AnkhToken.resetTile()
-    const ankhToken = this.fromHex?.meep as AnkhToken;
+    const ankhToken = this.hex?.meep as AnkhToken;
     if (ankhToken) {
       ankhToken.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
     }
@@ -160,8 +160,8 @@ export class Temple extends Monument {
 export class Portal extends AnkhPiece {
   static source = [[]]; // per-player source, although only 1 Osiris player...
   static color = 'rgba(80,80,80,.8)';
-  static dr = 3;
-  static radius0 = TP.hexRad - Portal.dr - 1;
+  static dr = 3; // colored 'ring'
+  static radius0 = TP.hexRad - Portal.dr - 2; // inner hex [or maybe the highlight is wrong, overwriting the green ring]
   override get radius() { return Portal.radius0 + Portal.dr };
 
   constructor(player: Player, serial?: number) {
@@ -179,7 +179,7 @@ export class Portal extends AnkhPiece {
   }
 
   highlight(vis = true) {
-    this.paint(vis ? 'black' : this.player.color);
+    this.paint(vis ? 'white' : this.player.color);
   }
 
   // override dropFunc(targetHex: Hex2, ctx: DragContext): void {
@@ -188,7 +188,7 @@ export class Portal extends AnkhPiece {
   // }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
-    return (ctx.phase === 'Osiris') ? undefined : 'Only after losing in Battle';
+    return (ctx.phase === 'Osiris' || ctx.lastShift) ? undefined : 'Only after losing in Battle';
   }
    // at end of Battle: Osiris Special:
    // enable move Portal to any empty non-Water space in the conflictRegion.
@@ -330,8 +330,8 @@ export class AnkhMeeple extends Meeple {
 
 /** a marker, associated with a Hex, but not the hex.meep */
 export class BastetMark extends AnkhMeeple {
-  declare homeHex: AnkhHex;
-  bastHex: AnkhHex; // where this bmark is deployed.
+  declare homeHex: AnkhHex; // the BastetHex 'source' hex.
+  bastHex: AnkhHex;         // where this bmark is deployed.
   get bastetHexes() { return Bastet.instance.bastetHexes; }
   get bastetMarks() { return Bastet.instance.bastetHexes.map(hex => hex.bmark) }
   get regionId() { return this.bastHex ? this.bastHex.regionId : undefined }
@@ -345,17 +345,25 @@ export class BastetMark extends AnkhMeeple {
     return new Graphics().f(color).ss(2).s('black').dc(0, 0, this.radius - 1);
   }
 
+  // BastetMark is on either its homeHex or its bastHex
   setOn(hex: AnkhHex) {
-    const bastHex = this.bastHex = hex ?? this.homeHex;
-    const cont = bastHex.map.mapCont.markCont;
-    cont.addChild(this);
-    this.x = bastHex.x - TP.ankh1Rad / 2; this.y = bastHex.y;
-    bastHex.map.update();
+    const toHex = hex ?? this.bastHex ?? this.homeHex;
+    toHex.map.mapCont.markCont.addChild(this);
+    this.x = toHex.x ; this.y = toHex.y;
+    if (toHex !== this.homeHex) {
+      this.bastHex = toHex;
+      this.x -= TP.ankh1Rad / 2;
+    }
+    toHex.map.update();
+  }
+  override sendHome(): void {
+    this.bastHex = undefined;
+    this.setOn(this.homeHex); this.moveTo
   }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
     if (player !== this.player.gamePlay.curPlayer) return 'not your turn';
-    if (player === this.player && !ctx.lastShift) return 'only during BastetDeploy';
+    if (player === this.player && ctx.phase !== 'BastetDeploy' && !ctx.lastShift) return 'only during BastetDeploy';
     return undefined;
   }
 
@@ -378,7 +386,6 @@ export class BastetMark extends AnkhMeeple {
           // bmark is disarmed, return to bastetHexes:
           this.player.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
         }
-        this.bastHex = undefined;
         this.sendHome();
         this.gamePlay.gameState.setBastetDone();
       }
@@ -389,9 +396,11 @@ export class BastetMark extends AnkhMeeple {
     if (ctx.phase === 'BastetDeploy' || ctx.lastShift) {
       if (!(hex?.isOnMap && (hex.regionId >= 1))) return false;
       if (!(hex.tile instanceof Monument)) return false;
-      const deployedHexes = this.bastetHexes.filter(hex => !!hex && hex !== this.bastHex);
-      const isBastetInRegion = deployedHexes.find(ohex => (ohex.regionId === hex.regionId));
-      return !isBastetInRegion;
+      const inSameRegion = (hex.regionId === this.bastHex?.regionId);
+      if (inSameRegion) return true;
+      const deployedRegions = this.bastetHexes.filter(hex => hex.bmark.bastHex).map(hex => hex.bmark.bastHex.regionId);
+      const otherInRegion = deployedRegions.includes(hex.regionId);
+      return !otherInRegion;
     } else {
       const player = this.player.gamePlay.curPlayer;
       const isAdj = hex.findAdjHex(adj => adj === this.bastHex);
@@ -697,7 +706,11 @@ export class Satet extends Guardian1 {
     return hex?.isOnMap && !(hex.tile instanceof Monument); // avoid AnkhToken
   }
   openHex(hex: AnkhHex, player: Player) {
-    return hex && (!hex.occupied || (!hex.meep && hex.tile instanceof Portal && player.godName === 'Osiris'));
+    if (!hex) return false;
+    if (!hex.tile && !hex.meep) return true;
+    // open if: there is a hex; && is no meep (or meep is satet-inFlight) && no tile (or tile is open portal for Osiris)
+    const noMeep = (!hex.meep || (hex.meep === this));
+    return noMeep && (!hex.tile || (hex.tile instanceof Portal && player.godName === 'Osiris'))
   }
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
     const figure = hex?.figure;
@@ -724,7 +737,7 @@ export class Satet extends Guardian1 {
       this.lastTarget = undefined;
     }
     const figure = hex?.figure;
-    if (hex?.isOnMap && figure) {
+    if (hex?.isOnMap && figure && (hex.figure?.player !== this.player)) {
       // find the right empty hex... opposite direction from which Satet entered hex
       const pt = this.parent.localToLocal(this.x, this.y, hex.cont); // from DragC --> targetHex coordinates
       const outDir = H.dirRev[hex.cornerDir(pt, hex.cont, H.nsDirs)[0]];

@@ -221,8 +221,7 @@ export class StableHex extends AnkhHex {
 
 /** SpecialHex scales the Tile or Meep by .8 */
 export class SpecialHex extends AnkhHex {
-  static scale = .8;
-  scale = SpecialHex.scale;
+  scale = .8;
 
   override get meep() { return super.meep; }
 
@@ -233,7 +232,7 @@ export class SpecialHex extends AnkhHex {
     }
     super.meep = meep;
     if (meep !== undefined) {
-      meep.scaleX = meep.scaleY = SpecialHex.scale;
+      meep.scaleX = meep.scaleY = this.scale;
       meep.updateCache();
     }
   }

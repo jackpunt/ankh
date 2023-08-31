@@ -154,7 +154,10 @@ export class PlayerPanel extends Container {
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
     if (this.god.name === 'Bastet') {
       const bmark = Bastet.instance.bastetMarks.find(bmark => bmark.regionId === regionNdx + 1);
-      if (bmark) addStrength(bmark.strength, `Bastet[${bmark.strength}]`);
+      if (bmark) {
+        addStrength(bmark.strength, `Bastet[${bmark.strength}]`);
+        bmark.sendHome();
+      }
     }
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionNdx);
@@ -182,15 +185,14 @@ export class PlayerPanel extends Container {
   enableBuild(regionId: RegionId): void {
     this.canBuildInRegion = regionId;
     const panel = this;
-    const onBuildDone = this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
+    this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
       const { panel0, monument } = evt;
       panel0.table.monumentSources.forEach(ms => ms.sourceHexUnit.setPlayerAndPaint(undefined));
       if (panel0 === panel) {
-        this.table.off('buildDone', onBuildDone);
         panel0.canBuildInRegion = undefined;
         this.player.gamePlay.phaseDone(panel0, monument);
       }
-    })
+    }, this, true); // trigger only once!
   }
   // detectObeliskTeleport... oh! this requires a 'Done' indication.
   enableObeliskTeleport(regionId: RegionId): void {
@@ -235,8 +237,8 @@ export class PlayerPanel extends Container {
       ['Pyramid', undefined, 'Summon to Pyramid']
     ],
     [
-      ['Glorious', undefined, '+3 Devotion when win by 3 Strength'],
-      ['Magnanimous', undefined, '+2 Devotion when 2 Figures in battle and lose'],
+      ['Glorious', undefined, '+3 Devotion when win Battle by 3 strength'],
+      ['Magnanimous', undefined, '+2 Devotion when 2 Figures in Battle and lose'],
       ['Bountiful', undefined, '+1 Devotion when gain Devotion in Red'],
       ['Worshipful', undefined, '+1 Devotion when sacrifice 2 after Battle']
     ], // rank 2
@@ -336,8 +338,8 @@ export class PlayerPanel extends Container {
     // if stable is normally faceDown, then we can face them up when activated !?
     const stableFigs = this.stableHexes.map(hex => hex.figure).filter(fig => !!fig);
     const anubisHexes = Anubis.instance?.anubisHexes;
-    const anubisFigs = anubisHexes.map(hex => hex.figure).filter(fig => fig.player === this.player);
-    const summonFigs = stableFigs.concat(anubisFigs);
+    const anubisFigs = anubisHexes?.map(hex => hex.figure).filter(fig => fig?.player === this.player);
+    const summonFigs = stableFigs.concat(anubisFigs ?? []);
     return summonFigs.filter(fig => fig.highlight(show, C.BLACK))
   }
 

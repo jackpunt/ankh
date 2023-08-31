@@ -1,6 +1,6 @@
 import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
-import { Container, Shape } from "@thegraid/easeljs-module";
+import { Container, Shape, Text } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhMeeple, AnkhSource, BastetMark, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
@@ -57,15 +57,29 @@ export class God {
   getAnkhMarker(rad = TP.ankhRad, color = this.color) {
     return new AnkhMarker(color, rad);
   }
-
+  specialCont: Container;
+  wh: WH;
+  tname: Text;
   makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
+    this.specialCont = cont;
+    this.wh = wh;
     const fillc = 'rgb(140,140,140)';
     const rad = TP.ankhRad + 4, y = wh.height / 2 + rad / 2;
     const bg = new Shape(); bg.graphics.f(fillc).dr(0, 0, wh.width, wh.height)
     cont.addChild(bg);
-    const tname = new CenterText(this.Aname, rad, 'white' );
+    const tname = this.tname = new CenterText(this.Aname, rad, 'white' );
     tname.x = wh.width / 2; tname.y += 2; tname.textBaseline = 'top';
     cont.addChild(tname);
+  }
+
+  specialText(lines: string, wh = this.wh, rad = TP.ankhRad) {
+    const text = new CenterText(lines, rad, 'white');
+    const x = wh.width / 2, h = text.getMeasuredHeight();
+    const r2 = this.tname.getMeasuredLineHeight(), y = r2 + (wh.height - h - r2) / 2;
+    text.textBaseline = 'top';
+    text.x += x;
+    text.y += y;
+    this.specialCont.addChild(text);
   }
 
   get nCardsAllowedInBattle() { return 1; }
@@ -98,17 +112,17 @@ export class Anubis extends God {
 
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel);
-    const cont2 = new Container(), sc = cont2.scaleX = cont2.scaleY = SpecialHex.scale;
+    const cont2 = new Container();
     cont2.name = 'AnubisCont';
     cont.addChild(cont2);
-    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
-    const sgap = (wh.width / sc - 6 * rad) / 4;
+    const r2 = this.tname.getMeasuredLineHeight(), y = r2 + (wh.height - r2) / 2
+    const sc = .9, rad = sc * TP.ankh1Rad, sgap = (wh.width - 6 * rad) / 4;
     [rad, rad, rad].forEach((radi, i) => {
       const circle = new CircleShape('lightgrey', radi, this.color);
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
       cont2.addChild(circle);
-      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex) as AnubisHex;
+      const hex = table.newHex2(0, 0, `amun-${i}`, AnubisHex) as AnubisHex; hex.scale = sc;
       this.anubisHexes.push(hex);
       hex.cont.visible = false;
       cont2.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
@@ -178,6 +192,7 @@ class BastetHex extends SpecialHex {
   bmark: BastetMark;
   constructor(map: HexMap<AnkhHex>, row = 0, col = 0, name = 'bm') {
     super(map, row, col, name);
+    this.scale = 1;
   }
 }
 
@@ -189,20 +204,20 @@ export class Bastet extends God {
   constructor() { super('Bastet', 'orange') }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
-    const cont2 = new Container(), sc = cont2.scaleX = cont2.scaleY = SpecialHex.scale;
-    cont2.name = 'AnubisCont';
-    cont.addChild(cont2);
-    const rad = TP.ankh1Rad, r2 = TP.ankh1Rad / 2, y = wh.height / 2 + r2;
-    const sgap = (wh.width / sc - 6 * rad) / 4;
+    const bCont = new Container();
+    bCont.name = 'BastetCont';
+    cont.addChild(bCont);
+    const r2 = this.tname.getMeasuredLineHeight(), y = r2 + (wh.height - r2) / 2
+    const sc = 1, rad = sc * TP.meepleRad, sgap = (wh.width - 6 * rad) / 4;
     [rad, rad, rad].forEach((radi, i) => {
       const circle = new CircleShape('lightgrey', radi, this.color);
       circle.x = sgap + radi + i * (2 * radi + sgap);
       circle.y = y;
-      cont2.addChild(circle);
-      const hex = table.newHex2(0, 0, `bastet-${i}`, BastetHex) as BastetHex;
+      bCont.addChild(circle);
+      const hex = table.newHex2(0, 0, `bastet-${i}`, BastetHex) as BastetHex; hex.scale = sc;
       this.bastetHexes.push(hex);
       hex.cont.visible = false;
-      cont2.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
+      bCont.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
       hex.legalMark.setOnHex(hex);
     })
     const strength = [0, 1, 3];
@@ -210,15 +225,18 @@ export class Bastet extends God {
       const bmark = new BastetMark(this.player, ndx, strength[ndx]);
       hex.bmark = bmark;
       bmark.homeHex = hex;
-      bmark.moveTo(hex);
+      bmark.setOn(hex);
     })
   }
 }
 
 export class Hathor extends God {
   static get instance() { return God.byName.get('Hathor') as Hathor }
-  constructor() { super('Hathor', 'magenta') }
-  // constructor() { super('Hathor', 'rgb(74,35,90)') }
+  constructor() { super('Hathor', 'rgb(180,130,190)') } // magenta?
+  override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
+    super.makeSpecial(cont, wh, table, panel);
+    super.specialText(`One free Summons\nafter sacrificing\nFollowers`);
+  }
 }
 
 class HorusMarker extends RegionMarker {
@@ -318,7 +336,8 @@ export class Osiris extends God {
     super.makeSpecial(cont, wh, table, panel);
     cont.name = 'Osiris-Special'
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
-    cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    const r2 = this.tname.getMeasuredLineHeight(), y = r2 + (wh.height - r2) / 2
+    cont.localToLocal(wh.width / 2, y, hex.cont.parent, hex.cont);
     const source = this.specialSource = Portal.makeSource0(AnkhSource<Portal>, Portal, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * .9;
     source.counter.x += TP.ankh2Rad * .5;
@@ -334,15 +353,16 @@ export class Ra extends God {
   static get instance() { return God.byName.get('Ra') as Ra }
   constructor() { super('Ra', 'yellow') }
 
-  specialCont: Container;
   specialSource: AnkhSource<RadianceMarker>;
   specialHex: SpecialHex;
 
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel);;
     cont.name = `Ra-Special`;
-    const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = .6;
-    cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
+    const r2 = this.tname.getMeasuredLineHeight(), y = r2 + (wh.height - r2) / 2;
+    const sc = .66;
+    const hex = this.specialHex = table.newHex2(0, 0, `radSrc`, SpecialHex) as SpecialHex; hex.scale = sc;
+    cont.localToLocal(wh.width / 2, y, hex.cont.parent, hex.cont);
     const source = this.specialSource = RadianceMarker.makeSource0(AnkhSource<RadianceMarker>, RadianceMarker, this.player, hex, 3);
     source.counter.y -= TP.ankh2Rad * .7;
     source.counter.x += TP.ankh2Rad * .5;
@@ -353,13 +373,10 @@ export class Ra extends God {
 export class SetGod extends God {
   static get instance() { return God.byName.get('Set') as SetGod }
   constructor() { super('Set', '#F1C40F') } // ~ C.coinGold
+
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
-    const rad = TP.ankhRad, x = wh.width/2, y = wh.height/2 - 6;// measuredHeight/2...
-    const text = new CenterText(`Set controls adjacent\nWarriors & Guardians\nduring Conflict`, rad, 'white');
-    text.x += x;
-    text.y += y;
-    cont.addChild(text);
+    this.specialText(`Set controls adjacent\nWarriors & Guardians\nduring Conflict`, wh);
   }
 }
 
