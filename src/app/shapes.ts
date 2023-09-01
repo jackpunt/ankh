@@ -275,9 +275,9 @@ export class BalMark extends Shape {
 
   constructor(tile: Tile) {
     super();
-    const { nB, fB, nR, fR } = tile, x0 = TP.hexRad * H.sqrt3_2 * .75;
-    this.bMark(nB, fB, x0-5, BalMark.bColor);
-    this.bMark(nR, fR, x0-0, BalMark.rColor);
+    // const { nB, fB, nR, fR } = tile, x0 = TP.hexRad * H.sqrt3_2 * .75;
+    // this.bMark(nB, fB, x0-5, BalMark.bColor);
+    // this.bMark(nR, fR, x0-0, BalMark.rColor);
   }
 
   bMark(n = 0, f = 0, x = 0, color = C.black, ds = [5, 5]) {

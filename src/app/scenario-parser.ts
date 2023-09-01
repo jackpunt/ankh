@@ -9,7 +9,7 @@ import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
 import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
-import { AnkhMarker, God } from "./god";
+import { AnkhMarker, Bastet, God } from "./god";
 import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
@@ -53,6 +53,7 @@ export type SetupElt = {
   scores?: number[],     // 0
   events?: EventElt,
   actions?: ActionElt,
+  bastet?: PlaceElt[],
   godState?: {},         // objects from God.saveState(), [index: god.name]
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   guards?: GuardIdent,   // Guardian types in use. default to random
@@ -160,7 +161,7 @@ export class ScenarioParser {
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, cards, godState, events, actions, stable, ankhs, places } = setup;
+    const { regions, splits, coins, scores, turn, guards, cards, godState, events, actions, stable, ankhs, places, bastet } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -240,6 +241,17 @@ export class ScenarioParser {
     });
     // reset all AnkhTokens, ready for claim some Monument:
     this.parsePlaces(places, turnSet);  // turnSet indicates a saved Scenario, vs original.
+    if (bastet) {
+      // presumably, all bmarks are on their homeHex, unless specified in bastet [[r][c], ...] array
+      const hexMap = this.gamePlay.hexMap;
+      Bastet.instance?.bastetMarks.forEach((bmark, ndx) => {
+        if (bastet[ndx]) {
+          const [row, col] = bastet[ndx];
+          const hex = hexMap[row][col];
+          bmark.setOn(hex);
+        }
+      })
+    }
     // set AnkhPowers in panel:
     ankhs?.forEach((powers: AnkhElt, pid) => {
       // console.log(stime(this, `.ankhs[${pid}]`), powers);
@@ -310,6 +322,7 @@ export class ScenarioParser {
     const stable = table.allPlayerPanels.map(panel => {
       return panel.stableHexes.slice(1).map(hex => hex.meep?.name).filter(elt => elt !== undefined) as GuardIdent;
     })
+    const bastet = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined) as PlaceElt[];
     const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());
     const places = this.gamePlay.allTiles.filter(t => t.hex?.isOnMap && !(t instanceof AnkhToken)).map(t => {
       const row = t.hex.row, col = t.hex.col, cons = className(t), pid = t.player ? t.player.index + 1 : undefined;
@@ -318,8 +331,7 @@ export class ScenarioParser {
       if (t instanceof Scorpion) elt4.unshift(t.rotDir);
       return [row, col, cons, pid, ...elt4] as PlaceElt;
     })
-
-    return { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, cards, godStates, stable, ankhs, places } as SetupElt;
+    return { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, cards, godStates, stable, ankhs, places, bastet } as SetupElt;
   }
 
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {

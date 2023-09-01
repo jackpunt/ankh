@@ -270,9 +270,7 @@ export class AnkhMeeple extends Meeple {
     this.underlay = new CircleShape(); this.underlay.name = 'underlay-highlight';
     this.addChildAt(this.underlay, 0);
     this.underlay.visible = false;
-    this.nameText.text = Aname.replace(/-/g, '\n');
-    const nlines = this.nameText.text.split('\n').length - 1;
-    if (nlines > 0) this.nameText.y -= nlines * this.nameText.getMeasuredHeight() / 4 * nlines;
+    this.setNameText(Aname);
   }
   underlay: CircleShape; // highlight when AnkhMeeple is moveable
 
@@ -353,6 +351,7 @@ export class BastetMark extends AnkhMeeple {
     if (toHex !== this.homeHex) {
       this.bastHex = toHex;
       this.x -= TP.ankh1Rad / 2;
+      this.setNameText('B-Cat');
     }
     toHex.map.update();
   }

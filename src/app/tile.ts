@@ -133,10 +133,17 @@ export class Tile extends Tile0 implements Dragable {
   }
 
   nameText: Text;
-  get nB() { return 0; }
-  get nR() { return 0; }
-  get fB() { return 0; }
-  get fR() { return 0; }
+  setNameText(name: string) {
+    this.nameText.text = name.replace(/-/g, '\n');
+    const nlines = this.nameText.text.split('\n').length - 1;
+    this.nameText.y = (nlines == 0) ? 0 : - nlines * this.nameText.getMeasuredHeight() / 4;
+    this.updateCache();
+  }
+  // for BalMark:
+  // get nB() { return 0; }
+  // get nR() { return 0; }
+  // get fB() { return 0; }
+  // get fR() { return 0; }
 
   /** location at start-of-game & after-Recycle; Meeple & Civic; Policy: sendHome -> sendToBag */
   homeHex: Hex1 = undefined;

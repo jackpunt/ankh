@@ -28,8 +28,7 @@ export class AnkhToken extends AnkhMeeple {
     const ankhChar = new CenterText(TP.ankhString, r * 2.2, C.black);
     ankhChar.y += r * 0.1;
     this.addChild(ankhChar);
-    this.nameText.text = '';
-    // this.nameText.y += 2 * this.radius; // outside of cache bounds, so we don;t see it.
+    this.setNameText('');
     this.baseShape.cgf = (color) => this.atcgf(color);
   }
   override cache(x, y, w, h) {

@@ -4,7 +4,7 @@ import { AnkhHex, RegionId } from "./ankh-map";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
 import { json } from "./functions";
 import type { GamePlay } from "./game-play";
-import { Amun, Anubis, Bastet, God, Horus, Osiris } from "./god";
+import { Amun, Anubis, Bastet, God, Hathor, Horus, Osiris } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
 import { PlayerPanel, PowerLine } from "./player-panel";
@@ -120,10 +120,11 @@ export class GameState {
   readonly states: { [index: string]: Phase } = {
     StartGame: {
       start: () => {
-        this.hathorPlayer = this.findGod('Hathor'); // Hathor.instance?.player
-        this.bastetPlayer = this.findGod('Bastet'); // Bastet.instance?.player
-        this.osirisPlayer = this.findGod('Osiris'); // Osiris.instance?.player
-        this.phase(this.bastetPlayer ? 'BastetDeploy' : 'BeginTurn', 'BeginTurn');
+        this.hathorPlayer = Hathor.instance?.player;
+        this.bastetPlayer = Bastet.instance?.player;
+        this.osirisPlayer = Osiris.instance?.player;
+        const bastetDeployed = Bastet.instance?.bastetMarks.find(bmark => bmark.bastHex);
+        this.phase(!this.bastetPlayer || bastetDeployed ? 'BeginTurn' : 'BastetDeploy', 'BeginTurn');
       }
     },
     BastetDeploy: {
@@ -134,7 +135,7 @@ export class GameState {
       // if '1' | '3' return it (deactivated) to Bastet.
       // if '*', it explodes, killing the adjacent Figure (unless it's a God)
       // and Bastet redeploys all the 'cats'.
-      // when Bastet is in Battle and there is a cat, it is revealed ('Revaal' phase)
+      // when Bastet is in Battle and there is a cat, it is revealed ('Reveal' phase)
       // and '1' | '3' is added to Bastet's strength.
       start: (phase: string) => {
         this.state.nextPhase = phase;
@@ -473,6 +474,9 @@ export class GameState {
           }
           if (panel.cardsInBattle.length === 2) Amun.instance.setTokenFaceUp(false); // must be Amun:Two Cards used
         });
+        // reveal BastetMark
+        const bmark = Bastet.instance?.bastetMarks.filter(bmark => bmark.regionId === this.conflictRegion)?.[0];
+        if (bmark) { bmark.setNameText(`${bmark.strength}`); bmark.updateCache() }
         this.gamePlay.hexMap.update();
         this.doneButton('Reveal Done', C.grey);
         if (TP.autoRevealDone > 0) setTimeout(() => { this.state.done(); }, TP.autoRevealDone);
@@ -653,9 +657,9 @@ export class GameState {
               () => {
                 resolution();
               })
-          } else {
-            resolution();
           }
+        } else {
+          resolution();
         }
       },
     },
