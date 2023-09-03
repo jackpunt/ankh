@@ -2,7 +2,7 @@ import { C, Constructor, WH, className } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape, Text } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
-import { AnkhMeeple, AnkhSource, BastetMark, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
+import { AnkhMeeple, AnkhSource, BastetMark, Figure, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, SpecialHex } from "./ankh-map";
 import type { Hex, Hex2, HexMap } from "./hex";
 import { Player } from "./player";
@@ -228,6 +228,21 @@ export class Bastet extends God {
       bmark.setOn(hex);
     })
   }
+  override saveState() {
+    const deployed = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined);
+    return deployed;
+  }
+  override parseState(deployed: number[][]): void {
+    const hexMap = this.player.gamePlay.hexMap;
+    // presumably, all bmarks are on their homeHex, unless specified in deployed [[r][c], ...] array
+    deployed.forEach((rc, ndx) => {
+      if (rc) {
+        const [row, col] = rc;
+        const hex = hexMap[row][col];
+        this.bastetMarks[ndx].setOn(hex);
+      }
+    })
+  }
 }
 
 export class Hathor extends God {
@@ -368,6 +383,23 @@ export class Ra extends God {
     source.counter.y -= TP.ankh2Rad * .7;
     source.counter.x += TP.ankh2Rad * .5;
     table.sourceOnHex(source, hex);
+  }
+
+  isRadiant(fig: Figure) {
+    return this.specialSource.filterUnits(rm => rm.parent === fig).length > 0;
+  }
+
+  override saveState() {
+    return this.specialSource.filterUnits(rm => !!rm.parent).map(rm => rm.rowcol);
+  }
+
+  override parseState(state: [row: number, col: number][]): void {
+    const hexMap = this.player.gamePlay.hexMap;
+    state.forEach(([row, col]) => {
+      const hex = hexMap[row][col];
+      if (!hex.figure) debugger;
+      this.specialSource.takeUnit().moveTo(hex); // assert: the Figure is already placed on hex.
+    })
   }
 }
 

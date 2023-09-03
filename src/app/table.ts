@@ -761,8 +761,8 @@ export class Table extends EventDispatcher  {
     return this.scoreMarks.map(pm => pm.score + this.scoreStacks[pm.score].indexOf(pm)/10);
   }
   get panelsInRank() { return this.panelsByScore(); }
-  panelsByScore(panels = this.allPlayerPanels) {
-    const scores = this.playerScores
+  panelsByScore(panels = this.allPlayerPanels.concat()) {
+    const scores = this.playerScores;
     return panels.sort((pa, pb) => scores[pa.player.index] - scores[pb.player.index]);
   }
 

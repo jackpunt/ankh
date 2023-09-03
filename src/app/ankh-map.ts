@@ -115,12 +115,12 @@ export class AnkhHex extends Hex2 {
   /** select each [in this/same region] Hex linked to this that satisfies predicate */
   filterAdjHexByRegion(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
     const region = this.map.regions[this.regionId - 1];
-    return this.linkDirs.filter(dir => !!this.links[dir] && region.includes(this.links[dir])).filter(dir => pred(this.links[dir], dir, this), this);
+    return this.linkDirs.filter(dir => !!this.links[dir] && region ? region.includes(this.links[dir]) : true).filter(dir => pred(this.links[dir], dir, this), this);
   }
   /** adjHexByRegion allows for Apep in adjacent water. */
   findAdjHexByRegion(pred: ((hex: this, dir: HexDir, hex0: this) => boolean)) {
     const region = this.map.regions[this.regionId - 1];
-    return this.linkDirs.filter(dir => !!this.links[dir] && region.includes(this.links[dir])).find(dir => pred(this.links[dir], dir, this), this);
+    return this.linkDirs.filter(dir => !!this.links[dir] && region ? region.includes(this.links[dir]) : true).find(dir => pred(this.links[dir], dir, this), this);
   }
 
   /** returns the dir to hex if there is no border, undefined otherwise */

@@ -1,3 +1,4 @@
+import { GodFigure, Obelisk, Temple, Warrior } from "./ankh-figure";
 import { Scenario } from "./scenario-parser";
 
 // Rivers make first 3 Regions: West(1), East(2), Delta(3)
@@ -251,92 +252,54 @@ export class AnkhScenario {
     ankhs: [["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Obelisk", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful", "Worshipful"]],
     places: [[4, 7, "CatMum", 4], [4, 4, "CatMum", 3], [6, 2, "Apep", 2, "Ra"], [6, 4, "Apep", 3], [4, 3, "Androsphinx", 4], [7, 3, "Androsphinx", 1], [4, 1, "Obelisk", null], [3, 5, "Obelisk", 3], [3, 8, "Obelisk", null], [5, 5, "Pyramid", 2], [7, 0, "Pyramid", 1], [2, 8, "Pyramid", 3], [5, 7, "Pyramid", 4], [8, 2, "Pyramid", 1], [1, 5, "Pyramid", 1], [5, 0, "Pyramid", 2], [3, 2, "Pyramid", 3], [3, 3, "Pyramid", 4], [2, 1, "Pyramid", 1], [4, 2, "Temple", 1], [8, 4, "Temple", 2], [1, 3, "Temple", 1], [8, 6, "Temple", 2], [1, 2, "Temple", 4], [2, 6, "Temple", 3], [6, 0, "Warrior", 1], [3, 1, "Warrior", 1], [1, 4, "Warrior", 1], [7, 1, "Warrior", 1], [2, 0, "Warrior", 1], [5, 6, "Warrior", 2], [7, 7, "Warrior", 2, "Ra"], [4, 5, "Warrior", 2], [4, 0, "Warrior", 2], [1, 8, "Warrior", 3], [5, 4, "Warrior", 3], [6, 6, "Warrior", 4], [2, 2, "Warrior", 4], [4, 3, "Portal", 4], [4, 8, "Portal", 4], [2, 4, "Portal", 4], [6, 1, "GodFigure", 1], [8, 3, "GodFigure", 2], [2, 7, "GodFigure", 3], [1, 7, "GodFigure", 4]]
   };
-
-  static AltMidKingdom5: Scenario = {
-    ngods: 5,
-    turn: 15,
-    godNames: ['Amun', 'Osiris', 'Set', 'Toth', 'Bastet'],
-    actions: { Move: [0, 1, 2, 3, 4], Summon: [2], Gain: [0, 1, 3, 4], Ankh: [3, 4], selected: [] },
-    ankhs: [
-      ['Inspiring', 'Omnipresent', 'Pyramid'],
-      ['Inspiring', 'Omnipresent'],
-      ['Inspiring', 'Omnipresent', 'Pyramid'],
-      ['Revered', 'Omnipresent', 'Pyramid'],
-      ['Revered', 'Omnipresent', 'Pyramid'],
-    ],
-    coins: [2, 2, 0, 0, 0],
-    events: [0, 2, 3],
-    guards: ['Satet', 'Apep', 'Androsphinx'],
-    places: [
-      [2, 5, 'Satet', 2],
-      [4, 1, 'Obelisk', undefined],
-      [7, 6, 'Obelisk', undefined],
-      [3, 8, 'Obelisk', 2],
-      [6, 6, 'Pyramid', 2],
-      [3, 5, 'Pyramid', 4],
-      [4, 5, 'Pyramid', 1],
-      [7, 1, 'Pyramid', 5],
-      [8, 4, 'Temple', 3],
-      [0, 2, 'Temple', undefined],
-      [8, 9, 'Temple', 3],
-      [1, 6, 'Temple', undefined],
-      [2, 1, 'Temple', 1],
-      [1, 5, 'Warrior', 1],
-      [2, 6, 'Warrior', 2],
-      [7, 4, 'Warrior', 3],
-      [4, 4, 'Warrior', 4],
-      [6, 5, 'Warrior', 5],
-      [5, 4, 'GodFigure', 1],
-      [7, 3, 'GodFigure', 5],
-      [7, 5, 'GodFigure', 3],
-      [5, 7, 'GodFigure', 2],
-      [1, 2, 'GodFigure', 4],
-    ],
-    splits: [
-      [[6, 7, 3], [7, 5, 'N'], [7, 6, 'WN', 'N'], [6, 7, 'WN', 'N', 'EN']],
-      [[4, 0, 5], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
-    ],
-    regions: [
-      [1, 0, 1],
-      [2, 9, 2],
-      [7, 6, 3],
-      [0, 2, 4],
-      [4, 1, 5],
-    ],
-    scores: [0, 0.1, 0.2, 0.3, 0.4],
-    stable: [
-      ['Satet', 'Apep'],
-      [],
-      ['Satet', 'Apep'],
-      [],
-      [],
-    ],
-  };
-
-  static AltMidKingdom2: Scenario = {
-    ngods: 2,
-    turn: 3,
-    regions: [[2, 0, 1], [2, 10, 2], [0, 2, 3]],
-    guards: ['Satet', 'Apep', 'Scorpion'],
-    events: [0, 1],
-    actions: { Move: [0, 1], Ankh: [0, 1] },
-    coins: [4, 5],
-    scores: [2, 3],
-    stable: [['Satet'], []],
-    ankhs: [['Commanding', 'Revered'], ['Inspiring', 'Omnipresent', 'Temple']],
-    places: [
-      [3, 4, 'Warrior', 1],
-      [8, 2, 'GodFigure', 1],
-      [3, 6, 'Warrior', 2],
-      [4, 7, 'GodFigure', 2],
-
-      [0, 3, 'Temple'],
-      [2, 5, 'Pyramid'],
-      [1, 8, 'Obelisk'],
-      [5, 0, 'Obelisk', 1],
-      [8, 1, 'Pyramid'],
-      [6, 5, 'Temple', 2],
-      [5, 8, 'Pyramid'],
-    ]
-  };
+  static readonly OldKingdom: Scenario[] = [
+    {
+      ngods: 2,
+      regions: [[1, 5, 3], [4, 6, 2], [4, 4, 1]],
+      places: [
+        [5, 0, Obelisk, 1], [5, 1, Warrior, 1], [4, 1, GodFigure, 2],
+        [5, 4, Temple], [2, 5, Temple], [2, 9, Temple],
+        [5, 7, GodFigure, 1], [6, 7, Warrior, 2], [6, 8, Obelisk, 2],
+        [8, 2, Temple], [8, 6, Temple],
+      ]
+    },
+    {
+      ngods: 3,
+      regions: [[1, 5, 1], [4, 6, 2], [4, 4, 3]],
+      places: [
+        [5, 0, Obelisk, 3], [5, 1, Warrior, 3], [4, 1, GodFigure, 2],
+        [7, 1, Temple], [5, 4, Temple],
+        [1, 2, Temple], [1, 5, Temple], [1, 7, GodFigure, 3], [1, 8, Obelisk, 1], [2, 8, Warrior, 1],
+        [2, 9, Temple], [5, 6, Temple],
+        [7, 5, GodFigure, 1], [8, 6, Warrior, 2], [8, 5, Obelisk, 2],
+      ]
+    },
+    {
+      ngods: 4,
+      regions: [[1, 5, 3], [6, 6, 4], [4, 4, 2], [7, 7, 1]],
+      splits: [[[7, 7, 1], [6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']]],
+      places: [
+        [5,0,Obelisk,2],[5,1,Warrior,2],[4,1,GodFigure,1],
+        [7,2,Temple], [5,4,Temple],
+        [0, 1, Temple], [1, 4, Obelisk, 3], [2, 4, GodFigure, 2], [1, 5, Warrior, 3], [1, 7, Temple],
+        [2, 9, Temple], [5, 6, Temple],
+        [5, 8, Warrior, 4], [4, 9, GodFigure, 3], [5, 9, Obelisk, 4],
+        [7,5,GodFigure,4], [8,5,Obelisk,1],[8,6,Warrior,1],[8,9, Temple],
+      ]
+    },
+    {
+      ngods: 5,
+      regions: [[1, 5, 4], [4, 6, 1], [4, 4, 3], [7, 7, 1], [6, 0, 2]],
+      splits: [[[7, 7, 1], [6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']],
+        [[6, 0, 2], [6, 0, 'N'], [5, 1, 'WN', 'N']]],
+      places: [
+        [4, 1, Obelisk, 3], [3, 1, GodFigure, 2], [4, 2, Warrior, 3], [4, 4, Temple],
+        [6, 0, Obelisk, 2], [5, 1, Warrior,2], [6, 1, GodFigure, 1],
+        [0, 1, Temple], [1, 4, Obelisk, 4], [2, 4, GodFigure, 3], [1, 5, Warrior, 4], [1, 7, Temple],
+        [2, 9, Temple], [5, 6, Temple], [8, 4, Temple],
+        [5, 8, Warrior, 5], [4, 9, GodFigure, 4], [5, 9, Obelisk, 5],
+        [7, 5, GodFigure, 5], [8, 5, Obelisk, 1], [8, 6, Warrior, 1], [8, 9, Temple],
+      ]
+    },
+  ]
 }

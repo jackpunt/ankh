@@ -4,7 +4,7 @@ import { AnkhHex, RegionId } from "./ankh-map";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
 import { json } from "./functions";
 import type { GamePlay } from "./game-play";
-import { Amun, Anubis, Bastet, God, Hathor, Horus, Osiris } from "./god";
+import { Amun, Anubis, Bastet, God, Hathor, Horus, Osiris, Ra } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
 import { PlayerPanel, PowerLine } from "./player-panel";
@@ -639,7 +639,7 @@ export class GameState {
             const nKilled = nPlague + nBattle;
             if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
           })
-          this.phase(this.osirisPlayer ? 'Osiris' : 'Worshipful')
+          this.phase(panels.includes(this.osirisPlayer.panel) ? 'Osiris' : 'Worshipful');
         }
 
         if (d == 0) {          // consider tiebreaker;
@@ -783,7 +783,7 @@ export class GameState {
       if (!!slot && (fig instanceof Warrior) && (fig.player.godName !== 'Anubis') && !trappedFigs.find(af => af.player === fig.player)) {
         trappedFigs.push(fig);              // prevent 2nd Figure from same player.
         fig.moveTo(slot);
-        fig.removeRa();
+        fig.removeRaMarker();
         return false;
       } else {
         return true;
@@ -835,8 +835,8 @@ export class GameState {
   }
 
   hasRadiance(panel: PlayerPanel) {
-    const playerFigs = panel.figuresInRegion(this.conflictRegion, panel.player);
-    return playerFigs.find(fig => fig.raMarker !== undefined);
+    const raGod = Ra.instance;
+    return raGod && panel.figuresInRegion(this.conflictRegion, panel.player).find(fig => raGod.isRadiant(fig));
   }
 
   horusInRegion(rid: RegionId) {
@@ -846,7 +846,7 @@ export class GameState {
   static typeNames = ['Obelisk', 'Pyramid', 'Temple'];
   /** score each monument type in conflictRegion */
   scoreMonuments(dom = false) {
-    const rid = this.conflictRegion, regionNdx = rid - 1;
+    const rid = this.conflictRegion, regionNdx = rid - 1, logInfo = false;
     const allPlayers = this.gamePlay.allPlayers;
     const players = this.panelsInConflict.map(panel => panel.player);
     // console.log(stime(this, `.scoreMonuments[${rid}]`), players);
@@ -861,9 +861,9 @@ export class GameState {
     const deltas = sortedCount.map(pnary => ({t: pnary[0].type, p: pnary[0].player, n: pnary[0].n, d: (pnary[0].n - (pnary[1] ? pnary[1].n : 0)) }));
     const winners = deltas.map(({ p, n, d, t }) => ({ p: ((n > 0 && d > 0) ? p : undefined), n, d, t }));
     winners.forEach(({ p, n, d, t }) => {
-      console.log(stime(this, `.scoreMonuments[${rid}]: ${t} -> ${p?.godName}, d=${d}, n=${n}`));
+      logInfo && console.log(stime(this, `.scoreMonuments[${rid}]: ${t} -> ${p?.godName}, d=${d}, n=${n}`));
     })
-    const winp = players.filter(player => winners.find(({p})=> p === player));
+    const winp = players.filter(player => winners.find(({ p }) => p === player));
     const winnerp = winp.map(p => winners.filter(elt => elt.p === p)); // monuments won by player
     const rfun = (pv, { p, n, d, t }) => ({ p, n, d, t: `${pv?.t ?? ''} ${t}:1` });
     const winsum = winnerp.map(winpary => winpary.reduce(rfun, {}))

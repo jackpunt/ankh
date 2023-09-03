@@ -163,7 +163,7 @@ export class PlayerPanel extends Container {
     }
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionId - 1);
-      const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.meep?.player == this.player));
+      const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.figure?.player == this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');

@@ -318,13 +318,13 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C', () => {
       const vis = (cardSelectorsUp = !cardSelectorsUp);
       this.table.allPlayerPanels.forEach(panel => {
-
-      })
-      this.allPlayers.forEach(player => {
-        if (!player.panel.cardSelector.activated)
-          player.panel.showCardSelector(vis, 'X');
-      })
-    })
+        if ((this.gameState.state.Aname === 'Cards')) {
+          if (panel.cardSelector.activated) panel.showCardSelector(vis, 'X');
+        } else {
+          panel.showCardSelector(vis, panel.cardSelector.activated ? 'Done' : 'X');
+        }
+      });
+    });
     KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START
       const cont = this.hexMap.mapCont.markCont;
       cont.visible = false;

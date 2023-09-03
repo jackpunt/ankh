@@ -178,6 +178,11 @@ export class Portal extends AnkhPiece {
     return new HexShape(Portal.radius0); // hexgon properly oriented...
   }
 
+  override moveTo(hex: Hex1): void {
+    super.moveTo(hex);
+    this.parent.addChildAt(this, 0); // Portal goes below other Tiles.
+  }
+
   highlight(vis = true) {
     this.paint(vis ? 'white' : this.player.color);
   }
@@ -223,6 +228,18 @@ export class RadianceMarker extends AnkhPiece {
     if (this.parent instanceof Figure) this.parent.updateCache();
   }
 
+  /**
+   * this.hex is either:
+   * - sourceHex
+   * - undefined - when on a Figure
+   *
+   * this.parent is either:
+   * - undefined: when on source, but not the top unit.
+   * - map.tileCont when on souce, the available unit.
+   * - a Figure: when attached to a Figure on the map.
+   * @param hex either sourceHex or onMap (with a Figure)
+   * @returns
+   */
   override moveTo(hex: AnkhHex) {
     if (hex === this.source.hex) {
       super.moveTo(hex);
@@ -230,7 +247,6 @@ export class RadianceMarker extends AnkhPiece {
     }
     const figure = hex?.figure;
     if (figure) {
-      figure.raMarker = this;
       const at = figure.children.indexOf(figure.baseShape);
       figure.addChildAt(this, at);     // below baseShape
       this.x = 0; this.y = 0;
@@ -243,11 +259,15 @@ export class RadianceMarker extends AnkhPiece {
       }
       this.hex = undefined;            // take it off the source.hex
     } else if (this.parent instanceof Figure) {
-      this.parent.raMarker = undefined;
       this.parent?.removeChild(this);
     } else if (hex === undefined) {
       super.moveTo(hex);
     }
+  }
+
+  get rowcol() {
+    const fig = this.parent as Figure, hex = fig.hex;
+    return [hex.row, hex.col] as [row: number, col: number];
   }
 
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
@@ -255,9 +275,9 @@ export class RadianceMarker extends AnkhPiece {
     const figure = (toHex instanceof AnkhHex) && toHex.figure;
     return toHex.isOnMap
       && figure
-      && figure.player === this.player
+      && figure.player === this.player        // Note: this.player === Ra.instance.player
       && (figure instanceof Warrior || figure instanceof Guardian)
-      && figure.raMarker === undefined;
+      && !figure.children.find(ch => ch instanceof RadianceMarker);
   }
 }
 
@@ -434,17 +454,16 @@ export class Figure extends AnkhMeeple {
   _lastController: God;
   get lastController() { return this._lastController ?? this.player.god; } // for Set
 
-  raMarker: RadianceMarker;  // for Ra
-  removeRa() {
-    if (this.raMarker) {
-      this.raMarker.sendHome();
-      this.raMarker = undefined;
+  removeRaMarker() {
+    const raMarker = this.children.find(ch => ch instanceof RadianceMarker) as RadianceMarker;
+    if (raMarker) {
+      raMarker.sendHome();
       this.updateCache();
     }
   }
 
   override resetTile(): void {
-    this.removeRa();
+    this.removeRaMarker();
     super.resetTile();
   }
 
@@ -823,11 +842,11 @@ export class Scorpion extends Guardian3 {
   }
 
   dirDisk: Container;
-  dirRot = 0;  // [0..5] rotation/60; index into H.nsDir
+  dirRot = 0 | 1 | 2 | 3 | 4 | 5;  // [0..5] rotation/60; index into H.nsDir
   get rotDir() { return H.ewDirs[this.dirRot]}
   set rotDir(dir: EwDir) {
     this.dirDisk.rotation = H.ewDirRot[dir];
-    this.dirRot = H.ewDirRot[dir] - 30;
+    this.dirRot = (H.ewDirRot[dir] - 30) / 60;
   }
   get attackDirs() {
     const rot1 = (this.dirRot) % 6;
