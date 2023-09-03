@@ -19,9 +19,7 @@ interface Phase {
   start(...args: any[]): void; // what to do in this phase
   done?: (...args: any[]) => void;          // for async; when done clicked: proceed
   undo?: () => void;
-  region?: number,
   panels?: PlayerPanel[],
-  players?: Player[],
   deadFigs?: Figure[], // for Plague
   nextPhase?: string,
 }
@@ -539,19 +537,24 @@ export class GameState {
       }
     },
     Plague: {
-      panels: [],
+      panels: [],    // panels in this region
       start: () => {
+        const plaguePanels = this.panelsInThisConflict.filter(panel => panel.hasCardInBattle('Plague'));
+        const plaguePanel = plaguePanels.shift();
+        if (!plaguePanel) { this.phase('ScoreMonuments'); return; }
+        plaguePanel.battleCardsToTable(plaguePanel.hasCardInBattle('Plague')); // will not appear in plaguePanels...
+
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.state.panels = this.panelsInConflict;
-        const hasPlague = panels.filter(panel => panel.hasCardInBattle('Plague'));
-        if (hasPlague.length === 0) { this.phase('ScoreMonuments'); return; }
+        const panels = this.state.panels = this.panelsInThisConflict.concat();
         panels.forEach(panel => panel.enablePlagueBid(this.conflictRegion));
       },
       done: (p: PlayerPanel) => {
         const panels = this.state.panels;
         const ndx = panels.indexOf(p);
-        panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
-        if (panels.length === 0) { this.phase('PlagueResolution'); return }
+        panels.splice(ndx, 1);
+        if (panels.length !== 0) return; // waiting for other panels to make their bid.
+        this.resolvePlague();
+        this.phase('Plague');  // restart, looking for next Plague card.
       }
 
       // mouse enable plague big counters (max value: player.coins)
@@ -562,15 +565,6 @@ export class GameState {
       panels: [],
       deadFigs: [],
       start: () => {
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
-        panels.forEach(panel => panel.showCardSelector(false, ''));
-        panels.sort((a, b) => b.plagueBid - a.plagueBid);
-        const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]
-        const isWinner = (b0 > b1);
-        const winner = isWinner ? panels[0].player.god : undefined;
-        this.table.logText(`Plague[${rid}] ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
-        this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
         this.phase('ScoreMonuments');
       },
     },
@@ -791,6 +785,17 @@ export class GameState {
     });
   }
 
+  resolvePlague() {
+    console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
+    const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
+    panels.forEach(panel => panel.showCardSelector(false, ''));
+    panels.sort((a, b) => b.plagueBid - a.plagueBid);
+    const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]
+    const isWinner = (b0 > b1);
+    const winner = isWinner ? panels[0].player.god : undefined;
+    this.table.logText(`Plague[${rid}] ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
+    this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
+  }
 
   countCurrentGain(player = this.curPlayer) {
     // Osiris Portal begins offMap.

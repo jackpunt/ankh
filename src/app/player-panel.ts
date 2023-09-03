@@ -714,8 +714,9 @@ export class PlayerPanel extends Container {
     this.stage.update();
   }
 
-  battleCardsToTable() {
-    this.cardsInBattle.forEach(pl => pl.button.paint(PlayerPanel.colorForState['onTable']));
+  battleCardsToTable(pl?: PowerLine) {
+    if (pl) pl.button.paint(PlayerPanel.colorForState['onTable']);
+    else this.cardsInBattle.forEach(pl => pl.button.paint(PlayerPanel.colorForState['onTable']));
     this.stage.update();
   }
 
