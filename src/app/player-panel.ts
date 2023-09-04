@@ -656,7 +656,7 @@ export class PlayerPanel extends Container {
       doneButton.y = 4 * rowh;
       doneButton.x = w - 3 * (gap);
       doneButton.on(S.click, () => {
-        if (doneButton.label_text !== 'Teleport') {
+        if (doneButton.label_text === 'Choose') { // <-- 'Choose'
           const nSelected = cardSelector.cardsInState('inBattle').length;
           if (this.cardSelector.activated && nSelected === 0) {
             this.blink(doneButton, 80, true);

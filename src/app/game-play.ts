@@ -288,7 +288,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('Escape', {thisArg: table, func: table.stopDragging}) // Escape
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.stopPlayer })// C-c Stop Planner
     KeyBinder.keyBinder.setKey('u', { thisArg: this, func: this.unMove })
-    KeyBinder.keyBinder.setKey('n', { thisArg: this, func: this.endTurn })
+    KeyBinder.keyBinder.setKey('n', () => { this.endTurn(); this.gameState.phase('BeginTurn') });
     KeyBinder.keyBinder.setKey('C-c', { thisArg: this, func: this.reCacheTiles })
 
     KeyBinder.keyBinder.setKey('m', { thisArg: this, func: this.chooseAction, argVal: 'Move' })

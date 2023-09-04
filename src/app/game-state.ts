@@ -434,7 +434,7 @@ export class GameState {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) { this.phase('Reveal'); return; }
-        panels.forEach(panel => panel.activateCardSelector());
+        panels.forEach(panel => panel.activateCardSelector(true, 'Choose'));
       },
       done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
@@ -544,9 +544,9 @@ export class GameState {
         if (!plaguePanel) { this.phase('ScoreMonuments'); return; }
         plaguePanel.battleCardsToTable(plaguePanel.hasCardInBattle('Plague')); // will not appear in plaguePanels...
 
-        console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const panels = this.state.panels = this.panelsInThisConflict.concat();
-        panels.forEach(panel => panel.enablePlagueBid(this.conflictRegion));
+        const panels = this.state.panels = this.panelsInThisConflict.concat(), rid = this.conflictRegion;
+        console.log(stime(this, `.${this.state.Aname}[${rid}]`));
+        panels.forEach(panel => panel.enablePlagueBid(rid));
       },
       done: (p: PlayerPanel) => {
         const panels = this.state.panels;
@@ -582,14 +582,9 @@ export class GameState {
       start: () => {
         const rid = this.conflictRegion;
         // all those who have played a Battle card for this region:
-        const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
+        const panels0 = this.panelsInThisConflict.concat();
         const panels = panels0.concat();
         this.table.logText(`${this.state.Aname}[${rid}]`);
-        if (panels.length === 0) {
-          // wtf? plague killed them all? maybe use tiebreaker to get a winner...
-          this.table.logText(`Battle[${rid}]: no Figures in Battle[${rid}]`);
-          // this.phase('ConflictRegionDone'); return;
-        }
         // After Plague, nFigsInRegion may be 0!
         panels.forEach(panel => panel.strength = panel.strengthInRegion(rid));
         panels.sort((a, b) => b.strength - a.strength);
@@ -651,6 +646,8 @@ export class GameState {
               () => {
                 resolution();
               })
+          } else {
+            resolution();
           }
         } else {
           resolution();
@@ -672,7 +669,7 @@ export class GameState {
     Worshipful: {
       panels: [],
       start: () => {
-        const panels0 = this.table.panelsInRank.filter(panel => panel.cardsInBattle.length > 0)
+        const panels0 = this.panelsInThisConflict.concat();
         // ASSERT: panels0 is [still] sorted by player rank.
         this.state.panels = panels0.filter(panel => panel.hasAnkhPower('Worshipful') && panel.player.coins >= 2);
         this.done();
@@ -786,14 +783,15 @@ export class GameState {
   }
 
   resolvePlague() {
-    console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-    const panels = this.state.panels = this.panelsInConflict, rid = this.conflictRegion;
+    const panels = this.panelsInThisConflict.concat(), rid = this.conflictRegion;
+    const plaguePanels = panels.filter(panel => panel.hasCardInBattle('Plague')), nToGo = plaguePanels.length;
+    console.log(stime(this, `.${this.state.Aname}[${rid}]-${nToGo}`), panels);
     panels.forEach(panel => panel.showCardSelector(false, ''));
     panels.sort((a, b) => b.plagueBid - a.plagueBid);
-    const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]
+    const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]; // Battle, not Dominance
     const isWinner = (b0 > b1);
     const winner = isWinner ? panels[0].player.god : undefined;
-    this.table.logText(`Plague[${rid}] ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
+    this.table.logText(`Plague[${rid}]-${nToGo} ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
     this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
   }
 

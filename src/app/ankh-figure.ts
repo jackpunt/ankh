@@ -462,7 +462,7 @@ export class Figure extends AnkhMeeple {
     }
   }
 
-  override resetTile(): void {
+  override resetTile(): void {   // Figure remove RaMarker
     this.removeRaMarker();
     super.resetTile();
   }
@@ -683,7 +683,7 @@ export class Guardian extends Figure {
     super.dropFunc(targetHex, ctx);
   }
 
-  override resetTile(): void {
+  override resetTile(): void {     // Guardian unset homeHex/usedBy
     if (this.stableHex) {
       this.stableHex.usedBy = undefined;
       this.homeHex = undefined;

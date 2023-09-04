@@ -238,7 +238,7 @@ export class Tile extends Tile0 implements Dragable {
     this.gamePlay.placeEither(this, toHex, payCost);
   }
 
-  resetTile() {
+  resetTile() {            // Tile: x,y = 0;
     this.x = this.y = 0;
   }
 

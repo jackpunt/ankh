@@ -158,7 +158,7 @@ export class Meeple extends Tile {
     return false;
   }
 
-  override resetTile(): void {
+  override resetTile(): void {   // Meeple faceUp
     this.faceUp();
     this.startHex = undefined;
   }
