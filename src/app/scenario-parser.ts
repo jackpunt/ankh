@@ -171,7 +171,7 @@ export class ScenarioParser {
       table.logText(`turn = ${turn}`, `parseScenario`);
       table.guardSources.forEach(source => {
         // retrieve Guardians from board or stables; return to source:
-        source.filterUnits(unit => (unit.player = undefined, unit.sendHome(), false));
+        source.filterUnits(unit => (unit.setPlayerAndPaint(undefined).sendHome(), false));
         source.nextUnit();
       });
       this.gamePlay.allTiles.forEach(tile => tile.hex?.isOnMap ? tile.sendHome() : undefined);
@@ -186,7 +186,7 @@ export class ScenarioParser {
       events.forEach((pid, ndx) => {
         table.setEventMarker(ndx, this.gamePlay.allPlayers[pid]);
       })
-      gamePlay.gameState.eventName = undefined;
+      gamePlay.gameState.eventName = gamePlay.gameState.eventSpecial = undefined; // do not saveState *during* an Event!
       map.update();
     }
     if (actions !== undefined) {

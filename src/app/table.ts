@@ -22,7 +22,7 @@ function firstChar(s: string, uc = true) { return uc ? s.substring(0, 1).toUpper
 
 export type EventName = 'Claim' | 'Split' | 'Conflict' | 'merge' | 'redzone';
 export interface ActionButton extends Container { isEvent: boolean, pid: number, rollover?: ((b: ActionButton, over: boolean) => void) }
-interface EventIcon extends Container { eventName: EventName, pid: number; }
+interface EventIcon extends Container { eventName: EventName, pid: number; special: 'merge' | 'redzone' }
 interface ScoreMark extends RectShape { score: number, rank: number }
 
 export interface Dragable {
@@ -445,7 +445,7 @@ export class Table extends EventDispatcher  {
   }
 
   sourceOnHex(source: TileSource<Tile>, hex: Hex2) {
-    source.counter.mouseEnabled = false;
+    if (source) source.counter.mouseEnabled = false;
     hex.legalMark.setOnHex(hex);
     hex.cont.visible = false;
   }
@@ -662,11 +662,11 @@ export class Table extends EventDispatcher  {
       'Claim', 'Conflict',
     ];
     const lf = false, rad = TP.ankhRad, gap = 5, dx = 2 * rad + gap, bx = .5;
-    let cx = 0;
-    events.forEach((evt, nth) => {
+    let cx = 0, special: 'merge' | 'redzone';
+    events.forEach((eventName, ndx) => {
       const icon = new Container() as EventIcon; icon.name = 'eventIcon';
-      icon.eventName = evt;
-      const k = (evt === 'Conflict') ? 'B' : firstChar(evt);
+      icon.eventName = eventName;
+      const k = (eventName === 'Conflict') ? 'B' : firstChar(eventName);
       const shape = new CircleShape('rgb(240,240,240)', rad, );
       const text = new CenterText(k, rad * 1.8); text.y += 2;
       if (lf && Math.floor(cx) === 8) cx = Math.floor(cx);
@@ -677,12 +677,15 @@ export class Table extends EventDispatcher  {
       if (k === 'B') {
         cx += bx;  // extra gap after Conflict
       }
-      if (k === 'M' || k === 'R') {
+      if (eventName === 'merge' || eventName === 'redzone') {
+        special = eventName;
         icon.y += dx;
         cx -= 1;
         shape.graphics.c().f('brown').dr(-rad, -rad * 3 - 2 * gap, 2 * rad, 4 * rad + 2 * gap);
       } else {
         this.eventCells.push(icon);
+        icon.special = special;
+        special = undefined;
       }
       icon.addChild(shape);
       icon.addChild(text);
@@ -696,11 +699,13 @@ export class Table extends EventDispatcher  {
     // if (this.gamePlay.eventName) this.setEventMarker(index - 1); // <--- QQQ: Why this?
   }
 
+  /** set GameState.eventName when a new event has been triggered. */
   setEventMarker(index: number, player = this.gamePlay.curPlayer) {
     const cell = this.eventCells[index];
     cell.pid = player.index;
     cell.addChild(player.god.getAnkhMarker(TP.ankhRad));
     this.gamePlay.gameState.eventName = cell.eventName;
+    this.gamePlay.gameState.eventSpecial = cell.special;
   }
 
   readonly emptyColor = 'rgb(240,240,240)';

@@ -1,10 +1,10 @@
 import { C, stime } from "@thegraid/common-lib";
-import { Figure, GodFigure, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
+import { Figure, GodFigure, Guardian, Monument, Obelisk, Scorpion, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId } from "./ankh-map";
 import { AnkhMapSplitter } from "./ankhmap-splitter";
 import { json } from "./functions";
 import type { GamePlay } from "./game-play";
-import { Amun, Anubis, Bastet, God, Hathor, Horus, Osiris, Ra } from "./god";
+import { Amun, Anubis, Bastet, God, Hathor, Horus, Isis, Osiris, Ra } from "./god";
 import { Hex1 } from "./hex";
 import type { Player } from "./player";
 import { PlayerPanel, PowerLine } from "./player-panel";
@@ -40,14 +40,14 @@ export class GameState {
   selectedActionIndex: number; // where in the row [0..n] to place an AnkhMarker
   selectedAction: ActionIdent; // set when click on action panel or whatever. read by ActionPhase;
   eventName: EventName;
+  eventSpecial: 'merge' | 'redzone';
 
   readonly selectedActions: ActionIdent[] = [];
 
-  osirisPlayer = undefined;
   bastetPlayer = undefined;
-  bastetDone = true;
+  bastetDisarmed = true;
   setBastetDone() {
-    this.bastetDone = true;
+    this.bastetDisarmed = true;
     if (this.table.doneButton.label_text === 'Disarm Bastet?')
       this.done(this.state.nextPhase); // supply nextPhase just in case... ??
   }
@@ -118,11 +118,9 @@ export class GameState {
   readonly states: { [index: string]: Phase } = {
     StartGame: {
       start: () => {
-        this.hathorPlayer = Hathor.instance?.player;
-        this.bastetPlayer = Bastet.instance?.player;
-        this.osirisPlayer = Osiris.instance?.player;
-        const bastetDeployed = Bastet.instance?.bastetMarks.find(bmark => bmark.bastHex);
-        this.phase(!this.bastetPlayer || bastetDeployed ? 'BeginTurn' : 'BastetDeploy', 'BeginTurn');
+        // TODO: fix this hueristic: save/parseBastet when all 3 marks have been disarmed!
+        const deployBastet = Bastet.instance?.bastetMarks.every(bmark => !bmark.bastHex);
+        this.phase(!deployBastet ? 'BeginTurn' : 'BastetDeploy', 'BeginTurn');
       }
     },
     BastetDeploy: {
@@ -159,7 +157,7 @@ export class GameState {
       start: () => {
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
-        this.bastetDone = !this.bastetPlayer || (this.bastetPlayer === this.curPlayer);
+        this.bastetDisarmed = Bastet.instance?.isPlayer(this.curPlayer); // if false: curPlayer can try to disarm Bastet
         this.phase('ChooseAction');
       },
     },
@@ -266,7 +264,7 @@ export class GameState {
         // [player can select Bastet Cat for disarming] if any BastetMark is adj to Figure(this.curPlayer)
         const bms = Bastet.instance?.bastetMarks.filter(bm => bm.bastHex);
         const adj = bms?.find(bmark => bmark.bastHex.findAdjHexByRegion((hex => hex.figure?.player === this.curPlayer)));
-        if (!this.bastetDone && adj) this.doneButton('Disarm Bastet?');
+        if (!this.bastetDisarmed && adj) this.doneButton('Disarm Bastet?');
         else this.done();
       },
       done: () => {
@@ -420,9 +418,7 @@ export class GameState {
         cardSelector.activateCardSelector(true, 'Ban Card', panel);
       },
       done: () => {
-        const horus = Horus.instance;
-        const panel = horus.player.panel;
-        const cardSelector = horus.cardSelector;
+        const cardSelector = Horus.instance.cardSelector;
         this.bannedCard = cardSelector.cardsInState('inBattle')[0].name;
         this.table.logText(`Horus banned card: ${this.bannedCard}`);
         this.phase('ChooseCard');
@@ -628,13 +624,16 @@ export class GameState {
             const nKilled = nPlague + nBattle;
             if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
           })
-          this.phase(panels.includes(this.osirisPlayer.panel) ? 'Osiris' : 'Worshipful');
+          this.phase(panels.includes(Osiris.instance.panel) ? 'Osiris' : 'Worshipful');
         }
 
         if (d == 0) {          // consider tiebreaker;
           const curPanel = this.panel;
           const contenders = panels.filter(panel => panel.strength === panels[0].strength);
           if (contenders.includes(curPanel) && curPanel.canUseTiebreaker) {
+            const ndx = panels.indexOf(curPanel);
+            panels[ndx] = panels[0];
+            panels[0] = curPanel;   // move curPanel to [0]; the slot for a winner
             curPanel.areYouSure(`Use tiebreaker to win?`,
               () => {
                 winner = curPanel;
@@ -714,9 +713,12 @@ export class GameState {
     },
     EventDone: {
       start: () => {
-        console.log(stime(this, `.EventDone: ${this.eventName}`))
-        this.eventName = undefined;
-        this.phase('EndTurn');
+        const special = this.eventSpecial;
+        console.log(stime(this, `.EventDone: ${this.eventName} ${special ? `--> ${special}` : ''}`));
+        this.eventName = this.eventSpecial = undefined;
+        if (special === 'merge') { this.doMerge('EndTurn') }
+        else if (special === 'redzone') { this.doRedzone('EndTurn') }
+        else { this.phase('EndTurn') };
       },
     },
     EndTurn: {
@@ -732,10 +734,7 @@ export class GameState {
       start: (nextPhase: string | (() => void)) => {
         if (!nextPhase) debugger;
         const next = (typeof nextPhase === 'function') ? nextPhase : () => this.phase(nextPhase);
-        const player = this.hathorPlayer;
-        const highlights = player.panel.highlightStable(true);
-        // const playerFigs = Figure.allFigures.filter(fig => fig.player === player);
-        // playerFigs.forEach(fig => fig.faceUp());   // set meep.startHex
+        const highlights = Hathor.instance.panel.highlightStable(true);
         this.state.done = () => {
           highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
           this.hathorSummon = false;
@@ -755,11 +754,11 @@ export class GameState {
   // if (winner === undefined): all non-GodFigure are at risk.
   deadFigs(cause: string, winner: God | undefined, rid: RegionId, isBattle = true) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
-    const isisProtected = (fig: Figure) => (fig.player.godName === 'Isis') && fig.hex.findAdjHexByRegion(hex => hex.figure && (hex.meep?.player.godName !== 'Isis'));
+    const isisGod = Isis.instance;
     const region = this.gamePlay.hexMap.regions[rid - 1];
     const figsInRegion = region.filter(hex => hex?.figure).map(hex => hex.figure);
     const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !(fig.controller === winner));
-    const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisProtected(fig)) : deadFigs0;
+    const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisGod.isProtected(fig)) : deadFigs0;
     const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
     this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
     this.filterAnubisTrap(deadFigs).forEach(fig => fig.sendHome()); // they all died; some are not sentHome.
@@ -819,13 +818,12 @@ export class GameState {
     if (n < 0 && player.godName === 'Hathor') {
       player.panel.highlightStable(true);
     }
-    this.hathorSummon = (player === this.hathorPlayer) && (n < 0) && (player.coins > 0);
+    this.hathorSummon = (Hathor.instance.isPlayer(player)) && (n < 0) && (player.coins > 0);
   }
   // TODO: check that plague kills mummy before battle resolution (so can be in Drought or adj-Temple)
   // after Ankh(Event), (BuildMonument)BuildMonument, (Worshipful)Worshipful, (Summon)AnubisRansom
   /** true when Hathor gets a free Summon (due to sacrificing a Follower) */
   hathorSummon = false;
-  hathorPlayer: Player = undefined;
 
   addDevotion(player: Player, n: number, reason?: string) {
     const score0 = player.score;
@@ -876,6 +874,82 @@ export class GameState {
       this.addDevotion(p, dev, `${t1}`);
     })
     return;
+  }
+
+  doMerge(nextPhase: string) {
+    // find bottom player & second to bottom
+    // remove Warriors, Monuments, of bottom; GodFigure.moveTo(undefined)
+    // set score of second to bottom;
+    // set bottom.uberGod = second; second.unterGod = bottom
+    // resolve Guardians (may need to open second stableHex for rank==1), setPlayerAndColor.
+    const panels = this.table.panelsInRank;
+    const bottom = panels[0], second = panels[1], bp = bottom.player, sp = second.player;
+    bottom.warriorSource.filterUnits(unit => (unit.sendHome(), false)); // remove Warriors from board
+    this.gamePlay.hexMap.forEachHex(hex => (hex.tile instanceof Monument) && hex.tile.player === bp && hex.tile.sendHome())
+    bp.god.figure.moveTo(undefined);
+    bp.god.figure.visible = false;
+    if (sp.score !== bp.score + .1) sp.score = bp.score; // no change if 3 players in same slot.
+    sp.god.unterGod = bp.god;
+    bp.god.uberGod = sp.god;
+    // Select up to 2 of each size of Guardians:
+    const guards = second.stableHexes.map(shex => shex.usedBy).filter(guard => !!guard);
+    bottom.stableHexes.forEach(shex => {
+      const guard = shex.usedBy;
+      if (guard) {
+        guard.setPlayerAndPaint(second.player); // all your guards are belong to us...
+        guards.push(guard);
+      }
+    })
+    const g1 = guards.filter(g => g.radius === TP.ankh1Rad); // length = [0..2]
+    const g2 = guards.filter(g => g.radius === TP.ankh2Rad); // length = [0..4]
+    const keepThese = (base = 1, ...guards: Guardian[]) => {
+      guards.forEach((guard, ndx) => {
+        const stableHex = second.stableHexes[ndx === 1 && base === 1 ? 4 : base + ndx];
+        stableHex.usedBy = guard;
+        guard.homeHex = stableHex;
+        if (guard.hex.isStableHex()) guard.moveTo(stableHex); // to new/correct StableHex
+      })
+      if (base === 2) {
+        g2.forEach(guard => {
+          if (!second.stableHexes.find(shex => shex.usedBy === guard)) {
+            guard.setPlayerAndPaint(undefined);
+            guard.sendHome()
+          }
+        })
+        this.phase(nextPhase);
+      }
+    }
+    if (g1.length > 1) {
+      // assert: (g1.length === 2)
+      second.makeAuxStable();  // open new stableHex on second:
+    }
+    keepThese(1, ...g1);
+
+    if (g2.length > 2) {
+      const oneEach = [g2[0], g2[2]], names = oneEach.map(g => g.Aname);
+      // offer choice: 2*rank2, 2*rank3, 1*rank2 + 1*rank3
+      const oneOfEach = () => keepThese(2, ...oneEach);
+      const twoOfSame = () => {
+        if (g2.length === 3) {
+          const keep = g2.filter(g => g.radius === g[1].radius)
+          keepThese(2, ...keep);
+        } else {
+          const rank2 = () => keepThese(2, g2[0], g2[1]);
+          const rank3 = () => keepThese(2, g2[2], g2[3]);
+          second.areYouSure(`Keep rank2 ${g2[1].Aname} (or rank3 ${g2[2].Aname})`, rank2, rank3);
+        }
+      }
+      g2.sort((a, b) => a.radius - b.radius); // ascending order
+      if (g2[1].radius !== g2[2].radius) {
+        second.areYouSure(`Keep one of each [${names}] (or two of the same)`, oneOfEach, twoOfSame);
+      }
+    } else {
+      keepThese(2, ...g2);
+    }
+  }
+
+  doRedzone(nextPhase: string) {
+
   }
 }
 /** a tiny HexShape */

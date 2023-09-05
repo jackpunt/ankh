@@ -46,7 +46,9 @@ export class Player {
   get score() { return this._score }
   set score(score: number) {
     this._score = Math.floor(score);
-    this.gamePlay?.table.setPlayerScore(this, score);
+    // unterGod.player goes below this.player:
+    if (this.god.unterGod) {this.gamePlay?.table.setPlayerScore(this.god.unterGod.player, this._score)}
+    this.gamePlay?.table.setPlayerScore(this, this._score);
   }
 
   // Created in masse by Table.layoutCounter

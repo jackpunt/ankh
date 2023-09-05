@@ -82,14 +82,25 @@ export class God {
     this.specialCont.addChild(text);
   }
 
-  get nCardsAllowedInBattle() { return 1; }
-  set nCardsAllowedInBattle(n: number) { }
+  // Note: Amun.nCardsAllowedInBattle does NOT call super, so should be no recursion.
+  get nCardsAllowedInBattle() { return !this.unterGod ? 1 : Math.max(1, this.unterGod.nCardsAllowedInBattle); }
   figure: GodFigure;
 
   /** return 'any' (typically [...] or {...}); if (!undefined) it will be JSON'd into SetupElt['special'][godName] = saveState() */
   saveState(): any { return undefined; }
   /** restore state as materialized by saveState() */
   parseState(state: any) {}
+
+  /** the unterGod becomes secondary to the uberGod */
+  uberGod: God;
+  unterGod: God;
+  /** panel of this or the uberGod */
+  get panel(): PlayerPanel { return (this ?? this.uberGod).player.panel; }
+
+  isPlayer(player: Player) {
+    const thisPlayer = (this ?? this.uberGod).player;
+    return player === thisPlayer;
+  }
 }
 
 class AnubisHex extends SpecialHex {
@@ -168,7 +179,7 @@ export class Amun extends God {
     this.token.label_text = v ? 'Two Cards' : 'Face Down';
     this.token.paint(v ? C.legalRed : C.grey );
   }
-  /** as method for conditional execetion: Amun.instance?.setTokenFactUp(true) */
+  /** as method for conditional execution: Amun.instance?.setTokenFactUp(true) */
   setTokenFaceUp(faceUp: boolean): void { this.tokenFaceUp = faceUp; }
 
   constructor() { super('Amun', 'red') }
@@ -339,6 +350,11 @@ export class Horus extends God {
 export class Isis extends God {
   static get instance() { return God.byName.get('Isis') as Isis }
   constructor() { super('Isis', 'lightblue') }
+
+  isProtected(fig: Figure) {
+    const isisGodName = (this ?? this.uberGod).name;
+    return (fig.player.godName === isisGodName) && fig.hex.findAdjHexByRegion(hex => hex.figure && (hex.meep?.player.godName !== isisGodName));
+  }
 }
 
 export class Osiris extends God {
@@ -385,12 +401,22 @@ export class Ra extends God {
     table.sourceOnHex(source, hex);
   }
 
+  canBeRadiant(figure: Figure) {
+    const raGodPlayer = (this.uberGod ?? this).player;
+    return figure?.hex?.isOnMap
+      && figure
+      && figure.player === raGodPlayer   // Note: this.player === Ra.instance.player
+      && !(figure instanceof GodFigure)  // (figure instanceof Warrior || figure instanceof Guardian)
+      && !this.isRadiant(figure);
+  }
+
   isRadiant(fig: Figure) {
+    // return figure.children.find(ch => ch instanceof RadianceMarker)
     return this.specialSource.filterUnits(rm => rm.parent === fig).length > 0;
   }
 
   override saveState() {
-    return this.specialSource.filterUnits(rm => !!rm.parent).map(rm => rm.rowcol);
+    return this.specialSource.filterUnits(rm => rm.parent instanceof Figure).map(rm => rm.rowcol);
   }
 
   override parseState(state: [row: number, col: number][]): void {
@@ -410,6 +436,17 @@ export class SetGod extends God {
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
     this.specialText(`Set controls adjacent\nWarriors & Guardians\nduring Conflict`, wh);
+  }
+
+  controlsFigure(fig: Figure) {
+    return fig.player.gamePlay.isConflictState
+      && !(fig instanceof GodFigure)
+      && this.isAdjToHex(fig.hex);
+  }
+
+  isAdjToHex(hex: AnkhHex) {
+    const setGodFigure = (this.uberGod || this).figure;
+    return hex.findAdjHex(hex => hex?.figure === setGodFigure)
   }
 }
 

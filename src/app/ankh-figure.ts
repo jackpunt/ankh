@@ -4,7 +4,7 @@ import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
-import { Anubis, Bastet, God, SetGod } from "./god";
+import { Anubis, Bastet, God, Ra, SetGod } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -121,7 +121,7 @@ export class Monument extends AnkhPiece {
   }
 
   override resetTile(): void {      // Monument AnkhToken.resetTile()
-    const ankhToken = this.hex?.meep as AnkhToken;
+    const ankhToken = (this.hex ?? this.fromHex)?.meep as AnkhToken;
     if (ankhToken) {
       ankhToken.sendHome();          // Assert: (this.hex.meep instanceof AnkhToken) but: circular dep...
     }
@@ -186,11 +186,6 @@ export class Portal extends AnkhPiece {
   highlight(vis = true) {
     this.paint(vis ? 'white' : this.player.color);
   }
-
-  // override dropFunc(targetHex: Hex2, ctx: DragContext): void {
-  //   super.dropFunc(targetHex, ctx);
-  //   this.parent.addChildAt(this, 0); // under any Figure
-  // }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
     return (ctx.phase === 'Osiris' || ctx.lastShift) ? undefined : 'Only after losing in Battle';
@@ -273,11 +268,7 @@ export class RadianceMarker extends AnkhPiece {
   override isLegalTarget(toHex: Hex1, ctx?: DragContext): boolean {
     if (!(ctx.phase === 'Summon' || ctx.phase === 'HathorSummon' || ctx.lastShift)) return false;
     const figure = (toHex instanceof AnkhHex) && toHex.figure;
-    return toHex.isOnMap
-      && figure
-      && figure.player === this.player        // Note: this.player === Ra.instance.player
-      && (figure instanceof Warrior || figure instanceof Guardian)
-      && !figure.children.find(ch => ch instanceof RadianceMarker);
+    return Ra.instance.canBeRadiant(figure);
   }
 }
 
@@ -375,9 +366,9 @@ export class BastetMark extends AnkhMeeple {
     }
     toHex.map.update();
   }
-  override sendHome(): void {
+  override sendHome(): void {   // BastetMark --> setOn(homeHex)
     this.bastHex = undefined;
-    this.setOn(this.homeHex); this.moveTo
+    this.setOn(this.homeHex);
   }
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
@@ -444,11 +435,7 @@ export class Figure extends AnkhMeeple {
   /** Check for adjacent Set durning Conflict. */
   get controller() {
     const setGod = SetGod.instance;  // Special treatment when Set is on the table
-    const ownedBySet = !!setGod
-      && this.player.gamePlay.isConflictState
-      && !(this instanceof GodFigure)
-      && !!this.hex.findAdjHex(hex => hex?.figure === setGod.figure);
-    this._lastController = (ownedBySet ? setGod : this.player.god);
+    this._lastController = (setGod?.controlsFigure(this) ? setGod : this.player.god);
     return this.lastController;
   }
   _lastController: God;
@@ -462,7 +449,7 @@ export class Figure extends AnkhMeeple {
     }
   }
 
-  override resetTile(): void {   // Figure remove RaMarker
+  override resetTile(): void {     // Figure remove RaMarker
     this.removeRaMarker();
     super.resetTile();
   }
@@ -473,7 +460,7 @@ export class Figure extends AnkhMeeple {
     return hex?.isOnMap
       && (hex.tile instanceof Portal)
       && (hex.meep === undefined)
-      && this.isFromStable
+      && (this.isFromStable || Anubis.instance?.isAnubisHex(this.hex)) // given phase==='Summon' maybe we don't care...
       && (this.player?.godName === 'Osiris')
   }
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
@@ -568,7 +555,7 @@ export class Figure extends AnkhMeeple {
 
 
 export class GodFigure extends Figure {
-  /** so we can keep GodFigures as singlton instances of each type. */
+  /** so we can keep GodFigures as singlton instances of each type. (see also: God.instance(name)) */
   static named(name: string) {
     const allMeeps = Meeple.allMeeples;
     const allGodFigs = allMeeps.filter(meep => meep instanceof GodFigure );
@@ -694,13 +681,13 @@ export class Guardian extends Figure {
   get stableHex() { return this.homeHex as StableHex; } // player.stableHexes.find(hex => hex.usedBy === this)
 
   override sendHome(): void {   // Guardian -> Stable OR Source
-    const player = this.player;
-    if (!player) { // same as !this.stableHex
-      this.setPlayerAndPaint(undefined); // so use: takeUnit().setPlayerAndPaint(player);
-      super.sendHome();          // resetTile(); source.availUnit();
+    if (this.player) {
+      // can't easily invoke super.sendHome() nor super.resetTile(); so we just do the needful:
+      this.removeRaMarker();
+      this.moveTo(this.stableHex); // Note: this.stableHex === this.homeHex
       return;
     }
-    this.moveTo(this.stableHex); // maybe just set homeHex === stableHex?
+    super.sendHome();          // resetTile(); source.availUnit();
   }
 }
 class Guardian1 extends Guardian {
@@ -779,7 +766,8 @@ export class CatMum extends Guardian1 {
   override sendHome(): void {  // CatMum: addDevotion
     const gamePlay = this.player?.gamePlay;
     gamePlay?.allPlayers.forEach(player => {
-      if (player !== this.player) gamePlay.gameState.addDevotion(player, -1, `${this} died!`);
+      if (player === this.player || player.god.uberGod?.player === this.player) return;
+      gamePlay.gameState.addDevotion(player, -1, `${this} died!`);
     })
     super.sendHome();
   }
@@ -806,7 +794,7 @@ export class Mummy extends Guardian2 {
     super(player, serial, `Mummy`);
   }
 
-  override sendHome(): void {
+  override sendHome(): void {   // Mummy -> adjTo GodFigure OR StableHex
     const god = this.player?.god, godFig = god?.figure;
     const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
     const dir = godFig?.hex.findAdjHex(hex => isLegal(hex)); // not water

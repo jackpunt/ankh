@@ -252,6 +252,26 @@ export class AnkhScenario {
     ankhs: [["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Obelisk", "Bountiful"], ["Revered", "Omnipresent", "Pyramid", "Temple", "Bountiful", "Worshipful"]],
     places: [[4, 7, "CatMum", 4], [4, 4, "CatMum", 3], [6, 2, "Apep", 2, "Ra"], [6, 4, "Apep", 3], [4, 3, "Androsphinx", 4], [7, 3, "Androsphinx", 1], [4, 1, "Obelisk", null], [3, 5, "Obelisk", 3], [3, 8, "Obelisk", null], [5, 5, "Pyramid", 2], [7, 0, "Pyramid", 1], [2, 8, "Pyramid", 3], [5, 7, "Pyramid", 4], [8, 2, "Pyramid", 1], [1, 5, "Pyramid", 1], [5, 0, "Pyramid", 2], [3, 2, "Pyramid", 3], [3, 3, "Pyramid", 4], [2, 1, "Pyramid", 1], [4, 2, "Temple", 1], [8, 4, "Temple", 2], [1, 3, "Temple", 1], [8, 6, "Temple", 2], [1, 2, "Temple", 4], [2, 6, "Temple", 3], [6, 0, "Warrior", 1], [3, 1, "Warrior", 1], [1, 4, "Warrior", 1], [7, 1, "Warrior", 1], [2, 0, "Warrior", 1], [5, 6, "Warrior", 2], [7, 7, "Warrior", 2, "Ra"], [4, 5, "Warrior", 2], [4, 0, "Warrior", 2], [1, 8, "Warrior", 3], [5, 4, "Warrior", 3], [6, 6, "Warrior", 4], [2, 2, "Warrior", 4], [4, 3, "Portal", 4], [4, 8, "Portal", 4], [2, 4, "Portal", 4], [6, 1, "GodFigure", 1], [8, 3, "GodFigure", 2], [2, 7, "GodFigure", 3], [1, 7, "GodFigure", 4]]
   };
+
+  static preMerge = {
+    ngods: 5,
+    godNames: ["Set","Isis","Amun","Osiris","Anubis"],
+    turn: 46,
+    time: "09-04 18:54:22.634",
+    regions: [[9,6,1],[8,5,2],[4,9,3],[0,1,4],[5,9,5],[6,0,6],[5,0,7]],
+    splits: [[[7,7,1],[6,6,"WS","S"],[6,7,"WS","S"]],[[6,0,2],[6,0,"N"],[5,1,"WN","N"]],[[8,8,6,false],[9,6,"WN"],[9,6,"N"],[8,6,"ES"],[8,7,"N"],[8,8,"WN"]],[[3,7,7,false],[5,9,"N"],[4,9,"WS"],[5,8,"N"],[4,8,"WS"],[4,7,"N"],[3,7,"WS"]]],
+    guards: ["CatMum","Apep","Scorpion"],
+    events: [0,1,2,3,3,4,0,3,3,4,2,3],
+    actions: {"Move":[4,0],"Summon":[1,2,4,1,4,0],"Gain":[0,1],"Ankh":[],"selected":[]},
+    coins: [2,5,0,1,0],
+    scores: [15,17,26,29,25],
+    cards: [[2,2,2,0,2,0,0],[0,0,0,2,0,0,0],[0,0,0,0,2,0,0],[2,2,0,2,2,0,0],[0,2,0,2,2,2,0]],
+    godStates: {"Anubis":{"trapped":[0,3,3]}},
+    stable: [["CatMum"],[],["CatMum","Scorpion"],[],[]],
+    ankhs: [["Revered","Omnipresent","Temple","Pyramid","Bountiful","Worshipful"],["Revered","Omnipresent","Temple","Pyramid","Bountiful","Worshipful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful","Worshipful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful","Worshipful"],["Revered","Omnipresent","Pyramid","Temple","Bountiful","Worshipful"]],
+    places: [[6,1,"CatMum",2],[4,7,"Apep",3],[6,4,"Apep",1],[4,1,"Scorpion",1,"NW"],[6,0,"Obelisk",2],[1,4,"Obelisk",4],[5,9,"Obelisk",5],[8,5,"Obelisk",1],[8,7,"Pyramid",4],[2,2,"Pyramid",2],[2,7,"Pyramid",5],[4,8,"Pyramid",4],[7,5,"Pyramid",4],[5,7,"Pyramid",3],[6,7,"Pyramid",5],[0,1,"Temple",2],[1,7,"Temple",5],[2,9,"Temple",3],[5,6,"Temple",3],[8,9,"Temple",5],[7,7,"Temple",5],[4,0,"Temple",3],[7,2,"Temple",2],[6,5,"Warrior",1],[1,3,"Warrior",2],[2,3,"Warrior",2],[7,1,"Warrior",2],[8,1,"Warrior",2],[3,7,"Warrior",4],[8,6,"Portal",4],[3,8,"Portal",4],[9,8,"Portal",4],[9,6,"Warrior",5],[2,8,"Warrior",5],[8,8,"Warrior",5],[3,6,"Warrior",5],[2,6,"Warrior",5],[6,6,"Warrior",5],[1,2,"GodFigure",2],[8,2,"GodFigure",1],[3,10,"GodFigure",3],[7,9,"GodFigure",4],[6,8,"GodFigure",5]]
+  }
+
   static readonly OldKingdom: Scenario[] = [
     {
       ngods: 2,

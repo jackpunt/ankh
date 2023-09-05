@@ -1,4 +1,4 @@
-import { C, DragInfo, S, ValueEvent, stime } from "@thegraid/easeljs-lib";
+import { C, DragInfo, S, ValueEvent, XY, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
 import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
@@ -163,7 +163,7 @@ export class PlayerPanel extends Container {
     }
     if (this.hasAnkhPower('Temple')) {
       const temples = this.templeHexesInRegion(regionId - 1);
-      const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.figure?.player == this.player));
+      const activeTemples = temples.filter(tmpl => tmpl.findAdjHexByRegion(hex => hex.figure?.player === this.player));
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
@@ -558,15 +558,16 @@ export class PlayerPanel extends Container {
     this.player.coins = initialCoins;
   }
 
-
-    // Stable:
+  warriorSource: AnkhSource<Warrior>
+  // Stable:
   stableHexes: StableHex[] = [];
+  stableCont: Container;
   /** size for each type: Warrior, G1, G2, G3 */
   stableSizes = [TP.ankh1Rad, TP.ankh1Rad, TP.ankh2Rad, TP.ankh2Rad,]
   makeStable() {
     const { wide, gap, rowh, dir, swidth } = this.metrics
-    const { panel, god, player, index, table} = this.objects
-    const stableCont = new Container(); stableCont.name = `stableCont:${player.index}`
+    const { panel, player } = this.objects
+    const stableCont = this.stableCont = new Container(); stableCont.name = `stableCont:${player.index}`
     const srad1 = TP.ankh1Rad, srad2 = TP.ankh2Rad;
     const swide0 = 4 * (srad1 + srad2); // 2 * sum(this.stableSizes)
     const sgap = (wide - (gap + swidth + gap + gap + swide0 + 0 * gap)) / 3;
@@ -575,22 +576,39 @@ export class PlayerPanel extends Container {
 
     let x0 = [wide, 0][(1 + dir) / 2] + dir * (1 * gap); // edge of next circle
     this.stableSizes.forEach((radi, i) => {
+      const x = x0 + dir * radi, y = (srad2 - radi);
+      this.makeStableHex({ x, y }, radi);
+      x0 += dir * (2 * radi + sgap);
+    });
+    this.makeSpecial(stableCont.y - srad2, srad2 * 2)
+  }
+
+  /** extra rank1 StableHex when merging */
+  makeAuxStable() {
+    const { wide, gap, brad, dir, rowh } = this.metrics;
+    let x0 = [wide, 0][(1 + dir) / 2] + dir * (2 * brad); // edge of next circle
+    this.makeStableHex({ x: x0, y: -5.5 * rowh + brad - gap }, TP.ankh1Rad)
+  }
+
+  /** draw circle (xy, radi) on this.stableCont, and place next StableHex on it. */
+  makeStableHex(xy: XY, radi: number, stableCont = this.stableCont) {
+    const { god, player, index, table} = this.objects
+    const i = this.stableHexes.length;
       const g0 = new Graphics().ss(2).sd([5, 5]);
       const circle = new CircleShape('', radi - 1, god.color, g0);
-      circle.y += (srad2 - radi);
-      circle.x = x0 + dir * radi;
-      x0 += dir * (2 * radi + sgap);
+      circle.y = xy.y;
+      circle.x = xy.x;
       stableCont.addChild(circle);
       const hexC = (i == 0) ? AnkhHex : StableHex;
       const hex = table.newHex2(0, 0, `s:${index}-${i}`, hexC) as StableHex;
       hex.size = radi;
       circle.parent.localToLocal(circle.x, circle.y, hex.cont.parent, hex.cont);
-      const source = (i === 0) ? Warrior.makeSource(player, hex) : table.guardSources[i - 1];
+      const source = (i === 0) ? this.warriorSource = Warrior.makeSource(player, hex) : undefined;
       table.sourceOnHex(source, hex);
       this.stableHexes.push(hex);
-    });
-    this.makeSpecial(stableCont.y - srad2, srad2 * 2)
+      return circle;
   }
+
   // Special:
   makeSpecial(sy: number, shigh: number) {
     const { dir, wide, gap, swidth } = this.metrics;

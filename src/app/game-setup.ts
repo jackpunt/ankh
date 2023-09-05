@@ -201,9 +201,10 @@ export class GameSetup {
     return gamePlay
   }
 
+  scenarioParser: ScenarioParser;
   parseScenenario(scenario: Scenario) {
     const hexMap = this.gamePlay.hexMap;
-    const scenarioParser = new ScenarioParser(hexMap, this.gamePlay);
+    const scenarioParser = this.scenarioParser = new ScenarioParser(hexMap, this.gamePlay);
     this.gamePlay.logWriter.writeLine(`// parseScenario: ${scenario.Aname}`)
     scenarioParser.parseScenario(scenario);
   }
