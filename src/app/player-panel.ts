@@ -78,9 +78,9 @@ export class CardSelector extends Container implements PowerLineCont {
     this.showCardSelector(activate, done);
   }
 
-  showCardSelector(vis = true, done = 'Done') {
+  showCardSelector(vis = true, done = this.doneButton.label_text) {
     const cs = this;
-    const asTeleport = (done === 'Teleport');
+    const asTeleport = (done.endsWith('Teleport'));
     if (asTeleport) {
       cs.visible = true;
       cs.addChildAt(cs.block, cs.children.indexOf(cs.doneButton) - 1);
@@ -154,7 +154,7 @@ export class PlayerPanel extends Container {
     const cardsInPlay = this.cardsInBattle;
     const namePowerInPlay = cardsInPlay.map(pl => [pl.name, pl.strength ?? 0] as [string, number]);
     namePowerInPlay.forEach(([name, power]) => addStrength(power, name));
-    if (this.god.name === 'Bastet') {
+    if (Bastet.instance?.isGodOf(this.player)) {
       const bmark = Bastet.instance.bastetMarks.find(bmark => bmark.regionId === regionId);
       if (bmark) {
         addStrength(bmark.strength, `Bastet[${bmark.strength}]`);
@@ -167,7 +167,7 @@ export class PlayerPanel extends Container {
       addStrength(2 * activeTemples.length, `Temple`)
     }
     if (this.isResplendent) addStrength(3, 'Resplendent');
-    if (this.player.godName === 'Anubis' && this.figuresInRegion(regionId, this.player).includes(this.god.figure)) {
+    if (Anubis.instance?.isGodOf(this.player) && this.figuresInRegion(regionId, this.player).includes(this.god.figure)) {
       addStrength(Anubis.instance.occupiedSlots.length, `Anubis`)
     }
     // TODO: add Bastet-Cats
@@ -196,10 +196,6 @@ export class PlayerPanel extends Container {
       }
     }, this, true); // trigger only once!
   }
-  // detectObeliskTeleport... oh! this requires a 'Done' indication.
-  enableObeliskTeleport(regionId: RegionId): void {
-    this.activateCardSelector(false, 'Teleport');
-  }
   outline: RectShape;
   ankhSource: AnkhSource<AnkhToken>;
   get god() { return this.player.god; }
@@ -222,7 +218,7 @@ export class PlayerPanel extends Container {
     this.makeAnkhPowerGUI();
     this.makeFollowers();
     this.cardSelector = this.makeCardSelector();
-    this.activateCardSelector(false);
+    this.activateCardSelector();
     this.makeStable();
   }
   static readonly ankhPowers: PowerSpec[][] = [
@@ -407,7 +403,33 @@ export class PlayerPanel extends Container {
     }
     afterUpdate(this, () => this.player.gamePlay.phaseDone());
   };
+  setAnkhPowers(powers: PowerIdent[]) {
+    const panel = this, god = this.god;
+    // remove & replace existing AnkhPowers
+    god.ankhPowers.length = 0;
+    god.ankhPowers.push(...powers);
+    panel.ankhPowerTokens.length = 0;
+    // for each colCont: remove any AnkhToken & add AnkhToken if applicable
+    panel.powerCols.forEach((colCont, cn) => {
+      colCont.removeChildType(AnkhToken).forEach(ankhToken => ankhToken.sendHome());
+      // leaving only the marker children!
+      const ankhs = [panel.ankhSource.takeUnit(), panel.ankhSource.takeUnit(),];
+      ankhs.forEach((ankh, cn) => {
+        const marker = colCont.children[cn];
+        ankh.x = marker.x; ankh.y = marker.y;
+      })
+      panel.ankhPowerTokens.push(...ankhs); // add 2 ankhs to supply
+      colCont.addChild(...ankhs);
+      colCont.ankhs = ankhs;
+    })
+    // find {colCont, powerLine} in panel.powerCols where button.name === powers[i]
+    powers.forEach(power => {
+      panel.powerCols.find(colCont =>
+        colCont.powerLines.find(pl => (pl.button.name === power) && (panel.addAnkhToPowerLine(pl), true))
+      );
+    })
 
+  }
   takeGuardianIfAble(ndx: 0 | 1 | 2, guard?: Guardian) {
     const guardian = guard ?? this.table.guardSources[ndx].takeUnit();
     let slot = -2;
@@ -674,16 +696,20 @@ export class PlayerPanel extends Container {
       doneButton.y = 4 * rowh;
       doneButton.x = w - 3 * (gap);
       doneButton.on(S.click, () => {
-        if (doneButton.label_text === 'Choose') { // <-- 'Choose'
+        const label = doneButton.label_text;
+        const after = (label === 'X') ? undefined : () =>  gamePlay.phaseDone(panel);
+        if (label.endsWith('Choose')) {
           const nSelected = cardSelector.cardsInState('inBattle').length;
           if (this.cardSelector.activated && nSelected === 0) {
             this.blink(doneButton, 80, true);
             return; // you must select a card
           }
+          cardSelector.showCardSelector(false, 'XChoose'); // deactive in 'Reveal'
+        } else {
+          cardSelector.showCardSelector(false, 'X');       // was never activated...
+          cardSelector.bidCounter.visible = false;
         }
-        cardSelector.showCardSelector(false);
-        cardSelector.bidCounter.visible = false;
-        doneButton.updateWait(false, () => { gamePlay.phaseDone(panel); }, gamePlay);
+        doneButton.updateWait(false, after, gamePlay);
       }, this);
     }
     // add Plague Counter:
@@ -699,13 +725,12 @@ export class PlayerPanel extends Container {
   }
 
   get canAffordMonument() { return this.player.coins >= 3 || this.hasAnkhPower('Inspiring') }
-  activateCardSelector(activate = true, done = 'Done', selector = this.cardSelector) {
-    selector.activateCardSelector(activate, done, this);
+  activateCardSelector(label = 'X', selector = this.cardSelector) {
+    selector.activateCardSelector(label === 'Choose', label, this);
   }
 
-  showCardSelector(vis = true, done = 'Done') {
-    const cs = this.cardSelector;
-    cs.showCardSelector(vis, done);
+  showCardSelector(vis = true, done?: string) {
+    this.cardSelector.showCardSelector(vis, done);
   }
 
   static colorForState: { [key in CardState]: string } = { inHand: 'green', inBattle: 'yellow', onTable: 'red' };
@@ -728,7 +753,8 @@ export class PlayerPanel extends Container {
   revealCards(vis = true): void {
     const inBattle = this.cardsInBattle.map(pl => pl.name);
     if (vis) this.player.gamePlay.table.logText(`${this.god.name}: ${inBattle}`);
-    this.showCardSelector(vis);
+    this.cardSelector.activated = false;
+    this.showCardSelector(vis, 'Revealed');
     this.stage.update();
   }
 
@@ -753,6 +779,10 @@ export class PlayerPanel extends Container {
 
   // button.parent is the PowerLine.
   selectForBattle(evt, button: CircleShape) {
+    if (!this.cardSelector.activated) {
+      this.blink(button);
+      return;
+    }
     const max = this.god.nCardsAllowedInBattle;
 
     const inHand = PlayerPanel.colorForState['inHand']

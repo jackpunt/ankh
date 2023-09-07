@@ -158,8 +158,9 @@ class TextLog extends Container {
   }
 
   private newText(line = '') {
-    const text = new Text(line, F.fontSpec(this.size))
-    text.textAlign = 'left'
+    const text = new Text(line, F.fontSpec(this.size));
+    text.textAlign = 'left';
+    text.mouseEnabled = false;
     return text;
   }
 
@@ -782,7 +783,7 @@ export class Table extends EventDispatcher  {
     }
   }
 
-  setRegionMarker(rid = this.regionMarkers.length as RegionId, marker = this.regionMarkers[rid - 1]) {
+  setRegionMarker(rid: RegionId, marker = this.regionMarkers[rid - 1]) {
     // move marker to 'corner' of hex (or {0,0} of markCont):
     const [x, y] = this.centerOfRegion(rid);
     const hex = this.hexMap.hexUnderPoint(x, y, false);

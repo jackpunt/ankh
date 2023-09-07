@@ -95,7 +95,7 @@ export class RegionMarker extends Tile {
     // the marker for RegionB ('1') now in same location as marker for RegionA ('4')
     // move ma '4' to its center of regionB
     table.setRegionMarker(rb); // Swap: move ma to center of rb
-    const mb2 = table.regionMarkers[rb];
+    const mb2 = table.regionMarkers[rb - 1];
     mb2.lastXY.x = mb2.x; mb2.lastXY.y = mb2.y; // using srcCont coords!
     hexMap.update();
   }

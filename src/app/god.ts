@@ -95,11 +95,10 @@ export class God {
   uberGod: God;
   unterGod: God;
   /** panel of this or the uberGod */
-  get panel(): PlayerPanel { return (this ?? this.uberGod).player.panel; }
+  get panel(): PlayerPanel { return (this.uberGod ?? this).player.panel; }
 
-  isPlayer(player: Player) {
-    const thisPlayer = (this ?? this.uberGod).player;
-    return player === thisPlayer;
+  isGodOf(player: Player) {
+    return this.player === player || this.uberGod?.player === player || this.unterGod?.player === player;
   }
 }
 
@@ -159,6 +158,7 @@ export class Anubis extends God {
     return { trapped };
   }
   override parseState(state: { trapped: number[] }): void {
+    this.anubisHexes.forEach(hex => hex.figure?.sendHome())
     const trapped = state.trapped;
     trapped.forEach((pid, ndx) => {
       const player = this.player.gamePlay.allPlayers[pid];

@@ -318,11 +318,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C', () => {
       const vis = (cardSelectorsUp = !cardSelectorsUp);
       this.table.allPlayerPanels.forEach(panel => {
-        if ((this.gameState.state.Aname === 'Cards')) {
-          if (panel.cardSelector.activated) panel.showCardSelector(vis, 'X');
-        } else {
-          panel.showCardSelector(vis, panel.cardSelector.activated ? 'Done' : 'X');
-        }
+        panel.showCardSelector(vis);
       });
     });
     KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START

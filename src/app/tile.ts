@@ -279,6 +279,8 @@ export class Tile extends Tile0 implements Dragable {
   }
 
   cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
+    // if (player.god.isGodOf(this.player)) ??
+    if (player && player === player.gamePlay.gameState.hathorSummon) return undefined;
     return (ctx?.lastShift || this.player === undefined || this.player === player) ? undefined : "Not your Tile";
   }
 

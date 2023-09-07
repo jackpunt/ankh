@@ -4,7 +4,7 @@ import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
-import { Anubis, Bastet, God, Ra, SetGod } from "./god";
+import { Anubis, Bastet, God, Osiris, Ra, SetGod } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -461,7 +461,7 @@ export class Figure extends AnkhMeeple {
       && (hex.tile instanceof Portal)
       && (hex.meep === undefined)
       && (this.isFromStable || Anubis.instance?.isAnubisHex(this.hex)) // given phase==='Summon' maybe we don't care...
-      && (this.player?.godName === 'Osiris')
+      && (this.player && Osiris.instance?.isGodOf(this.player))
   }
   isOccupiedLegal(hex: AnkhHex, ctx: DragContext) {
     return !hex.piece;
@@ -499,7 +499,7 @@ export class Figure extends AnkhMeeple {
     if (!hex.isOnMap) return false; // RecycleHex is "on" the map?
     if (this.backSide.visible && !ctx?.lastShift) return false;
     // AnkhToken (not a Figure!) can moveTo Monument, but that is not a user-drag.
-    if (this.player.godName === 'Osiris' && hex.tile?.name === 'Portal' && !hex.meep) return true;
+    if (Osiris.instance?.isGodOf(this.player) && (hex.tile instanceof Portal) && !hex.meep) return true;
     if (!!hex.occupied) return false;
     return true;
   }
@@ -715,7 +715,7 @@ export class Satet extends Guardian1 {
     if (!hex.tile && !hex.meep) return true;
     // open if: there is a hex; && is no meep (or meep is satet-inFlight) && no tile (or tile is open portal for Osiris)
     const noMeep = (!hex.meep || (hex.meep === this));
-    return noMeep && (!hex.tile || (hex.tile instanceof Portal && player.godName === 'Osiris'))
+    return noMeep && (!hex.tile || (hex.tile instanceof Portal && Osiris.instance?.isGodOf(player)));
   }
   override isLegalTarget(hex: AnkhHex, ctx?: DragContext): boolean {
     const figure = hex?.figure;
@@ -796,7 +796,7 @@ export class Mummy extends Guardian2 {
 
   override sendHome(): void {   // Mummy -> adjTo GodFigure OR StableHex
     const god = this.player?.god, godFig = god?.figure;
-    const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && god.name === 'Osiris');
+    const isLegal = (hex: AnkhHex) => !hex.occupied || (hex.tile instanceof Portal && Osiris.instance?.isGodOf(this.player));
     const dir = godFig?.hex.findAdjHex(hex => isLegal(hex)); // not water
     if (dir) {
       const toHex = godFig.hex.links[dir];

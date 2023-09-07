@@ -9,13 +9,14 @@ import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
 import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
-import { AnkhMarker, Bastet, God } from "./god";
+import { AnkhMarker, God } from "./god";
 import { EwDir, HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { Player } from "./player";
 import { PlayerPanel, cardStates } from "./player-panel";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
+import { GameState } from "./game-state";
 
 type GodName = string;
 export type GuardName = string | Constructor<Guardian>;
@@ -47,6 +48,7 @@ export type SetupElt = {
   regions: RegionElt[],  // delta, east, west, ...; after splits.
   // the rest assume defaults or random values:
   godNames?: string[],   // Gods in the game ?? use names from URL command.
+  merged?: [unter: string, uber: string], //
   time?: string,         // stime.fs() when state was saved.
   cards?: (0|1|2)[][],   // [flood...cycle][0=inHand|1=inBattl|2=onTable]
   coins?: number[],      // 1
@@ -91,7 +93,7 @@ export class ScenarioParser {
 
   parseSplits(splits: SplitSpec[], turnSet = false) {
     const map = this.map;
-    if (map.splits.length > 3) {
+    if (map.regions.length > 3) {
       map.splits = [];
       map.oneRegion();
       map.addRiverSplits();
@@ -155,13 +157,13 @@ export class ScenarioParser {
     // console.log(stime(this, `.claimHex: ${hex}`), player.color);
   }
 
-  // coins, score, actions, events, AnkhPowers, Guardians in stable; Amun, Bastet, Horus, ...
+  // coins, score, actions, events, AnkhPowers, Guardians in stable; specials for Amun, Bastet, Horus, ...
   parseScenario(setup: SetupElt) {
     if (!setup) return;
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, cards, godStates, events, actions, stable, ankhs, places, bastet } = setup;
+    const { regions, splits, coins, scores, turn, guards, cards, godStates, events, actions, stable, ankhs, places, merged } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -236,39 +238,24 @@ export class ScenarioParser {
     });
     // reset all AnkhTokens, ready for claim some Monument:
     this.parsePlaces(places, turnSet);  // turnSet indicates a saved Scenario, vs original.
-    // set AnkhPowers in panel:
+    // For each Player, set AnkhPowers in panel:
     ankhs?.forEach((powers: AnkhElt, pid) => {
       // console.log(stime(this, `.ankhs[${pid}]`), powers);
-      const player = allPlayers[pid], panel = player.panel;
-      const god = player.god;
-      // remove existing AnkhPowers & AnkhTokens
-      god.ankhPowers.length = 0;
-      god.ankhPowers.push(...powers);
-      panel.ankhPowerTokens.length = 0;
-      // add ankhs for each colCont:
-      panel.powerCols.forEach((colCont, cn) => {
-        colCont.removeChildType(AnkhToken).forEach(ankhToken => ankhToken.sendHome());
-        // leaving only the marker children!
-        const ankhs = [panel.ankhSource.takeUnit(), panel.ankhSource.takeUnit(),];
-        ankhs.forEach((ankh, cn) => {
-          const marker = colCont.children[cn];
-          ankh.x = marker.x; ankh.y = marker.y;
-        })
-        panel.ankhPowerTokens.push(...ankhs); // add 2 ankhs to supply
-        colCont.addChild(...ankhs);
-        colCont.ankhs = ankhs;
-      })
-      // find {colCont, powerLine} in panel.powerCols where button.name === powers[i]
-      powers.forEach(power => {
-        panel.powerCols.find(colCont =>
-          colCont.powerLines.find(pl => (pl.button.name === power) && (panel.addAnkhToPowerLine(pl), true))
-        );
-      })
+      const panel = allPlayers[pid].panel;
+      panel.setAnkhPowers(powers);
     });
     if (godStates) {
       Object.keys(godStates).forEach((godName: string) => {
         God.byName.get(godName).parseState(godStates[godName]);
       });
+    }
+    if (merged) {
+      const [unter, uber] = merged;
+      if (unter) {
+        const unterGod = God.byName.get(unter), uberGod = God.byName.get(uber);
+        unterGod.uberGod = uberGod;
+        uberGod.unterGod = unterGod;
+      }
     }
     this.gamePlay.hexMap.update();
   }
@@ -282,6 +269,7 @@ export class ScenarioParser {
     const scores = table.playerScores;
     const time = stime.fs();
     if (!silent) console.log(stime(this, `.saveState: --- `), { turn, ngods, godNames })
+    const merged = [God.allGods.find(god => god.uberGod)?.name, God.allGods.find(god => god.unterGod)?.name];
 
     const allRegions = gamePlay.hexMap.regions;
     const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as SplitBid);
@@ -318,7 +306,7 @@ export class ScenarioParser {
       const godState = player.god.saveState();
       if (godState !== undefined) godStates[player.god.name] = godState;
     });
-    const setupElt = { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, cards, godStates, stable, ankhs, places } as SetupElt;
+    const setupElt = { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, merged, cards, godStates, stable, ankhs, places } as SetupElt;
     return setupElt;
   }
 

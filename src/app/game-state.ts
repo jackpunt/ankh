@@ -35,7 +35,7 @@ export class GameState {
   state: Phase;
   get table() { return this.gamePlay?.table; }
   get curPlayer() { return this.gamePlay.curPlayer; }
-  get panel() { return this.gamePlay.curPlayer.panel; }
+  get panel() { return this.curPlayer.god.panel; }
 
   selectedActionIndex: number; // where in the row [0..n] to place an AnkhMarker
   selectedAction: ActionIdent; // set when click on action panel or whatever. read by ActionPhase;
@@ -157,7 +157,7 @@ export class GameState {
       start: () => {
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
-        this.bastetDisarmed = Bastet.instance?.isPlayer(this.curPlayer); // if false: curPlayer can try to disarm Bastet
+        this.bastetDisarmed = Bastet.instance?.isGodOf(this.curPlayer); // if false: curPlayer can try to disarm Bastet
         this.phase('ChooseAction');
       },
     },
@@ -400,10 +400,11 @@ export class GameState {
         if (panel) {
           const ndx = panels.indexOf(panel); // ndx === 0!
           if (ndx < 0) return;    // ignore extra doneification.
+          panel.showCardSelector(false, 'X');
           panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
         }
         if (panels.length > 0) {
-          panels[0].enableObeliskTeleport(this.conflictRegion);
+          panels[0].showCardSelector(true, 'Teleport');
           return;
         }
         this.phase(this.horusInRegion(this.conflictRegion) ? 'HorusCard' : 'ChooseCard');
@@ -430,7 +431,7 @@ export class GameState {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) { this.phase('Reveal'); return; }
-        panels.forEach(panel => panel.activateCardSelector(true, 'Choose'));
+        panels.forEach(panel => panel.activateCardSelector('Choose'));
       },
       done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
@@ -472,7 +473,7 @@ export class GameState {
         const bmark = Bastet.instance?.bastetMarks.filter(bmark => bmark.regionId === this.conflictRegion)?.[0];
         if (bmark) { bmark.setNameText(`${bmark.strength}`); bmark.updateCache() }
         this.gamePlay.hexMap.update();
-        this.doneButton('Reveal Done', C.grey);
+        this.doneButton('Reveal Done', C.white);
         if (TP.autoRevealDone > 0) setTimeout(() => { this.state.done(); }, TP.autoRevealDone);
       },
       done: () => {
@@ -624,7 +625,7 @@ export class GameState {
             const nKilled = nPlague + nBattle;
             if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
           })
-          this.phase(panels.includes(Osiris.instance.panel) ? 'Osiris' : 'Worshipful');
+          this.phase(panels.includes(Osiris.instance?.panel) ? 'Osiris' : 'Worshipful');
         }
 
         if (d == 0) {          // consider tiebreaker;
@@ -737,10 +738,10 @@ export class GameState {
         const highlights = Hathor.instance.panel.highlightStable(true);
         this.state.done = () => {
           highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
-          this.hathorSummon = false;
+          this.hathorSummon = undefined;
           next();
         }
-        this.doneButton('Hathor Summon');
+        this.doneButton('Hathor Summon', Hathor.instance.player.color);
       },
       done: () => {
         // dyna-set above with highlights & nextPhase
@@ -754,11 +755,10 @@ export class GameState {
   // if (winner === undefined): all non-GodFigure are at risk.
   deadFigs(cause: string, winner: God | undefined, rid: RegionId, isBattle = true) {
     const floodProtected = (fig: Figure, player: Player,) => player.panel.hasCardInBattle('Flood') && (fig.hex.terrain === 'f');
-    const isisGod = Isis.instance;
     const region = this.gamePlay.hexMap.regions[rid - 1];
     const figsInRegion = region.filter(hex => hex?.figure).map(hex => hex.figure);
     const deadFigs0 = figsInRegion.filter(fig => !(fig instanceof GodFigure) && !(fig.controller === winner));
-    const deadFigs1 = isBattle ? deadFigs0.filter(fig => !isisGod.isProtected(fig)) : deadFigs0;
+    const deadFigs1 = isBattle ? deadFigs0.filter(fig => !Isis.instance?.isProtected(fig)) : deadFigs0;
     const deadFigs = isBattle ? deadFigs1.filter(fig => !floodProtected(fig, fig.controller.player)) : deadFigs1;
     this.table.logText(`${cause}[${rid}] killed: ${deadFigs}`);
     this.filterAnubisTrap(deadFigs).forEach(fig => fig.sendHome()); // they all died; some are not sentHome.
@@ -795,7 +795,7 @@ export class GameState {
   }
 
   countCurrentGain(player = this.curPlayer) {
-    // Osiris Portal begins offMap.
+    player = player.god.uberGod?.player ?? player;
     const montsOnMap = this.gamePlay.allTiles.filter(tile => (tile.hex?.isOnMap) && (tile instanceof Monument));
     const monts =  montsOnMap.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
     const adjPlayer = monts.filter(mont => mont.hex.findAdjHexByRegion(hex => hex.figure?.player === player));
@@ -815,15 +815,15 @@ export class GameState {
     const verb = (n >= 0) ? 'gains' : 'sacrifices';
     const noun = (n == 1) ? 'Follower' : 'Followers';
     this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} ${noun}: ${reason}`);
-    if (n < 0 && player.godName === 'Hathor') {
+    if (n < 0 && Hathor.instance?.isGodOf(player)) {
       player.panel.highlightStable(true);
     }
-    this.hathorSummon = (Hathor.instance.isPlayer(player)) && (n < 0) && (player.coins > 0);
+    this.hathorSummon = (Hathor.instance?.isGodOf(player)) && (n < 0) && (player.coins > 0) ? player : undefined;
   }
   // TODO: check that plague kills mummy before battle resolution (so can be in Drought or adj-Temple)
   // after Ankh(Event), (BuildMonument)BuildMonument, (Worshipful)Worshipful, (Summon)AnubisRansom
-  /** true when Hathor gets a free Summon (due to sacrificing a Follower) */
-  hathorSummon = false;
+  /** Hathor.player when Hathor gets a free Summon (due to sacrificing a Follower) */
+  hathorSummon: Player = undefined;
 
   addDevotion(player: Player, n: number, reason?: string) {
     const score0 = player.score;
@@ -833,6 +833,7 @@ export class GameState {
     player.score = Math.max(0, score0 + n);
     const dscore = player.score - score0; // n or 0
     this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason}`);
+    if (Math.floor(player.score) === 31) this.gamePlay.logText(`*** Game Over: ${player.god.name} WINS!`);
   }
 
   hasRadiance(panel: PlayerPanel) {
@@ -888,10 +889,15 @@ export class GameState {
     this.gamePlay.hexMap.forEachHex(hex => (hex.tile instanceof Monument) && hex.tile.player === bp && hex.tile.sendHome())
     bp.god.figure.moveTo(undefined);
     bp.god.figure.visible = false;
+    this.addDevotion(sp, bp.coins, `from merge with ${bp.godName}`);
+    bp.coins = 0;
     if (sp.score !== bp.score + .1) sp.score = bp.score; // no change if 3 players in same slot.
     sp.god.unterGod = bp.god;
     bp.god.uberGod = sp.god;
-    // Select up to 2 of each size of Guardians:
+    this.table.logText(`MergeGods: ${bp.god.name} under ${sp.god.name}`);
+    // TODO: adjust AnkhPowers to match uberGod
+    bottom.setAnkhPowers(second.god.ankhPowers);
+    // mergeGuardians: Select up to 2 of each size of Guardians:
     const guards = second.stableHexes.map(shex => shex.usedBy).filter(guard => !!guard);
     bottom.stableHexes.forEach(shex => {
       const guard = shex.usedBy;
@@ -908,12 +914,14 @@ export class GameState {
         stableHex.usedBy = guard;
         guard.homeHex = stableHex;
         if (guard.hex.isStableHex()) guard.moveTo(stableHex); // to new/correct StableHex
+        this.table.logText(`${sp.god.name} keeps ${guard}`);
       })
       if (base === 2) {
         g2.forEach(guard => {
           if (!second.stableHexes.find(shex => shex.usedBy === guard)) {
             guard.setPlayerAndPaint(undefined);
-            guard.sendHome()
+            guard.sendHome();
+            this.table.logText(`${sp.god.name} releases ${guard}`);
           }
         })
         this.phase(nextPhase);
