@@ -1,24 +1,29 @@
-import { C, DragInfo, XY } from "@thegraid/easeljs-lib";
+import { C, Constructor, DragInfo, XY } from "@thegraid/easeljs-lib";
+import { Text } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { CenterText, PaintableShape, PolyShape } from "./shapes";
+import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { Table, DragContext } from "./table";
-import { Text } from "@thegraid/easeljs-module";
+import { TileSource } from "./tile-source";
 
 /** a Tile, but it lives on markCont !! */
 
 export class RegionMarker extends Tile {
+  static table: Table;
+
   override get radius() { return TP.ankh1Rad; }
   override makeShape(): PaintableShape {
     return new PolyShape(4, 0, 'rgba(40,40,40,.7)', this.radius, C.WHITE);
   }
   idText: Text;
+  table: Table;
   hexMap: AnkhMap<AnkhHex>;
-  constructor(public table: Table, public regionId = 1 as RegionId, Aname = `Region=${regionId}`) {
+  constructor(player: Player, public regionId = 1 as RegionId, Aname = `Region=${regionId}`) {
     super(Aname);
+    const table = this.table = RegionMarker.table;
     this.hexMap = table.hexMap as AnkhMap<AnkhHex>;
     const txt = this.idText = new CenterText(`${regionId}`, this.radius, C.WHITE);
     this.baseShape.paint();

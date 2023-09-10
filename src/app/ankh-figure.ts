@@ -17,6 +17,7 @@ import { MapTile, Tile } from "./tile";
 import { TileSource } from "./tile-source";
 
 
+/** TileSource with customized Counter on the source.hex. */
 export class AnkhSource<T extends Tile> extends TileSource<T> {
   static dummyCounter = new NumCounter('dummy');
   constructor(type: Constructor<T>, player: Player, hex: Hex2, xy?: XY, counter?: NumCounter) {
@@ -378,27 +379,26 @@ export class BastetMark extends AnkhMeeple {
   }
 
   override dropFunc(targetHex: AnkhHex, ctx: DragContext): void {
-    // super.dropFunc(targetHex, ctx);
     if (ctx.phase === 'BastetDeploy' || ctx.lastShift) {
+      // Deploy on Monument:
       this.setOn(targetHex);
       this.player.gamePlay.logText(`Bastet[${this.strength}] deployed to ${this.bastHex}`);
+    } else if (!targetHex || targetHex === this.bastHex) {
+      // Self-drop (to Monument or homeHex):
+      this.setOn(this.bastHex);
     } else {
-      // self-drop or drop on adj Figure of curPlayer.
-      if (!targetHex || targetHex === this.bastHex) {
-        this.setOn(this.bastHex)
+      // Drop on adjacent Figure to disarm:
+      const fig = targetHex.figure;
+      if (this.strength === 0 && !(fig instanceof GodFigure)) {
+        // bmark explodes, killing targetHex.Figure
+        this.player.gamePlay.logText(`Bastet[${this.strength}] explodes, killing ${fig}`);
+        fig.sendHome();
       } else {
-        const fig = targetHex.figure;
-        if (this.strength === 0 && !(fig instanceof GodFigure)) {
-          // bmark explodes, killing targetHex.Figure
-          this.player.gamePlay.logText(`Bastet[${this.strength}] explodes, killing ${fig}`);
-          fig.sendHome();
-        } else {
-          // bmark is disarmed, return to bastetHexes:
-          this.player.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
-        }
-        this.sendHome();
-        this.gamePlay.gameState.setBastetDone();
+        // bmark is disarmed, return to bastetHexes:
+        this.player.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
       }
+      this.sendHome();
+      this.gamePlay.gameState.setBastetDisarmed();
     }
   }
 

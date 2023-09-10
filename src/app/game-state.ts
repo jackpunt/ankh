@@ -21,7 +21,7 @@ interface Phase {
   undo?: () => void;
   panels?: PlayerPanel[],
   deadFigs?: Figure[], // for Plague
-  nextPhase?: string,
+  nextPhase?: string,  // for BastetDeploy
 }
 
 export class GameState {
@@ -44,12 +44,24 @@ export class GameState {
 
   readonly selectedActions: ActionIdent[] = [];
 
-  bastetPlayer = undefined;
-  bastetDisarmed = true;
-  setBastetDone() {
+  bastetPlayer: Player = undefined;
+  /** Bastet should redeploy the BastetMarkers. */
+  bastetRedeploy = true;
+  /** Player has done a BastetDisarm this turn. */
+  bastetDisarmed = false;
+  disarmBastet = 'Disarm Bastet?';
+  /** Player has done a BastetDisarm this turn, remove doneButton. */
+  setBastetDisarmed() {
     this.bastetDisarmed = true;
-    if (this.table.doneButton.label_text === 'Disarm Bastet?')
-      this.done(this.state.nextPhase); // supply nextPhase just in case... ??
+    if (this.table.doneButton.label_text === this.disarmBastet) {
+      this.done();
+    }
+  }
+  get bastetDisarmable() {
+    // [player can select Bastet Cat for disarming] if any BastetMark is adj to Figure(this.curPlayer)
+    const bms = Bastet.instance?.bastetMarks.filter(bm => bm.bastHex);
+    const adj = bms?.find(bmark => bmark.bastHex.findAdjHexByRegion((hex => hex.figure?.player === this.curPlayer)));
+    return !this.bastetDisarmed && !!adj && TP.promptBastetDisarm;
   }
 
   get playerFigures() { const plyr = this.curPlayer; return Figure.allFigures.filter(fig => fig.player === plyr) }
@@ -73,6 +85,7 @@ export class GameState {
   }
 
   start(phase = 'StartGame') {
+    this.bastetPlayer = Bastet.instance?.player;
     this.phase(phase);
   }
 
@@ -118,9 +131,8 @@ export class GameState {
   readonly states: { [index: string]: Phase } = {
     StartGame: {
       start: () => {
-        // TODO: fix this hueristic: save/parseBastet when all 3 marks have been disarmed!
-        const deployBastet = Bastet.instance?.bastetMarks.every(bmark => !bmark.bastHex);
-        this.phase(!deployBastet ? 'BeginTurn' : 'BastetDeploy', 'BeginTurn');
+        // TODO: see if event === 'ConflictInRegion' && conflictRegion is set; from parseState()
+        this.phase('BeginTurn');
       }
     },
     BastetDeploy: {
@@ -149,24 +161,31 @@ export class GameState {
           return; // must deploy all BastetMarks
         }
         bmarks.forEach(bmark => bmark.highlight(false));
-        this.doneButton();
+        this.bastetRedeploy = false;
+        this.doneButton(); // Bastet Deploy: remove doneButton
         this.phase(this.state.nextPhase);
       }
     },
     BeginTurn: {
       start: () => {
+        if (this.bastetRedeploy) this.phase('BastetDeploy', 'BeginTurn');
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
         this.bastetDisarmed = Bastet.instance?.isGodOf(this.curPlayer); // if false: curPlayer can try to disarm Bastet
+        if (this.bastetDisarmable) { this.doneButton(this.disarmBastet); return; }
         this.phase('ChooseAction');
       },
+      done: () => {
+        this.phase('ChooseAction');
+      }
     },
     // ChooseAction:
     // if (2 action done || no actions to activate || Event) phase(EndTurn)
     // else { place AnkhMarker, phase(actionName) }
     ChooseAction: {
       start: () => {
-        if (this.actionsDone >= 2) this.phase('EndTurn');
+        const maxActs = (this.curPlayer.god.uberGod || this.curPlayer.god.unterGod) ? 1 : 2;
+        if (this.actionsDone >= maxActs) this.phase('EndTurn');
         // enable and highlight open spots on Action Panel
         const lastAction = this.selectedActions[0], n = this.selectedActions.length + 1;
         const active = this.table.activateActionSelect(true, lastAction);
@@ -200,7 +219,7 @@ export class GameState {
       done: (ok?: boolean) => {
         const nmoved = this.highlights.filter(fig => fig.hex !== fig.startHex).length;
         if (!ok && nmoved === 0) {
-          this.panel.areYouSure('You have not moved any Figures', () => {
+          this.curPlayer.panel.areYouSure('You have not moved any Figures', () => {
             setTimeout(() => this.state.done(true), 50); // new thread
           }, () => {
             console.log(stime(this, `.Move done: cancel`), this.selectedActions)
@@ -252,7 +271,7 @@ export class GameState {
             });
           return;
         }
-        this.doneButton();
+        this.doneButton(); // Ankh Power: no done button
         panel.activateAnkhPowerSelector();
       },
       done: () => {
@@ -261,11 +280,8 @@ export class GameState {
     },
     EndAction: {
       start: () => {
-        // [player can select Bastet Cat for disarming] if any BastetMark is adj to Figure(this.curPlayer)
-        const bms = Bastet.instance?.bastetMarks.filter(bm => bm.bastHex);
-        const adj = bms?.find(bmark => bmark.bastHex.findAdjHexByRegion((hex => hex.figure?.player === this.curPlayer)));
-        if (!this.bastetDisarmed && adj) this.doneButton('Disarm Bastet?');
-        else this.done();
+        if (this.bastetDisarmable) { this.doneButton(this.disarmBastet); return }
+        this.done();
       },
       done: () => {
         this.phase(!!this.eventName ? 'Event' : 'ChooseAction');
@@ -285,7 +301,7 @@ export class GameState {
         this.table.logText(`${this.curPlayer.godName} makes Split [${this.gamePlay.hexMap.regions.length}]`);
         // overlay is HexShape child of hex.cont; on mapCont.hexCont;
         this.ankhMapSplitter.runSplitShape();
-        this.doneButton();
+        this.doneButton(); // Split: hide doneButton
       },
       done: () => {
         this.phase('Swap');
@@ -309,7 +325,7 @@ export class GameState {
         const done = () => this.phase('EventDone');
         const ankhToken = this.panel.ankhSource.sourceHexUnit; //takeUnit();
         if (ankhToken?.claimableMonuments(this.panel.player).length > 0) {
-          this.panel.ankhSource.sourceHexUnit.highlight(true, C.BLACK);
+          this.panel.ankhSource.sourceHexUnit?.highlight(true, C.BLACK);
           this.table.dragger.dragTarget(ankhToken, { x: 8, y: 8 });
           this.doneButton('Claim done');
         } else if (ankhToken) {
@@ -366,6 +382,7 @@ export class GameState {
     },
     ConflictInRegion: {
       start: () => {
+        this.gamePlay.saveState();
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
         this.table.logText(`${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
 
@@ -429,9 +446,11 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
+        this.table.allPlayerPanels.forEach(panel => panel.cardSelector.doneButton.label_text='X'); // TODO encapsulate?
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) { this.phase('Reveal'); return; }
         panels.forEach(panel => panel.activateCardSelector('Choose'));
+        this.doneButton(); // Choose: hide doneButton TODO:  save bastet, Horus lastXYY, RegionMarker lastXY; saveState before ConflictInRegion
       },
       done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
@@ -497,11 +516,13 @@ export class GameState {
           this.phase('Plague');
           return;
         }
-        panels[0].enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
-        this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
-        this.doneButton('Build Done', panels[0].player.color);
+        const panel0 = panels[0], player = panel0.player;
+        panel0.enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
+        this.table.monumentSources.forEach(ms => ms.sourceHexUnit?.paint(player.color));
+        this.doneButton('Build Done', player.color);
       },
-      // Triggered by 'Build Done' button OR 'buildDone' event from panel.enableBuild() --> Monument.dropFunc
+      // Triggered by 'Build Done' button (no panel/Monument!)
+      // OR by 'buildDone' event from panel.enableBuild() --> Monument.dropFunc (with: panel/Monument)
       done: (panel: PlayerPanel = this.state.panels[0], monument?: Monument) => {
         if (panel && monument) {
           this.table.logText(`${panel.player.godName} built Monument: ${monument?.hex.toString()}`);
@@ -511,7 +532,7 @@ export class GameState {
             if (this.hathorSummon) {
               this.phase('HathorSummon', () => {
                 // return to BuildMonument.done(panel);
-                ; (this.state = this.states['BuildMonument']).done(panel);
+                ; (this.state = this.states['BuildMonument']).done(panel); // with no Monument!
               });
               return;
             }
@@ -522,16 +543,17 @@ export class GameState {
         if (ndx >= 0) {           // vs repeated or undefined panel
           panels.splice(ndx, 1);  // or rig it up to use Promise/PromiseAll
           if (panels.length === 0) {
-            this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(undefined));
+            this.table.monumentSources.forEach(ms => ms.sourceHexUnit?.paint(undefined));
             this.doneButton('', C.grey, () => this.phase('Plague'));
             return;
           }
         }
         // console.log(stime(this, `Build.done: return NOT done...`))
-        panels[0].enableBuild(this.conflictRegion); // Monument.dropFunc() --> buildDone --> panel.enableBuild
-        this.table.monumentSources.forEach(ms => ms.sourceHexUnit.paint(panels[0].player.color));
-        this.doneButton('Build Done', panels[0].player.color);
-      }
+        const panel0 = panels[0], player = panel0.player;
+        panel0.enableBuild(this.conflictRegion); // ankh-figure: Monument.dropFunc() --> buildDone --> panel.enableBuild
+        this.table.monumentSources.forEach(ms => ms.sourceHexUnit?.paint(player.color));
+        this.doneButton('Build Done', player.color);
+     }
     },
     Plague: {
       panels: [],    // panels in this region
@@ -550,8 +572,7 @@ export class GameState {
         const ndx = panels.indexOf(p);
         panels.splice(ndx, 1);
         if (panels.length !== 0) return; // waiting for other panels to make their bid.
-        this.resolvePlague();
-        this.phase('Plague');  // restart, looking for next Plague card.
+        this.phase('PlagueResolution');
       }
 
       // mouse enable plague big counters (max value: player.coins)
@@ -560,9 +581,9 @@ export class GameState {
     },
     PlagueResolution:{
       panels: [],
-      deadFigs: [],
       start: () => {
-        this.phase('ScoreMonuments');
+        this.plagueDeadFigs = this.resolvePlague();
+        this.phase(!this.hathorSummon ? 'ScoreMonuments' : 'HathorSummon', 'ScoreMonuments');
       },
     },
 
@@ -607,8 +628,6 @@ export class GameState {
             panels.splice(0, 1); // remove winner, panels now has all the losers.
           }
 
-          const deadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
-
           // ----------- After Battle Resolution: panels contains losers --------------
           // no need to re-sort: only winner has changed score [?]
           panels.forEach(panel => {
@@ -617,11 +636,12 @@ export class GameState {
             }
           });
 
+          const battleDeadFigs = this.deadFigs('Battle', winner?.player.god, rid, true);
           // Resolve Miracle cards:
           panels0.filter(panel => panel.hasCardInBattle('Miracle')).forEach(panel => {
             const player = panel.player, ofPlayer = (fig: Figure) => fig.lastController === player.god;
-            const nPlague = this.states['PlagueResolution'].deadFigs.filter(ofPlayer).length;
-            const nBattle = deadFigs.filter(ofPlayer).length;
+            const nPlague = this.plagueDeadFigs.filter(ofPlayer).length;
+            const nBattle = battleDeadFigs.filter(ofPlayer).length;
             const nKilled = nPlague + nBattle;
             if (nKilled > 0) this.addDevotion(player, nKilled, `Miracle - Plague:${nPlague} Battle:${nBattle}`);
           })
@@ -662,7 +682,7 @@ export class GameState {
       },
       done: () => {
         Osiris.instance.highlight(false);  // un-highlight Portal tiles.
-        this.doneButton();
+        this.doneButton();  // Osiris: Portal done
         this.phase('Worshipful');
       }
     },
@@ -733,14 +753,19 @@ export class GameState {
     /** Hathor: after addFollowers() Ankh-Event, BuildMonument, Worshipful, Summon-AnubisRansom */
     HathorSummon: {
       start: (nextPhase: string | (() => void)) => {
+        const hathor = Hathor.instance, hathorFigs = () => this.gamePlay.hexMap.hexAry.filter(hex => hex.figure && hathor.isGodOf(hex.figure.player)).length;
+        const nFigsOnMap0 = hathorFigs();
         if (!nextPhase) debugger;
         const next = (typeof nextPhase === 'function') ? nextPhase : () => this.phase(nextPhase);
-        const highlights = Hathor.instance.panel.highlightStable(true);
+        const highlights = hathor.panel.highlightStable(true);
         this.state.done = () => {
           highlights.forEach(fig => (fig.highlight(false), fig.faceUp(true)));
+          const nFigsOnMap1 = hathorFigs();
+          if (nFigsOnMap1 > nFigsOnMap0) this.addFollowers(hathor.player, -1, `to Summon the Figure`);
           this.hathorSummon = undefined;
           next();
         }
+
         this.doneButton('Hathor Summon', Hathor.instance.player.color);
       },
       done: () => {
@@ -781,23 +806,35 @@ export class GameState {
     });
   }
 
+  plagueDeadFigs: Figure[] = [];
   resolvePlague() {
     const panels = this.panelsInThisConflict.concat(), rid = this.conflictRegion;
     const plaguePanels = panels.filter(panel => panel.hasCardInBattle('Plague')), nToGo = plaguePanels.length;
     console.log(stime(this, `.${this.state.Aname}[${rid}]-${nToGo}`), panels);
     panels.forEach(panel => panel.showCardSelector(false, ''));
+    const bids = panels.map(panel => panel.plagueBid);
+    panels.forEach(panel => {
+      const bid = panel.plagueBid;
+      panel.player.coins += bid;
+      this.addFollowers(panel.player, -bid, `for Plague`); // may set this.hathorSummons !
+    })
     panels.sort((a, b) => b.plagueBid - a.plagueBid);
     const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]; // Battle, not Dominance
     const isWinner = (b0 > b1);
     const winner = isWinner ? panels[0].player.god : undefined;
-    this.table.logText(`Plague[${rid}]-${nToGo} ${winner?.Aname ?? 'Nobody'} survives! [${b0}]`)
-    this.state.deadFigs = this.deadFigs('Plague', winner, rid, false);
+    this.table.logText(`Plague[${rid}]-${nToGo} ${winner?.Aname ?? 'Nobody'} survives! [${bids}]`)
+    return this.deadFigs('Plague', winner, rid, false);
   }
 
-  countCurrentGain(player = this.curPlayer) {
+  monumentsOfPlayer(player = this.curPlayer) {
     player = player.god.uberGod?.player ?? player;
     const montsOnMap = this.gamePlay.allTiles.filter(tile => (tile.hex?.isOnMap) && (tile instanceof Monument));
     const monts =  montsOnMap.filter(mont => (mont.player === player || mont.player === undefined)) as Monument[];
+    return monts;
+  }
+
+  countCurrentGain(player = this.curPlayer) {
+    const monts = this.monumentsOfPlayer(player);
     const adjPlayer = monts.filter(mont => mont.hex.findAdjHexByRegion(hex => hex.figure?.player === player));
     const n = adjPlayer.length + (player.god.ankhPowers.includes('Revered') ? 1 : 0);
     return n
@@ -831,9 +868,9 @@ export class GameState {
       n += 1; reason = `${reason ?? ''} Bountiful:1`
     }
     player.score = Math.max(0, score0 + n);
-    const dscore = player.score - score0; // n or 0
-    this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason}`);
-    if (Math.floor(player.score) === 31) this.gamePlay.logText(`*** Game Over: ${player.god.name} WINS!`);
+    const score = Math.floor(player.score), dscore = player.score - score0; // n or 0
+    this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason} [${score}]`);
+    if (Math.floor(player.score) === 31) this.gamePlay.logText(`---- Game Over: ${player.god.name} WINS! ----`);
   }
 
   hasRadiance(panel: PlayerPanel) {
@@ -889,12 +926,15 @@ export class GameState {
     this.gamePlay.hexMap.forEachHex(hex => (hex.tile instanceof Monument) && hex.tile.player === bp && hex.tile.sendHome())
     bp.god.figure.moveTo(undefined);
     bp.god.figure.visible = false;
-    this.addDevotion(sp, bp.coins, `from merge with ${bp.godName}`);
+    this.table.logText(`MergeGods: ${bp.god.name}[${bp.score}] under ${sp.god.name}[${sp.score}]`);
+    this.addFollowers(sp, bp.coins, `from merge with ${bp.godName}`);
     bp.coins = 0;
-    if (sp.score !== bp.score + .1) sp.score = bp.score; // no change if 3 players in same slot.
+    const dd = Math.floor(bp.score) - Math.floor(sp.score);
+    // no change if 3 or 4 'tied' in last place:
+    if (sp.score !== bp.score + .1) this.addDevotion(sp, dd, `from merge with ${bp.godName}`);
+    sp.score = bp.score;
     sp.god.unterGod = bp.god;
     bp.god.uberGod = sp.god;
-    this.table.logText(`MergeGods: ${bp.god.name} under ${sp.god.name}`);
     // TODO: adjust AnkhPowers to match uberGod
     bottom.setAnkhPowers(second.god.ankhPowers);
     // mergeGuardians: Select up to 2 of each size of Guardians:
@@ -913,7 +953,10 @@ export class GameState {
         const stableHex = second.stableHexes[ndx === 1 && base === 1 ? 4 : base + ndx];
         stableHex.usedBy = guard;
         guard.homeHex = stableHex;
-        if (guard.hex.isStableHex()) guard.moveTo(stableHex); // to new/correct StableHex
+        if (guard.hex.isStableHex()) {
+          guard.source.takeUnit(); // remove from
+          guard.moveTo(stableHex); // to new/correct StableHex
+        }
         this.table.logText(`${sp.god.name} keeps ${guard}`);
       })
       if (base === 2) {
@@ -934,6 +977,7 @@ export class GameState {
     keepThese(1, ...g1);
 
     if (g2.length > 2) {
+      g2.sort((a, b) => a.radius - b.radius); // ascending order
       const oneEach = [g2[0], g2[2]], names = oneEach.map(g => g.Aname);
       // offer choice: 2*rank2, 2*rank3, 1*rank2 + 1*rank3
       const oneOfEach = () => keepThese(2, ...oneEach);
@@ -947,7 +991,6 @@ export class GameState {
           second.areYouSure(`Keep rank2 ${g2[1].Aname} (or rank3 ${g2[2].Aname})`, rank2, rank3);
         }
       }
-      g2.sort((a, b) => a.radius - b.radius); // ascending order
       if (g2[1].radius !== g2[2].radius) {
         second.areYouSure(`Keep one of each [${names}] (or two of the same)`, oneOfEach, twoOfSame);
       }

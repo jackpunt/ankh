@@ -26,7 +26,7 @@ export class TileSource<T extends Tile> {
     counter?: NumCounter,
   ) {
     this.Aname = `${type.name}Source`;
-    if (!counter) {
+    if (counter === undefined) {
       const cont = hex.map.mapCont.counterCont; // GP.gamePlay.hexMap.mapCont.counterCont;
       const { x, y } = hex.cont.localToLocal(0, TP.hexRad / H.sqrt3, cont);
       counter = this.makeCounter(`${type.name}:${player?.index ?? 'any'}`, this.numAvailable, `lightblue`, TP.hexRad / 2);
@@ -95,7 +95,7 @@ export class TileSource<T extends Tile> {
     return n;
   }
 
-  filterUnits(pred: (unit: T) => boolean) { return this.allUnits.filter(pred) }
+  filterUnits(pred: (unit: T, ndx?: number) => boolean) { return this.allUnits.filter(pred) }
 
   get sourceHexUnit() {
     return (this.hex.tile || this.hex.meep) as T; // moveTo puts it somewhere...

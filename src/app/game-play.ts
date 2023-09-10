@@ -315,6 +315,7 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
+    KeyBinder.keyBinder.setKey('D', () => this.fixit())
     KeyBinder.keyBinder.setKey('C', () => {
       const vis = (cardSelectorsUp = !cardSelectorsUp);
       this.table.allPlayerPanels.forEach(panel => {
@@ -337,6 +338,15 @@ export class GamePlay extends GamePlay0 {
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
+  }
+
+  fixit() {
+    const table = this.table, gameState = this.gameState, player = this.curPlayer
+    const panel = player.panel, godByName = God.byName, hexMap = this.hexMap, state = gameState.state
+    console.log(stime(this, `.fixit:`), {gameState, player, panel, table, hexMap, godByName, state});
+    table.toggleText(true);
+    debugger;
+    return;
   }
 
 
@@ -380,7 +390,7 @@ export class GamePlay extends GamePlay0 {
       this.nstate = 0;
     }
 
-    const scenarioParser = new ScenarioParser(this.hexMap, this);
+    const scenarioParser = this.gameSetup.scenarioParser;
     const state = scenarioParser.saveState(this);
     this.backStates.unshift(state);
     console.log(stime(this, `.saveState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}`), state);
@@ -549,7 +559,7 @@ export class GamePlay extends GamePlay0 {
     this.curPlayer.panel.showPlayer(false);
     super.setNextPlayer(turnNumber); // update player.coins
     const [logName, ext] = this.gameSetup.logWriter.fileName?.split('.') ?? ['unsaved',''];
-    this.logText(`turnNumber=${logName}@${this.turnNumber} ${this.curPlayer.godName}`, `GamePlay.setNextPlayer`)
+    this.logText(`turnNumber=${logName}@${this.turnNumber} ${this.curPlayer.godName} ${stime.fs()}`, `GamePlay.setNextPlayer`)
     this.curPlayer.panel.showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...

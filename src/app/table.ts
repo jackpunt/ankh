@@ -662,35 +662,37 @@ export class Table extends EventDispatcher  {
       'Split', 'Claim', 'Claim', 'Conflict', 'redzone',
       'Claim', 'Conflict',
     ];
-    const lf = false, rad = TP.ankhRad, gap = 5, dx = 2 * rad + gap, bx = .5;
-    let cx = 0, special: 'merge' | 'redzone';
+    const rad = TP.ankhRad, gap = 5, dx = 2 * rad + gap, bx = .5;
+    let cx = 0, lastIcon: EventIcon;
     events.forEach((eventName, ndx) => {
       const icon = new Container() as EventIcon; icon.name = 'eventIcon';
       icon.eventName = eventName;
       const k = (eventName === 'Conflict') ? 'B' : firstChar(eventName);
       const shape = new CircleShape('rgb(240,240,240)', rad, );
       const text = new CenterText(k, rad * 1.8); text.y += 2;
-      if (lf && Math.floor(cx) === 8) cx = Math.floor(cx);
-      const row = lf ? Math.min(1, Math.floor(Math.floor(cx) / 8)) : 0;
-      icon.y = row * dx;
-      icon.x = ((row == 0) ? cx : cx - 8 ) * dx;
-      cx += 1;
-      if (k === 'B') {
-        cx += bx;  // extra gap after Conflict
-      }
-      if (eventName === 'merge' || eventName === 'redzone') {
-        special = eventName;
-        icon.y += dx;
-        cx -= 1;
-        shape.graphics.c().f('brown').dr(-rad, -rad * 3 - 2 * gap, 2 * rad, 4 * rad + 2 * gap);
-      } else {
-        this.eventCells.push(icon);
-        icon.special = special;
-        special = undefined;
-      }
+      icon.y = 0;
+      icon.x = cx * dx;
       icon.addChild(shape);
       icon.addChild(text);
       eventCont.addChild(icon);
+      const flag = new Shape(new Graphics().f('brown').dr(-(rad + gap / 2), -(rad + gap / 2), 2 * (rad + gap / 2), 2 * (rad + gap / 2)));
+      cx += 1;
+      if (eventName === 'Conflict') {
+        cx += bx;  // extra gap after Conflict
+        icon.addChildAt(flag, 0);
+      }
+      if (eventName === 'merge' || eventName === 'redzone') {
+        cx -= 1;
+        lastIcon.special = eventName;
+        icon.y += dx;
+        icon.x = lastIcon.x;
+        icon.addChildAt(flag, 0);
+        icon.removeChild(shape);
+        eventCont.addChildAt(icon, 0);
+      } else {
+        this.eventCells.push(icon);
+        lastIcon = icon;
+      }
     })
     return eventCont;
   }
@@ -775,14 +777,15 @@ export class Table extends EventDispatcher  {
   // TODO: AnkhTable extends Table { override hexMap: HexMap<AnkhHex> }
   regionMarkers: RegionMarker[] = [];
   makeRegionMarkers(n: RegionId = 8) {
+    RegionMarker.table = this;
     for (let regionId: RegionId = n; regionId > 0; --regionId) {
-      const marker = new RegionMarker(this, regionId);
+      const marker = new RegionMarker(undefined, regionId);
       this.regionMarkers.unshift(marker);
       this.hexMap.mapCont.markCont.addChild(marker);
-      marker.updateCache();
     }
   }
 
+  /** set the appropriate RegionMarker on the specifiied Region. */
   setRegionMarker(rid: RegionId, marker = this.regionMarkers[rid - 1]) {
     // move marker to 'corner' of hex (or {0,0} of markCont):
     const [x, y] = this.centerOfRegion(rid);

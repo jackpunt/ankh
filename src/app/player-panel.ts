@@ -189,7 +189,7 @@ export class PlayerPanel extends Container {
     const panel = this;
     this.table.on('buildDone', (evt: { panel0?: PlayerPanel, monument?: Monument }) => {
       const { panel0, monument } = evt;
-      panel0.table.monumentSources.forEach(ms => ms.sourceHexUnit.setPlayerAndPaint(undefined));
+      panel0.table.monumentSources.forEach(ms => ms.sourceHexUnit?.setPlayerAndPaint(undefined));
       if (panel0 === panel) {
         panel0.canBuildInRegion = undefined;
         this.player.gamePlay.phaseDone(panel0, monument);

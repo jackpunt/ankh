@@ -16,7 +16,6 @@ import { Player } from "./player";
 import { PlayerPanel, cardStates } from "./player-panel";
 import { ActionContainer } from "./table";
 import { Tile } from "./tile";
-import { GameState } from "./game-state";
 
 type GodName = string;
 export type GuardName = string | Constructor<Guardian>;
@@ -55,7 +54,6 @@ export type SetupElt = {
   scores?: number[],     // 0
   events?: EventElt,
   actions?: ActionElt,
-  bastet?: PlaceElt[],
   godStates?: {},         // objects from God.saveState(), [index: god.name]
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   guards?: GuardIdent,   // Guardian types in use. default to random
@@ -260,7 +258,7 @@ export class ScenarioParser {
     this.gamePlay.hexMap.update();
   }
 
-  saveState(gamePlay: GamePlay, silent = false) {
+  saveState(gamePlay: GamePlay, silent = false) { // TODO: save Bastet 'deployed' state, so start: does not redploy; also: save conflictRegion! when current-event/phase is Conflict
     const table = gamePlay.table;
     const ngods = gamePlay.allPlayers.length;
     const godNames = gamePlay.allPlayers.map(player => player.god.name);

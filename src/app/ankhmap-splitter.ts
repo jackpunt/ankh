@@ -16,7 +16,7 @@ import { Tile } from "./tile";
 export class AnkhMapSplitter {
   isLegalSwap(toHex: AnkhHex, ctx: DragContext): boolean {
     const marker = ctx.tile as RegionMarker;
-    if (marker.regionId > this.table.regionMarkers.length) return false;
+    if (marker.regionId > this.table.regionMarkers.length) return false; // TODO: use regionMarker.onMap
     if (!toHex || toHex.terrain === 'w') return false;
     return true;
   }

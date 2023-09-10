@@ -240,13 +240,18 @@ export class Bastet extends God {
     })
   }
   override saveState() {
-    const deployed = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined);
-    return deployed;
+    const redeploy = this.player.gamePlay.gameState.bastetRedeploy;
+    const disarmed = this.player.gamePlay.gameState.bastetDisarmed;
+    const hexes = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined);
+    return [redeploy, disarmed, ...hexes] as [boolean, boolean, ...number[][]];
   }
-  override parseState(deployed: number[][]): void {
+  override parseState(deployed: [redeploy: boolean, disarmed: boolean, hexes: number[][]]): void {
     const hexMap = this.player.gamePlay.hexMap;
+    const [redeploy, disarmed, hexes] = deployed;
+    this.player.gamePlay.gameState.bastetRedeploy = redeploy;
+    this.player.gamePlay.gameState.bastetDisarmed = disarmed;
     // presumably, all bmarks are on their homeHex, unless specified in deployed [[r][c], ...] array
-    deployed.forEach((rc, ndx) => {
+    hexes.forEach((rc, ndx) => {
       if (rc) {
         const [row, col] = rc;
         const hex = hexMap[row][col];
@@ -267,9 +272,9 @@ export class Hathor extends God {
 
 class HorusMarker extends RegionMarker {
   static source: AnkhSource<HorusMarker>;
-  static table: Table;
+  // proforma arg list: RegionMarker uses Contructor for TileSource.
   constructor(player: Player, serial: number, Aname: string) {
-    super(HorusMarker.table, 1, `Aname-${serial}`);
+    super(undefined, 1, `Aname-${serial}`);
     this.regionId = undefined;
     return;
   }
@@ -326,7 +331,6 @@ export class Horus extends God {
   constructor() { super('Horus', 'darkred') }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
     super.makeSpecial(cont, wh, table, panel); cont.name = 'Horus-Special'
-    HorusMarker.table = table;
     const hex = this.specialHex = table.newHex2(0, 0, `portalSrc`, SpecialHex) as SpecialHex; hex.scale = .9;
     cont.localToLocal(wh.width / 2, wh.height / 2 + 7, hex.cont.parent, hex.cont);
     const source = this.specialSource = HorusMarker.makeSource0(AnkhSource<HorusMarker>, HorusMarker, undefined, hex, 2);
@@ -344,6 +348,13 @@ export class Horus extends God {
 
   getRegionId(regionId: RegionId) {
     return HorusMarker.source.filterUnits(hm => hm.regionId === regionId)[0];
+  }
+  override saveState() {
+    const hms = HorusMarker.source.filterUnits(hm => hm.hex !== hm.source.hex).map(hm => [hm.hex.row, hm.hex.col]);
+    return hms.length > 0 ? hms : undefined;
+  }
+  override parseState(rcs: [[row: number, col: number]]): void {
+    rcs.forEach(([row, col]) => HorusMarker.source.nextUnit().moveTo(this.player.gamePlay.hexMap[row][col]));
   }
 }
 

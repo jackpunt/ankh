@@ -68,6 +68,8 @@ export class TP {
   static ankhString = `${'\u2625'}`;
   static inRedzone = 20;     // score in the redzone
   static autoRevealDone = 0;  // 2000? to speed past card Reveal phase
+  static promptBastetDisarm = false; // true to remind when adj to BastetMarke
+  static maxRegions = 8;
 
 
   /** map size for (dpb, dop) */

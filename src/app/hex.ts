@@ -391,6 +391,7 @@ export class HexMark extends HexShape {
 export class MapCont extends Container {
   constructor(public hexMap: HexMap<Hex2>) {
     super()
+    this.name = 'mapCont';
   }
   static cNames = ['resaCont', 'hexCont', 'infCont', 'tileCont', 'markCont', 'capCont', 'counterCont', 'eventCont'];
   resaCont: Container    // playerPanels

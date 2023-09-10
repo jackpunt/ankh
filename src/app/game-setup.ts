@@ -188,7 +188,7 @@ export class GameSetup {
 
     this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer or parseScenario
     // Place Pieces and Figures on map:
-    this.parseScenenario(scenario); // may change turnNumber
+    this.parseScenenario(scenario); // may change gamePlay.turnNumber, gamePlay.phase (& conflictRegion)
     this.gamePlay.logWriterLine0();
 
     gamePlay.forEachPlayer(p => p.newGame(gamePlay))        // make Planner *after* table & gamePlay are setup
