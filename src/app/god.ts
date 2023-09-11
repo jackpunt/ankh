@@ -207,6 +207,7 @@ class BastetHex extends SpecialHex {
   }
 }
 
+type RowCol = [row: number, col: number];
 export class Bastet extends God {
   static get instance() { return God.byName.get('Bastet') as Bastet }
   bastetHexes: BastetHex[] = [];
@@ -243,11 +244,11 @@ export class Bastet extends God {
     const redeploy = this.player.gamePlay.gameState.bastetRedeploy;
     const disarmed = this.player.gamePlay.gameState.bastetDisarmed;
     const hexes = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined);
-    return [redeploy, disarmed, ...hexes] as [boolean, boolean, ...number[][]];
+    return [redeploy, disarmed, ...hexes] as [boolean, boolean, ...RowCol[]];
   }
-  override parseState(deployed: [redeploy: boolean, disarmed: boolean, hexes: number[][]]): void {
+  override parseState(deployed: [redeploy: boolean, disarmed: boolean, ...hexes: RowCol[]]): void {
     const hexMap = this.player.gamePlay.hexMap;
-    const [redeploy, disarmed, hexes] = deployed;
+    const [redeploy, disarmed, ...hexes] = deployed;
     this.player.gamePlay.gameState.bastetRedeploy = redeploy;
     this.player.gamePlay.gameState.bastetDisarmed = disarmed;
     // presumably, all bmarks are on their homeHex, unless specified in deployed [[r][c], ...] array

@@ -1,18 +1,25 @@
-import { C, Constructor, DragInfo, XY } from "@thegraid/easeljs-lib";
+import { C, DragInfo, XY } from "@thegraid/easeljs-lib";
 import { Text } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
+import { MapXY } from "./scenario-parser";
 import { CenterText, PaintableShape, PolyShape } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";
-import { TileSource } from "./tile-source";
 
 /** a Tile, but it lives on markCont !! */
 
 export class RegionMarker extends Tile {
   static table: Table;
+
+  static getLastXY() {
+    const table = RegionMarker.table;
+    const regions = (table.hexMap as AnkhMap<AnkhHex>).regions;
+    const mapRmarks = table.regionMarkers.slice(0, regions.length);
+    return mapRmarks.map(rm => [Math.round(rm.lastXY.x), Math.round(rm.lastXY.y)]) as MapXY[];
+  }
 
   override get radius() { return TP.ankh1Rad; }
   override makeShape(): PaintableShape {

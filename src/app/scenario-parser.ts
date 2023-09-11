@@ -3,6 +3,7 @@
 
 import { Constructor, S, className, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
+import { RegionMarker } from "./RegionMarker";
 import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, RadianceMarker, Scorpion } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
@@ -18,6 +19,7 @@ import { ActionContainer } from "./table";
 import { Tile } from "./tile";
 
 type GodName = string;
+export type MapXY = [x: number, y: number];
 export type GuardName = string | Constructor<Guardian>;
 export type GuardIdent = [ g1?: GuardName, g2?: GuardName, g3?: GuardName ];
 export type PowerIdent = 'Commanding' | 'Inspiring' | 'Omnipresent' | 'Revered' | 'Resplendent' | 'Obelisk' | 'Temple' | 'Pyramid' | 'Glorious' | 'Magnanimous' | 'Bountiful' | 'Worshipful';
@@ -45,6 +47,7 @@ export type SetupElt = {
   places: PlaceElt[],    // must have some GodFigure on the board!
   splits?: SplitSpec[],  // added camel train borders
   regions: RegionElt[],  // delta, east, west, ...; after splits.
+  rmarks?: MapXY[],      // or: [hex,dx,dy] to be independent of resolution... for now: lastXY on hexCont.
   // the rest assume defaults or random values:
   godNames?: string[],   // Gods in the game ?? use names from URL command.
   merged?: [unter: string, uber: string], //
@@ -161,7 +164,8 @@ export class ScenarioParser {
     console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
-    const { regions, splits, coins, scores, turn, guards, cards, godStates, events, actions, stable, ankhs, places, merged } = setup;
+    const { regions, splits, coins, scores, turn, guards, cards, godStates, rmarks,
+      events, actions, stable, ankhs, places, merged } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -202,7 +206,7 @@ export class ScenarioParser {
     }
     if (splits) this.parseSplits(splits, turnSet);
     if (regions) this.parseRegions(regions);
-    table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId)); // after parseRegions
+    table.regionMarkers.forEach((r, n) => table.setRegionMarker(n + 1 as RegionId, rmarks?.[n])); // after parseRegions
     guards?.forEach((name, ndx) => {
       const source = table.guardSources[ndx]
 
@@ -273,6 +277,7 @@ export class ScenarioParser {
     const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as SplitBid);
     const regions = rawRegions.filter(r => !!r);
     const splits = gamePlay.hexMap.splits.slice(2);
+    const rmarks = RegionMarker.getLastXY();
     const events = table.eventCells.slice(0, table.nextEventIndex).map(elt => elt.pid);
     // Guardian constructors used to fill table.guardSources:
     const guards = gamePlay.guards.map(CoG => CoG.name) as GuardIdent;
@@ -304,7 +309,8 @@ export class ScenarioParser {
       const godState = player.god.saveState();
       if (godState !== undefined) godStates[player.god.name] = godState;
     });
-    const setupElt = { ngods, godNames, turn, time, regions, splits, guards, events, actions, coins, scores, merged, cards, godStates, stable, ankhs, places } as SetupElt;
+    const setupElt = { turn, ngods, godNames, time, regions, splits, guards, rmarks,
+      events, actions, coins, scores, merged, cards, godStates, stable, ankhs, places } as SetupElt;
     return setupElt;
   }
 

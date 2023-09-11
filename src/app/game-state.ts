@@ -313,7 +313,6 @@ export class GameState {
         console.log(stime(this, `Swap:`));
         this.table.logText(`${this.curPlayer.godName} does Swap [${this.gamePlay.hexMap.regions.length}]`);
         this.ankhMapSplitter.runSwap();
-        // TODO: no Button until 'finalize'
         this.doneButton('Swap done');
       },
       done: () => {

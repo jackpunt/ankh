@@ -16,7 +16,7 @@ import { Tile } from "./tile";
 export class AnkhMapSplitter {
   isLegalSwap(toHex: AnkhHex, ctx: DragContext): boolean {
     const marker = ctx.tile as RegionMarker;
-    if (marker.regionId > this.table.regionMarkers.length) return false; // TODO: use regionMarker.onMap
+    if (marker.regionId > this.gamePlay.hexMap.regions.length) return false;
     if (!toHex || toHex.terrain === 'w') return false;
     return true;
   }
@@ -219,12 +219,12 @@ export class AnkhMapSplitter {
       const splitBid = [row, col, rid, false];    // false => TP.edgeColor vs TP.riverColor
       const splitDirs = splits.slice(1).map(([hex, nsDir]) => [hex.row, hex.col, nsDir] as SplitDir);
       const splitSpec = [splitBid, ...splitDirs] as SplitSpec;
-      const [origRid, newRid] = this.newRegionIds = hexMap.addSplit(splitSpec, true);
-      this.table.setRegionMarker(origRid);  // runSplitter.finalize
-      this.table.setRegionMarker(newRid);   // runSplitter.finalize
+      const [rid1, rid2] = hexMap.addSplit(splitSpec, true);
+      this.table.setRegionMarker(rid1);  // runSplitter.finalize
+      this.table.setRegionMarker(rid2);   // runSplitter.finalize
       hexMap.regions.forEach((region, ndx) => hexMap.showRegion(ndx)); // remove highlight
       hexMap.update();
-      this.checkRegionSizes('Swap');
+      this.checkRegionSizes(rid1, rid2, 'Swap');
     }
 
     const dragSplitter = () => {
@@ -236,9 +236,8 @@ export class AnkhMapSplitter {
     dragSplitter();
   }
 
-  checkRegionSizes(nextPhase: string) {
+  checkRegionSizes(rid1: RegionId, rid2: RegionId, nextPhase: string) {
     const hexMap = this.gamePlay.hexMap;
-    const [rid1, rid2] = this.newRegionIds;
     const l1 = hexMap.regions[rid1 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
     const l2 = hexMap.regions[rid2 - 1]?.filter(h => h.terrain !== 'w').length ?? 0;
     const OhWell = () => this.gameState.phase(nextPhase);
@@ -254,7 +253,7 @@ export class AnkhMapSplitter {
     const hexMap = this.gamePlay.hexMap;
     const splitsX = this.gamePlay.hexMap.splits.slice(2); // not the rivers!
     const splitSpec = splitsX.pop();
-    const splitN = splitSpec[0] as SplitBid;
+    // const splitN = splitSpec[0] as SplitBid;
     // const [row, col, bid] = splitN, hex0 = hexMap[row][col];
     // const ri = hexMap.regionIndex(row, col, hex0);
     let hex1: AnkhHex, hex2: AnkhHex;

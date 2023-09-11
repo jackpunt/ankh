@@ -11,7 +11,7 @@ import { H, XYWH } from "./hex-intfs";
 import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
 import { RegionMarker } from "./RegionMarker";
-import { ActionIdent, Scenario } from "./scenario-parser";
+import { ActionIdent, MapXY, Scenario } from "./scenario-parser";
 import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
@@ -786,7 +786,13 @@ export class Table extends EventDispatcher  {
   }
 
   /** set the appropriate RegionMarker on the specifiied Region. */
-  setRegionMarker(rid: RegionId, marker = this.regionMarkers[rid - 1]) {
+  setRegionMarker(rid: RegionId, mapXY?: MapXY) {
+    const marker = this.regionMarkers[rid - 1];
+    if (mapXY !== undefined) {
+      const [x, y] = mapXY;
+      marker.x = x; marker.y = y;
+      return;
+    }
     // move marker to 'corner' of hex (or {0,0} of markCont):
     const [x, y] = this.centerOfRegion(rid);
     const hex = this.hexMap.hexUnderPoint(x, y, false);
@@ -800,7 +806,7 @@ export class Table extends EventDispatcher  {
     const txy = (region.length > 0) ? (region.map(hex => hex.cont) as XY[]).reduce((pv, cv, ci) => {
       return { x: pv.x + cv.x, y: pv.y + cv.y }
     }, { x: 0, y: 0 }) : { x: 0, y: 0 };
-    return [txy.x / nHexes, txy.y / nHexes]; // hexCont coordinates: centroid of region Hexes
+    return [txy.x / nHexes, txy.y / nHexes] as MapXY; // hexCont coordinates: centroid of region Hexes
   }
   placeRegionMarker(marker: RegionMarker, hex: AnkhHex, x = hex?.x, y = hex?.y) {
     if (hex) {
