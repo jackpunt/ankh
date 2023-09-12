@@ -265,7 +265,7 @@ export class Hathor extends God {
   constructor() { super('Hathor', 'Violet') }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
-    super.specialText(`One free Summons\nafter sacrificing\nFollowers`);
+    super.specialText(`Sacrifice one\nadditional Follower\nto Summon Figure`);
   }
 }
 
@@ -349,7 +349,7 @@ export class Horus extends God {
     return HorusMarker.source.filterUnits(hm => hm.regionId === regionId)[0];
   }
   override saveState() {
-    const hms = HorusMarker.source.filterUnits(hm => hm.hex !== hm.source.hex).map(hm => [hm.hex.row, hm.hex.col]);
+    const hms = HorusMarker.source.filterUnits(hm => hm.hex && hm.hex !== hm.source.hex).map(hm => [hm.hex.row, hm.hex.col]);
     return hms.length > 0 ? hms : undefined;
   }
   override parseState(rcs: [[row: number, col: number]]): void {

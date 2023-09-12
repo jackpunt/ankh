@@ -66,17 +66,12 @@ export class GamePlay0 {
   readonly history: Move[] = []          // sequence of Move that bring board to its state
   readonly redoMoves = []
 
-  makeLogWriter() {
-    const time = stime.fs('MM-DD_Lkk_mm');
-    const logFile = `log_${time}.js`;
-    return new LogWriter(logFile, '{}\n]\n'); // terminate array, but insert before terminal
-  }
   logWriterLine0() {
     const setup = this.gameSetup, thus = this as any as GamePlay, turn = thus.turnNumber;
     const scene = setup.scene, ngods = setup.ngods, gods = God.allGodNames, guards = thus.guards.map(CoG => CoG.name)
     let line = { time: stime.fs(), scene, turn, ngods, gods, guards };
     let line0 = json(line, true); // machine readable starting conditions
-    console.log(`-------------- ${line0} --------------`)
+    console.log(`-------------------- ${line0}`)
     this.logWriter.writeLine(`{start: ${line0}},`)
   }
 
@@ -299,10 +294,10 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('y', { thisArg: this, func: this.clickConfirm, argVal: true })
     KeyBinder.keyBinder.setKey('d', { thisArg: this, func: this.clickDone, argVal: true })
 
-    KeyBinder.keyBinder.setKey('l', { thisArg: this.logWriter, func: this.logWriter.pickLogFile })
-    KeyBinder.keyBinder.setKey('L', { thisArg: this.logWriter, func: this.logWriter.showBacklog })
-    KeyBinder.keyBinder.setKey('M-l', { thisArg: this.logWriter, func: () => { this.logWriter.closeFile() } }) // void vs Promise<void>
-    KeyBinder.keyBinder.setKey('C-l', () => this.readFileState()) // void vs Promise<void>
+    KeyBinder.keyBinder.setKey('l', () => this.logWriter.pickLogFile());
+    KeyBinder.keyBinder.setKey('L', () => this.logWriter.showBacklog());
+    KeyBinder.keyBinder.setKey('M-l', () => this.logWriter.closeFile());
+    KeyBinder.keyBinder.setKey('C-l', () => this.readFileState());
     KeyBinder.keyBinder.setKey('r', () => this.readFileState());
 
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
@@ -547,8 +542,12 @@ export class GamePlay extends GamePlay0 {
   override setNextPlayer(turnNumber?: number) {
     this.curPlayer.panel.showPlayer(false);
     super.setNextPlayer(turnNumber); // update player.coins
-    const [logName, ext] = this.gameSetup.logWriter.fileName?.split('.') ?? ['unsaved',''];
-    this.logText(`turnNumber=${logName}@${this.turnNumber} ${this.curPlayer.godName} ${stime.fs()}`, `GamePlay.setNextPlayer`)
+    const fileName = this.gameSetup.logWriter.fileName;
+    const [logName, ext] = (fileName ?? this.gameSetup.logTime_js)?.split('.');
+    const backLog = this.logWriter.fileName ? '' : ' **';
+    const logAt = `${logName}@${this.turnNumber}${backLog}`;
+    this.logText(`&file=${logAt} ${this.curPlayer.godName} ${stime.fs()}`, `GamePlay.setNextPlayer`);
+    ;(document.getElementById('readFileName') as HTMLTextAreaElement).value = logAt;
     this.curPlayer.panel.showPlayer(true);
     this.paintForPlayer();
     this.updateCounters(); // beginning of round...

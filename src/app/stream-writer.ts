@@ -58,10 +58,11 @@ export class LogWriter extends FileBase implements ILogWriter {
    * @param atEnd insert at end-of-file; but remove before writeLine. [\n]
    * @param buttonId DOM id of button to click to bring up FilePicker
    */
-  constructor(name = 'logFile', public atEnd = '\n', buttonId = "fsOpenFileButton") {
+  constructor(name = 'logFile', public atZero = '', public atEnd = '\n', buttonId = "fsOpenFileButton") {
     super(name, buttonId)
-    this.setButtonToSaveLog()
+    this.setButtonToSaveLog();
   }
+
   setButtonToSaveLog(name: string = this.name) {
     const options = {
       id: 'logWriter',
@@ -82,25 +83,19 @@ export class LogWriter extends FileBase implements ILogWriter {
     }, 'SaveLog')
   }
   fileName: string;
+  xfileName: string; // retain last fileName when file is closed
 
-  backlog: string = ''
+  backlog: string[] = [];
   writeLine(text = '') {
     const wasNoBacklog = (this.backlog.length === 0);
-    this.backlog += `${text}\n`;
+    this.backlog.push(`${text}\n`);
     if (wasNoBacklog && this.streamPromise) {
       this.writeBacklog(this); // try write new backlog.
     }
   }
   showBacklog() {
     console.log(stime(this, `.showBacklog:\n`));
-    let backlog = this.backlog.concat();
-    // slice it up, so Chrome does not get confused by mega-string:
-    while (backlog.length > 1600) {
-      const ndx = backlog.indexOf('},\n');
-      const line = backlog.slice(0, ndx + 2); // exclude the trailing '\n'
-      console.log(line);
-      backlog = backlog.slice(ndx + 3);       // the rest, after '},\n'
-    }
+    const backlog = this.backlog.join('');
     console.log(backlog);
   }
 
@@ -113,11 +108,15 @@ export class LogWriter extends FileBase implements ILogWriter {
     //console.log(stime(this, ident), `Backlog:`, this.backlog.length, this.backlog)
     if (thus.backlog.length > 0) try {
       const stream = await thus.streamPromise;     // indicates writeable is ready
-      await stream.seek(Math.max(0, (await thus.fileHandle.getFile()).size - this.atEnd.length));
-      const lines = thus.backlog;
-      await stream.write({ type: 'write', data: `${lines}${this.atEnd}` }); // write to tmp store
-      await stream.close(); // flush to file system.
-      thus.backlog = '';    // indicate all lines are now on disk.
+      const fileHandle = await thus.fileHandle.getFile();
+      const size = fileHandle.size;
+      const line0 = (size === 0) ? this.atZero : '';
+      await stream.seek(Math.max(0, size - this.atEnd.length));
+      const nlines = thus.backlog.length;
+      const lines = `${line0}${this.backlog.slice(0, nlines).join('')}${this.atEnd}`; // shift all lines; commit to writing
+      await stream.write({ type: 'write', data: lines }); // write to tmp store
+      await stream.close();                               // flush to file system.
+      thus.backlog.splice(0, nlines);              // remove from backlog
       thus.streamPromise = thus.openWriteStream(); // begin open new stream (streamPromise will be fullfiled)
     } catch (err) {
       console.warn(stime(thus, thus.ident('writeBacklog')), `failed:`, err)
@@ -125,10 +124,12 @@ export class LogWriter extends FileBase implements ILogWriter {
     }
   }
   async closeFile() {
-    try {
+    if (this.streamPromise) try {
       const stream = await this.streamPromise;
       const promise = stream.close();
       this.streamPromise = undefined;
+      this.xfileName = this.fileName;
+      this.fileName = undefined;
       return promise;
     } catch (err) {
       console.warn(stime(this, `.closeFile failed:`), err)

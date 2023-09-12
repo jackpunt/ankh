@@ -404,6 +404,7 @@ export class GameState {
     },
     ConflictInRegion: {
       start: () => {
+        this.plagueDeadFigs.length = 0;
         this.saveGame();
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
         this.table.logText(`${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
@@ -838,7 +839,7 @@ export class GameState {
     panels.forEach(panel => {
       const bid = panel.plagueBid;
       panel.player.coins += bid;
-      this.addFollowers(panel.player, -bid, `for Plague`); // may set this.hathorSummons !
+      this.addFollowers(panel.player, -bid, `for Plague`, 'sacrifices'); // may set this.hathorSummons !
     })
     panels.sort((a, b) => b.plagueBid - a.plagueBid);
     const [b0, b1] = [panels[0].plagueBid, panels[1].plagueBid]; // Battle, not Dominance
@@ -869,9 +870,9 @@ export class GameState {
     this.addFollowers(player, n, `Gain Followers action${revered}`);
   }
 
-  addFollowers(player: Player, n: number, reason?: string) {
+  addFollowers(player: Player, n: number, reason?: string, verb0 = 'gains') {
     player.coins += n;
-    const verb = (n >= 0) ? 'gains' : 'sacrifices';
+    const verb = (n >= 0) ? verb0 : 'sacrifices';
     const noun = (n == 1) ? 'Follower' : 'Followers';
     this.gamePlay.logText(`${player.god.name} ${verb} ${Math.abs(n)} ${noun}: ${reason}`);
     if (n < 0 && Hathor.instance?.isGodOf(player)) {

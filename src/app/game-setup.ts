@@ -38,8 +38,8 @@ export class GameSetup {
     stime.fmt = "MM-DD kk:mm:ss.SSSL"
     this.stage = makeStage(canvasId, false)
     this.stage.snapToPixel = TP.snapToPixel;
-    this.setupToParseState();                 // restart when/if button is clicked
-    this.setupToReadFileState();              // restart when/if button is clicked
+    this.setupToParseState();                 // restart when/if 'SetState' button is clicked
+    this.setupToReadFileState();              // restart when/if 'LoadFile' button is clicked
     Tile.loader.loadImages(() => this.startup(qParams));
   }
   _netState = " " // or "yes" or "ref"
@@ -51,12 +51,11 @@ export class GameSetup {
   get netState() { return this._netState }
   set playerId(val: string) { this.netGUI?.selectValue("PlayerId", val || "     ") }
 
+  logTime_js: string;
   readonly logWriter = this.makeLogWriter();
   makeLogWriter() {
-    const time = stime.fs('MM-DD_Lkk_mm');
-    const logFile = `log_${time}.js`;
-    const logWriter = new LogWriter(logFile, '{}\n]\n'); // terminate array, but insert before terminal
-    logWriter.writeLine(`[`)
+    const logTime_js = this.logTime_js = `log_${stime.fs('MM-DD_Lkk_mm')}.js`;
+    const logWriter = new LogWriter(logTime_js, '[\n', ']\n'); // terminate array, but insert before terminal
     return logWriter;
   }
 
