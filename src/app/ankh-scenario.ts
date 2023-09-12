@@ -53,7 +53,7 @@ export class AnkhScenario {
       ngods: 4,
       regions: [[4, 5, 2], [3, 5, 3], [4, 6, 4],],
       splits: [
-        [[3, 0, 1,], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
+        [[4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
       ],
       places: [
         [3, 1, 'GodFigure', 1],
@@ -85,8 +85,8 @@ export class AnkhScenario {
       ngods: 5,
       regions: [[4, 5, 1], [4, 6, 2], [3, 5, 4]],
       splits: [
-        [[6, 7, 3], [7, 5, 'N'], [7, 6, 'WN', 'N'], [6, 7, 'WN', 'N', 'EN']],
-        [[4, 0, 5], [4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
+        [[7, 5, 'N'], [7, 6, 'WN', 'N'], [6, 7, 'WN', 'N', 'EN']],
+        [[4, 0, 'N', 'EN'], [4, 1, 'N', 'EN']],
       ],
       places: [
         [2, 1, 'Temple', 1],
@@ -297,7 +297,7 @@ export class AnkhScenario {
     {
       ngods: 4,
       regions: [[1, 5, 3], [6, 6, 4], [4, 4, 2], [7, 7, 1]],
-      splits: [[[7, 7, 1], [6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']]],
+      splits: [[[6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']]],
       places: [
         [5,0,Obelisk,2],[5,1,Warrior,2],[4,1,GodFigure,1],
         [7,2,Temple], [5,4,Temple],
@@ -310,8 +310,8 @@ export class AnkhScenario {
     {
       ngods: 5,
       regions: [[1, 5, 4], [4, 6, 1], [4, 4, 3], [7, 7, 1], [6, 0, 2]],
-      splits: [[[7, 7, 1], [6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']],
-        [[6, 0, 2], [6, 0, 'N'], [5, 1, 'WN', 'N']]],
+      splits: [[[6, 6, 'WS', 'S'], [6, 7, 'WS', 'S']],
+        [[6, 0, 'N'], [5, 1, 'WN', 'N']]],
       places: [
         [4, 1, Obelisk, 3], [3, 1, GodFigure, 2], [4, 2, Warrior, 3], [4, 4, Temple],
         [6, 0, Obelisk, 2], [5, 1, Warrior,2], [6, 1, GodFigure, 1],

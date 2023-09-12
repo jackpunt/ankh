@@ -92,7 +92,16 @@ export class LogWriter extends FileBase implements ILogWriter {
     }
   }
   showBacklog() {
-    console.log(stime(this, `.showBacklog:\n`), this.backlog)
+    console.log(stime(this, `.showBacklog:\n`));
+    let backlog = this.backlog.concat();
+    // slice it up, so Chrome does not get confused by mega-string:
+    while (backlog.length > 1600) {
+      const ndx = backlog.indexOf('},\n');
+      const line = backlog.slice(0, ndx + 2); // exclude the trailing '\n'
+      console.log(line);
+      backlog = backlog.slice(ndx + 3);       // the rest, after '},\n'
+    }
+    console.log(backlog);
   }
 
   /**

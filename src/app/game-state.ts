@@ -45,8 +45,6 @@ export class GameState {
   readonly selectedActions: ActionIdent[] = [];
 
   bastetPlayer: Player = undefined;
-  /** Bastet should redeploy the BastetMarkers. */
-  bastetRedeploy = true;
   /** Player has done a BastetDisarm this turn. */
   bastetDisarmed = false;
   disarmBastet = 'Disarm Bastet?';
@@ -84,13 +82,33 @@ export class GameState {
     return this.gamePlay.allPlayers.find(p => p.god.Aname == name);
   }
 
-  start(phase = 'StartGame') {
+  saveGame() {
+    this.gamePlay.gameSetup.scenarioParser.saveState(this.gamePlay);
+  }
+
+  saveState() {
+    return (this.state.Aname === 'ConflictInRegion')
+    ? ['ConflictNextRegion', this.conflictRegion]
+    : ['BeginTurn'];
+  }
+
+  parseState(phaseWithArgs: any[]) {
+    if (phaseWithArgs) {
+      const [phase, ...args] = phaseWithArgs;
+      this.startPhase = phase;
+      this.startArgs = args;
+    }
+  }
+  startPhase = 'BeginTurn';
+  startArgs = [];
+  /** Bootstrap the Scenario: set bastetPlayer and then this.phase(startPhase, ...startArgs). */
+  start() {
     this.bastetPlayer = Bastet.instance?.player;
-    this.phase(phase);
+    this.phase(this.startPhase, ...this.startArgs);
   }
 
   phase(phase: string, ...args: any[]) {
-    console.log(stime(this, `.phase: ${this.state?.Aname ?? 'BeginGame'} -> ${phase}`));
+    console.log(stime(this, `.phase: ${this.state?.Aname ?? 'Initialize'} -> ${phase}`));
     this.state = this.states[phase];
     this.state.start(...args);
   }
@@ -129,24 +147,19 @@ export class GameState {
  }
 
   readonly states: { [index: string]: Phase } = {
-    StartGame: {
-      start: () => {
-        // TODO: see if event === 'ConflictInRegion' && conflictRegion is set; from parseState()
-        this.phase('BeginTurn');
-      }
-    },
     BastetDeploy: {
+      // (turn === 0 -> ChooseAction) OR (ConflictDone -> EventDone) OR (when bastetExplodes)
       nextPhase: 'ChooseAction',
       // after Setup and after each Conflict, Bastet deploys all three 'cats'.
-      // Once per turn, player can click on a Bastet Cat (adjacent to their Figure)
+      // Once per turn, player may choose to reveal a Cat Token (adjacent to their Figure)
       // (drag Cat onto adjacent Figure)
       // if '1' | '3' return it (deactivated) to Bastet.
       // if '*', it explodes, killing the adjacent Figure (unless it's a God)
-      // and Bastet redeploys all the 'cats'.
+      // and Bastet gathers and redeploys all the Cats.
       // when Bastet is in Battle and there is a cat, it is revealed ('Reveal' phase)
       // and '1' | '3' is added to Bastet's strength.
       start: (phase: string) => {
-        this.state.nextPhase = phase;
+        if (phase !== undefined) this.state.nextPhase = phase;
         // enable Cats on the board; onClick-> {gamePlay.bastetCat(cat); curState.done()}
         Bastet.instance.bastetMarks.forEach(bmark => {
           bmark.sendHome();
@@ -161,19 +174,23 @@ export class GameState {
           return; // must deploy all BastetMarks
         }
         bmarks.forEach(bmark => bmark.highlight(false));
-        this.bastetRedeploy = false;
         this.doneButton(); // Bastet Deploy: remove doneButton
         this.phase(this.state.nextPhase);
       }
     },
     BeginTurn: {
       start: () => {
-        if (this.bastetRedeploy) this.phase('BastetDeploy', 'BeginTurn');
         this.selectedAction = undefined;
         this.selectedActions.length = 0;
+        this.saveGame();
         this.bastetDisarmed = Bastet.instance?.isGodOf(this.curPlayer); // if false: curPlayer can try to disarm Bastet
-        if (this.bastetDisarmable) { this.doneButton(this.disarmBastet); return; }
-        this.phase('ChooseAction');
+        if (this.bastetDisarmable) {
+          this.states['BastetDeploy'].nextPhase = 'ChooseAction';// explode -> ChooseAction
+          this.doneButton(this.disarmBastet);
+          return;
+        }
+        const bastetDeploy = !!Bastet.instance && (this.gamePlay.turnNumber === 0);
+        this.phase(!bastetDeploy ? 'ChooseAction' : 'BastetDeploy', 'ChooseAction');
       },
       done: () => {
         this.phase('ChooseAction');
@@ -279,12 +296,18 @@ export class GameState {
       },
     },
     EndAction: {
+      nextPhase: 'ChooseAction',
       start: () => {
-        if (this.bastetDisarmable) { this.doneButton(this.disarmBastet); return }
-        this.done();
+        const nextPhase = this.state.nextPhase = !!this.eventName ? 'Event' : 'ChooseAction';
+        if (this.bastetDisarmable) {
+          this.states['BastetDeploy'].nextPhase = nextPhase; // explode -> BastetDeploy -> nextPhase
+          this.doneButton(this.disarmBastet);                // doneButton -> done() -> nextPhase
+          return;
+        }
+        this.phase(nextPhase);     // directl -> nextPhase
       },
       done: () => {
-        this.phase(!!this.eventName ? 'Event' : 'ChooseAction');
+        this.phase(this.state.nextPhase);
       }
     },
     Event: {
@@ -375,13 +398,13 @@ export class GameState {
       start: (regionId = this.conflictRegion + 1) => {
         this.conflictRegion = regionId; // 1..n;
         const isRegion = (regionId <= this.gamePlay.hexMap.regions.length);
-        this.highlightRegions(isRegion);
+        this.highlightRegions(isRegion, regionId);
         setTimeout(() => this.phase(isRegion ? 'ConflictInRegion' : 'ConflictDone'), 1000);
       },
     },
     ConflictInRegion: {
       start: () => {
-        this.gamePlay.saveState();
+        this.saveGame();
         const panels = this.panelsInThisConflict = this.panelsInConflict;  // original players; before plague, Set, or whatever.
         this.table.logText(`${this.state.Aname}[${this.conflictRegion}] ${panels.map(panel => panel.player.godName)}`);
 
@@ -449,7 +472,7 @@ export class GameState {
         const panels = this.state.panels = this.panelsInConflict;
         if (panels.length === 0) { this.phase('Reveal'); return; }
         panels.forEach(panel => panel.activateCardSelector('Choose'));
-        this.doneButton(); // Choose: hide doneButton TODO:  save bastet, Horus lastXYY, RegionMarker lastXY; saveState before ConflictInRegion
+        this.doneButton(); // Choose: hide doneButton
       },
       done: (panel: PlayerPanel) => {
         const panels = this.state.panels;
@@ -727,7 +750,7 @@ export class GameState {
         this.conflictRegion = undefined;
         this.highlightRegions(false);
         Amun.instance?.setTokenFaceUp(true); // reset 'Two Cards' token.
-        this.phase(this.bastetPlayer ? 'BastetDeploy' : 'EventDone', 'EventDone');
+        this.phase(!this.bastetPlayer ? 'EventDone' : 'BastetDeploy', 'EventDone');
       },
       // TODO: coins from Scales to Toth, add Devotion(Scales)
     },

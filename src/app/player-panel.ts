@@ -401,7 +401,7 @@ export class PlayerPanel extends Container {
     if (ankh && colCont.guardianSlot === ankhCol) {
       this.takeGuardianIfAble(colCont.ndx); // will log the aquisition (or not)
     }
-    afterUpdate(this, () => this.player.gamePlay.phaseDone());
+    afterUpdate(this, () => this.player.gamePlay.phaseDone(), this.player.gamePlay);
   };
   setAnkhPowers(powers: PowerIdent[]) {
     const panel = this, god = this.god;

@@ -33,12 +33,13 @@ type PlayerId = number;
 type ActionElt = { [key in ActionIdent]?: PlayerId[]; } & { selected?: ActionIdent[]; };
 type EventElt = PlayerId[];
 
-/** [row, col, bid] -> new rid, with battle order = bid ;
- * - For Ex: [3, 0, 1], [4, 0, 'N', 'EN'], [4, 1, 'N']
- */
-export type SplitBid = [row: number, col: number, bid: RegionId];
+// /** [row, col, bid] -> new rid, with battle order = bid ;
+//  * - For Ex: [3, 0, 1], [4, 0, 'N', 'EN'], [4, 1, 'N']
+//  */
+//export type SplitBid = [row: number, col: number, bid: RegionId];
+/** [row, col, dir0, ...dirs] edges adj to a Hex. That Hex is in rid1, hex.links[dir0] is in rid2 */
 export type SplitDir = [row: number, col: number, d0: HexDir, d1?: HexDir, d2?: HexDir, d3?: HexDir, d4?: HexDir, d5?: HexDir];
-export type SplitElt = (SplitBid | SplitDir)
+export type SplitElt = (SplitDir);
 export type SplitSpec = SplitElt[];
 
 export type SetupElt = {
@@ -57,11 +58,12 @@ export type SetupElt = {
   scores?: number[],     // 0
   events?: EventElt,
   actions?: ActionElt,
-  godStates?: {},         // objects from God.saveState(), [index: god.name]
+  godStates?: {},        // objects from God.saveState(), [index: god.name]
   ankhs?: AnkhElt[],     // per-player; [1, ['Revered', 'Omnipresent'], ['Satet']]
   guards?: GuardIdent,   // Guardian types in use. default to random
   stable?: GuardIdent[], // Guardians in player's stable.
   turn?: number;         // default to 0; (or 1...)
+  gameState?: any[];     // GameState contribution
 }
 export type StartElt = { start: { time: string, scene: string, turn: number, ngods: 2 | 3 | 4 | 5, gods: string[], guards: GuardIdent } };
 export type LogElts = [ StartElt, ...SetupElt[]];
@@ -161,11 +163,11 @@ export class ScenarioParser {
   // coins, score, actions, events, AnkhPowers, Guardians in stable; specials for Amun, Bastet, Horus, ...
   parseScenario(setup: SetupElt) {
     if (!setup) return;
-    console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
+    // console.log(stime(this, `.parseScenario: curState =`), this.saveState(this.gamePlay, true)); // log current state for debug...
     console.log(stime(this, `.parseScenario: newState =`), setup);
 
     const { regions, splits, coins, scores, turn, guards, cards, godStates, rmarks,
-      events, actions, stable, ankhs, places, merged } = setup;
+      events, actions, stable, ankhs, places, merged, gameState } = setup;
     const map = this.map, gamePlay = this.gamePlay, allPlayers = gamePlay.allPlayers, table = gamePlay.table;
     coins?.forEach((v, ndx) => allPlayers[ndx].coins = v);
     scores?.forEach((v, ndx) => allPlayers[ndx].score = v);
@@ -259,6 +261,9 @@ export class ScenarioParser {
         uberGod.unterGod = unterGod;
       }
     }
+    if (gameState) {
+      this.gamePlay.gameState.parseState(gameState);
+    }
     this.gamePlay.hexMap.update();
   }
 
@@ -271,10 +276,11 @@ export class ScenarioParser {
     const scores = table.playerScores;
     const time = stime.fs();
     if (!silent) console.log(stime(this, `.saveState: --- `), { turn, ngods, godNames })
-    const merged = [God.allGods.find(god => god.uberGod)?.name, God.allGods.find(god => god.unterGod)?.name];
+    const unterGod = God.allGods.find(god => god.uberGod), uberGod = unterGod?.uberGod;
+    const merged = unterGod ? [unterGod?.name, uberGod?.name] : null;
 
     const allRegions = gamePlay.hexMap.regions;
-    const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as SplitBid);
+    const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as RegionElt);
     const regions = rawRegions.filter(r => !!r);
     const splits = gamePlay.hexMap.splits.slice(2);
     const rmarks = RegionMarker.getLastXY();
@@ -304,16 +310,19 @@ export class ScenarioParser {
       if (t instanceof Scorpion) elt4.unshift(t.rotDir);
       return [row, col, cons, pid, ...elt4] as PlaceElt;
     })
+    const gameState = this.gamePlay.gameState.saveState();
     const godStates = {}
     gamePlay.allPlayers.forEach(player => {
       const godState = player.god.saveState();
       if (godState !== undefined) godStates[player.god.name] = godState;
     });
     const setupElt = { turn, ngods, godNames, time, regions, splits, guards, rmarks,
-      events, actions, coins, scores, merged, cards, godStates, stable, ankhs, places } as SetupElt;
+      events, actions, coins, scores, merged, cards, godStates, stable, ankhs, places, gameState, } as SetupElt;
+    this.logState(setupElt);
     return setupElt;
   }
 
+  /** write each component of SetupElt on a line, wrapped between '{' ... '\n}' */
   logState(state: SetupElt, logWriter = this.gamePlay.logWriter) {
     let lines = '{', keys = Object.keys(state), n = keys.length - 1;
     keys.forEach((key, ndx) => {

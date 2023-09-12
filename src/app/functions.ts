@@ -52,9 +52,25 @@ export function json(obj: object): string {
   return JSON.stringify(obj).replace(/"/g, '')
 }
 
-export function afterUpdate(cont: DisplayObject, after: () => void) {
-  cont.stage.on('drawend', after, this, true);
+export function afterUpdate(cont: DisplayObject, after: () => void, scope?: any) {
+  cont.stage.on('drawend', after, scope, true);
   cont.stage.update();
+}
+
+export async function awaitUpdate(cont: DisplayObject) {
+  return new Promise<void>((res, rej) => {
+    afterUpdate(cont, res);
+  })
+}
+
+export async function blinkAndThen(dispObj: DisplayObject, after: () => void, dwell = 0) {
+  dispObj.visible = false;
+  awaitUpdate(dispObj).then(() => {
+    setTimeout(() => {
+      dispObj.visible = true;
+      after();
+    }, dwell)
+  });
 }
 
 export function uniq<T>(ary: T[]) {

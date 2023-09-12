@@ -117,7 +117,7 @@ class AnubisHex extends SpecialHex {
 
 export class Anubis extends God {
   static get instance() { return God.byName.get('Anubis') as Anubis }
-  constructor() { super('Anubis', 'green') }
+  constructor() { super('Anubis', 'purple') }
   anubisHexes: AnubisHex[] = [];
 
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel) {
@@ -241,15 +241,13 @@ export class Bastet extends God {
     })
   }
   override saveState() {
-    const redeploy = this.player.gamePlay.gameState.bastetRedeploy;
     const disarmed = this.player.gamePlay.gameState.bastetDisarmed;
     const hexes = Bastet.instance?.bastetMarks.map(bmark => bmark.bastHex).map(hex => hex ? [hex.row, hex.col]: undefined);
-    return [redeploy, disarmed, ...hexes] as [boolean, boolean, ...RowCol[]];
+    return [disarmed, ...hexes] as [boolean, ...RowCol[]];
   }
-  override parseState(deployed: [redeploy: boolean, disarmed: boolean, ...hexes: RowCol[]]): void {
+  override parseState(deployed: [disarmed: boolean, ...hexes: RowCol[]]): void {
     const hexMap = this.player.gamePlay.hexMap;
-    const [redeploy, disarmed, ...hexes] = deployed;
-    this.player.gamePlay.gameState.bastetRedeploy = redeploy;
+    const [disarmed, ...hexes] = deployed;
     this.player.gamePlay.gameState.bastetDisarmed = disarmed;
     // presumably, all bmarks are on their homeHex, unless specified in deployed [[r][c], ...] array
     hexes.forEach((rc, ndx) => {
@@ -264,7 +262,7 @@ export class Bastet extends God {
 
 export class Hathor extends God {
   static get instance() { return God.byName.get('Hathor') as Hathor }
-  constructor() { super('Hathor', 'rgb(180,130,190)') } // magenta?
+  constructor() { super('Hathor', 'Violet') }
   override makeSpecial(cont: Container, wh: WH, table: Table, panel: PlayerPanel): void {
     super.makeSpecial(cont, wh, table, panel);
     super.specialText(`One free Summons\nafter sacrificing\nFollowers`);
@@ -361,7 +359,7 @@ export class Horus extends God {
 
 export class Isis extends God {
   static get instance() { return God.byName.get('Isis') as Isis }
-  constructor() { super('Isis', 'lightblue') }
+  constructor() { super('Isis', 'SkyBlue') }
 
   isProtected(fig: Figure) {
     const isisGodName = (this ?? this.uberGod).name;
@@ -371,7 +369,7 @@ export class Isis extends God {
 
 export class Osiris extends God {
   static get instance() { return God.byName.get('Osiris') as Osiris }
-  constructor() { super('Osiris', 'lightgreen') }
+  constructor() { super('Osiris', 'darkgreen') }
   specialHex: SpecialHex;
   specialSource: AnkhSource<Portal>;
 

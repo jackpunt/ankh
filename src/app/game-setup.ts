@@ -4,7 +4,7 @@ import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
-import { selectN, uniq } from "./functions";
+import { blinkAndThen, selectN, uniq } from "./functions";
 // import { parse as JSON5_parse } from 'json5';
 import json5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";
@@ -93,7 +93,7 @@ export class GameSetup {
       const stateText = parseStateText.value;
       const state = json5.parse(stateText) as SetupElt;
       state.Aname = state.Aname ?? `parseStateText`;
-      this.restart(state);
+      blinkAndThen(this.gamePlay.hexMap.mapCont.markCont, () => this.restart(state))
     }
   }
 
@@ -205,7 +205,7 @@ export class GameSetup {
   parseScenenario(scenario: Scenario) {
     const hexMap = this.gamePlay.hexMap;
     const scenarioParser = this.scenarioParser = new ScenarioParser(hexMap, this.gamePlay);
-    this.gamePlay.logWriter.writeLine(`// parseScenario: ${scenario.Aname}`)
+    this.gamePlay.logWriter.writeLine(`// GameSetup.parseScenario: ${scenario.Aname}`)
     scenarioParser.parseScenario(scenario);
   }
 

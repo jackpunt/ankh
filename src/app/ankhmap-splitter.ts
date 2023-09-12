@@ -7,7 +7,7 @@ import { Arrays_intersect } from "./functions";
 import { GamePlay } from "./game-play";
 import { GameState, SplitterShape } from "./game-state";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
-import { RegionElt, SplitBid, SplitDir, SplitSpec } from "./scenario-parser";
+import { RegionElt, SplitDir, SplitSpec } from "./scenario-parser";
 import { CircleShape, EdgeShape } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";

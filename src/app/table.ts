@@ -790,7 +790,8 @@ export class Table extends EventDispatcher  {
     const marker = this.regionMarkers[rid - 1];
     if (mapXY !== undefined) {
       const [x, y] = mapXY;
-      marker.x = x; marker.y = y;
+      marker.lastXY.x = marker.x = x;
+      marker.lastXY.y = marker.y = y;
       return;
     }
     // move marker to 'corner' of hex (or {0,0} of markCont):
@@ -842,7 +843,7 @@ export class Table extends EventDispatcher  {
     // this.stage.enableMouseOver(10);
     this.scaleCont.addChild(this.overlayCont); // now at top of the list.
     this.gamePlay.setNextPlayer(this.gamePlay.turnNumber > 0 ? this.gamePlay.turnNumber : 0);
-    this.gamePlay.saveState();         // save parsed scenario
+    // this.gamePlay.saveState();         // save parsed scenario
     this.gamePlay.gameState.start();   // enable Table.GUI to drive game state.
   }
 

@@ -4,7 +4,7 @@ import { EzPromise } from "@thegraid/ezpromise";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ClassByName } from "./class-by-name";
-import { afterUpdate } from "./functions";
+import { blinkAndThen } from "./functions";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { God } from "./god";
@@ -12,9 +12,9 @@ import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
-import { ActionIdent, Scenario, ScenarioParser } from "./scenario-parser";
+import { ActionIdent, Scenario } from "./scenario-parser";
 import { LogWriter } from "./stream-writer";
-import { EventName, Table } from "./table";
+import { Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
 //import { NC } from "./choosers";
@@ -323,16 +323,8 @@ export class GamePlay extends GamePlay0 {
       });
     });
     KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START
-      const cont = this.hexMap.mapCont.markCont;
-      cont.visible = false;
-      afterUpdate(cont, () => {
-        setTimeout(() => {
-          cont.visible = true;
-          cont.stage.update();
-          this.gameSetup.restart();
-        }, 10)
-      });
-    })
+      blinkAndThen(this.hexMap.mapCont.markCont, () => this.gameSetup.restart());
+    });
 
     let cardSelectorsUp = false;
     // diagnostics:
@@ -362,7 +354,6 @@ export class GamePlay extends GamePlay0 {
 
   /** when turnNumber auto-increments. */
   override newTurn(): void {
-    this.saveState();
   }
 
   readFileState() {
@@ -390,11 +381,9 @@ export class GamePlay extends GamePlay0 {
       this.nstate = 0;
     }
 
-    const scenarioParser = this.gameSetup.scenarioParser;
-    const state = scenarioParser.saveState(this);
+    const state = this.gameSetup.scenarioParser.saveState(this);
     this.backStates.unshift(state);
     console.log(stime(this, `.saveState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}`), state);
-    scenarioParser.logState(state);
   }
   // TODO: setup undo index to go fwd and back? wire into undoPanel?
   nstate = 0;

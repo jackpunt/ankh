@@ -4,7 +4,7 @@ import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
 import { selectN } from "./functions";
-import { Anubis, Bastet, God, Osiris, Ra, SetGod } from "./god";
+import { Anubis, Bastet, God, Hathor, Osiris, Ra, SetGod } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";
 import { Meeple } from "./meeple";
@@ -382,23 +382,25 @@ export class BastetMark extends AnkhMeeple {
     if (ctx.phase === 'BastetDeploy' || ctx.lastShift) {
       // Deploy on Monument:
       this.setOn(targetHex);
-      this.player.gamePlay.logText(`Bastet[${this.strength}] deployed to ${this.bastHex}`);
+      this.gamePlay.logText(`Bastet[${this.strength}] deployed to ${this.bastHex}`);
     } else if (!targetHex || targetHex === this.bastHex) {
       // Self-drop (to Monument or homeHex):
       this.setOn(this.bastHex);
     } else {
+      this.sendHome();
+      this.gamePlay.gameState.setBastetDisarmed();
+      // Assert: doneButton('DisarmBastet') && BastetDeploy.nextPhase is set [ChooseAction, EndAction, Event]
       // Drop on adjacent Figure to disarm:
       const fig = targetHex.figure;
       if (this.strength === 0 && !(fig instanceof GodFigure)) {
         // bmark explodes, killing targetHex.Figure
-        this.player.gamePlay.logText(`Bastet[${this.strength}] explodes, killing ${fig}`);
+        this.gamePlay.logText(`Bastet[${this.strength}] explodes, killing ${fig}`);
         fig.sendHome();
+        this.gamePlay.gameState.phase('BastetDeploy'); // nextPhase already set...
       } else {
         // bmark is disarmed, return to bastetHexes:
-        this.player.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
+        this.gamePlay.logText(`Bastet[${this.strength}] disarmed by ${fig}`);
       }
-      this.sendHome();
-      this.gamePlay.gameState.setBastetDisarmed();
     }
   }
 
@@ -474,8 +476,12 @@ export class Figure extends AnkhMeeple {
 
   override cantBeMovedBy(player: Player, ctx: DragContext): string | boolean {
     // see also Meeple.canBeMovedBy: canAutoUnmove && backside.visible
-    if (ctx.phase === ('Obelisks')) {
+    if (ctx.phase === 'Obelisks') {
       const oplayer = player.gamePlay.gameState.state.panels[0].player;
+      return (ctx?.lastShift || this.controller === oplayer.god) ? undefined : "Not your Tile";
+    }
+    if (ctx.phase === 'HathorSummon') {
+      const oplayer = Hathor.instance.player;
       return (ctx?.lastShift || this.controller === oplayer.god) ? undefined : "Not your Tile";
     }
     return super.cantBeMovedBy(player, ctx);
