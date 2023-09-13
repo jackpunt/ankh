@@ -118,7 +118,7 @@ export class GameSetup {
 
   scenarioFromSource(scene: string) {
     const scene1 = AnkhScenario[this.scene] as (Scenario);
-    const scene2 = AnkhScenario[this.scene] as (Scenario[]) ?? AnkhScenario.MiddleKingdom;
+    const scene2 = AnkhScenario[this.scene] as (Scenario[]) ?? AnkhScenario.OldKingdom;
     const scenario = scene1?.['ngods'] ? scene1 : scene2?.find(scen => (scen.ngods === this.ngods));
     console.log(stime(this, `.scenarioFromSource: ${scene} ngods=${this.ngods} scenario=`), scenario);
     return scenario;
@@ -128,12 +128,12 @@ export class GameSetup {
    * @param qParams from URL
    */
   startup(qParams: Params = []) {
-    //ngods = 4, gods?: string[], scene = this.scene ?? 'MiddleKingdom'
+    //ngods = 4, gods?: string[], scene = this.scene ?? 'OldKingdom'
     this.godNames = qParams['gods']?.split(',') ?? this.godNames;
     this.ngods = qParams?.['n'] ? Number.parseInt(qParams?.['n'])
       : (this.godNames.length > 1) ? this.godNames.length : 2;
     this.ngods = Math.min(5, this.ngods);
-    this.scene = qParams['scene'] ?? this.scene ?? 'MiddleKingdom';
+    this.scene = qParams['scene'] ?? this.scene ?? 'OldKingdom';
     this.guards = qParams['guards']?.split(',') ?? this.guards;
 
     const scenario = this.scenarioFromSource(this.scene);
