@@ -958,69 +958,55 @@ export class GameState {
     sp.score = bp.score;
     sp.god.unterGod = bp.god;
     bp.god.uberGod = sp.god;
-    // TODO: adjust AnkhPowers to match uberGod
+    // Adjust AnkhPowers to match uberGod:
     bottom.setAnkhPowers(second.god.ankhPowers);
     // mergeGuardians: Select up to 2 of each size of Guardians:
-    const guards = second.stableHexes.map(shex => shex.usedBy).filter(guard => !!guard);
-    bottom.stableHexes.forEach(shex => {
-      const guard = shex.usedBy;
-      if (guard) {
-        guard.setPlayerAndPaint(second.player); // all your guards are belong to us...
-        guards.push(guard);
-      }
-    })
-    const g1 = guards.filter(g => g.radius === TP.ankh1Rad); // length = [0..2]
-    const g2 = guards.filter(g => g.radius === TP.ankh2Rad); // length = [0..4]
-    // TODO: enforce that uberGod *must* keep their Guardians, and then add from unterGod
+    // Enforce that uberGod *must* keep their Guardians, and then add from unterGod
     const keepThese = (base = 1, ...guards: Guardian[]) => {
       guards.forEach((guard, ndx) => {
         const stableHex = second.stableHexes[ndx === 1 && base === 1 ? 4 : base + ndx];
         stableHex.usedBy = guard;
         guard.homeHex = stableHex;
+        guard.setPlayerAndPaint(sp);
         if (guard.hex.isStableHex()) {
           guard.source.takeUnit(); // remove from
           guard.moveTo(stableHex); // to new/correct StableHex
         }
         this.table.logText(`${sp.god.name} keeps ${guard}`);
-      })
-      if (base === 2) {
-        g2.forEach(guard => {
-          if (!second.stableHexes.find(shex => shex.usedBy === guard)) {
-            guard.setPlayerAndPaint(undefined);
-            guard.sendHome();
-            this.table.logText(`${sp.god.name} releases ${guard}`);
-          }
-        })
-        this.phase(nextPhase);
-      }
-    }
-    if (g1.length > 1) {
-      // assert: (g1.length === 2)
-      second.makeAuxStable();  // open new stableHex on second:
-    }
-    keepThese(1, ...g1);
-
-    if (g2.length > 2) {
-      g2.sort((a, b) => a.radius - b.radius); // ascending order
-      const oneEach = [g2[0], g2[2]], names = oneEach.map(g => g.Aname);
-      // offer choice: 2*rank2, 2*rank3, 1*rank2 + 1*rank3
-      const oneOfEach = () => keepThese(2, ...oneEach);
-      const twoOfSame = () => {
-        if (g2.length === 3) {
-          const keep = g2.filter(g => g.radius === g[1].radius)
-          keepThese(2, ...keep);
-        } else {
-          const rank2 = () => keepThese(2, g2[0], g2[1]);
-          const rank3 = () => keepThese(2, g2[2], g2[3]);
-          second.areYouSure(`Keep rank2 ${g2[1].Aname} (or rank3 ${g2[2].Aname})`, rank2, rank3);
+      });
+    };
+    const release = (...guards: Guardian[]) => {
+      guards.forEach(guard => {
+        if (!second.stableHexes.find(shex => shex.usedBy === guard)) {
+          guard.setPlayerAndPaint(undefined);
+          guard.sendHome();
+          this.table.logText(`${sp.god.name} releases ${guard}`);
         }
-      }
-      if (g2[1].radius !== g2[2].radius) {
-        second.areYouSure(`Keep one of each [${names}] (or two of the same)`, oneOfEach, twoOfSame);
-      }
-    } else {
-      keepThese(2, ...g2);
+      })
+    };
+    const gs = second.stableHexes.map(shex => shex.usedBy).filter(guard => !!guard);
+    const gs1 = gs.filter(g => g.radius === TP.ankh1Rad); // length = [0..1]
+    const gs2 = gs.filter(g => g.radius === TP.ankh2Rad); // length = [0..2]
+
+    const gb = bottom.stableHexes.map(shex => shex.usedBy).filter(guard => !!guard);
+    const gb1 = gb.filter(g => g.radius === TP.ankh1Rad); // length = [0..1]
+    const gb2 = gb.filter(g => g.radius === TP.ankh2Rad); // length = [0..2]
+
+    if (gs1.length + gb1.length > 1) second.makeAuxStable();  // assert: (g1.length === 2) open new stableHex on second:
+    keepThese(1, ...gs1.concat(gb1)); // Assuming at most 1 Guardian from each Player.
+    release(...gb1);
+
+    if (gs2.length === 0) {
+      keepThese(2, ...gb2);
+    } else if (gs2.length === 1 && gb2.length < 2) {
+      keepThese(2, ...gb2);
+    } else if (gs2.length ===1 && gb2.length === 2) {
+      second.areYouSure(`Keep ${gb2[1].Aname} (or ${gb2[0].Aname}) ?`,
+        () => keepThese(2, gs2[0], gb2[1]), () => keepThese(2, gs2[0], gb2[0]));
     }
+    // return unused gb2 Guardians:
+    release(...gb2);
+    this.phase(nextPhase);
   }
 
   doRedzone(nextPhase: string) {
