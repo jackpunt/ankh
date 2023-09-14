@@ -893,7 +893,7 @@ export class GameState {
     player.score = Math.max(0, score0 + n);
     const score = Math.floor(player.score), dscore = player.score - score0; // n or 0
     this.gamePlay.logText(`${player.god.name} ${n >= 0 ? 'gains' : 'loses'} ${Math.abs(dscore)} Devotion: ${reason} [${score}]`);
-    if (Math.floor(player.score) === 31) this.gamePlay.logText(`---- Game Over: ${player.god.name} WINS! ----`);
+    if ((player.score) === 31) this.gamePlay.logText(`-------- Game Over: ${player.god.name} WINS! -------`);
   }
 
   hasRadiance(panel: PlayerPanel) {
@@ -971,6 +971,7 @@ export class GameState {
     })
     const g1 = guards.filter(g => g.radius === TP.ankh1Rad); // length = [0..2]
     const g2 = guards.filter(g => g.radius === TP.ankh2Rad); // length = [0..4]
+    // TODO: enforce that uberGod *must* keep their Guardians, and then add from unterGod
     const keepThese = (base = 1, ...guards: Guardian[]) => {
       guards.forEach((guard, ndx) => {
         const stableHex = second.stableHexes[ndx === 1 && base === 1 ? 4 : base + ndx];

@@ -664,7 +664,7 @@ export class PlayerPanel extends Container {
     cont.addChild(cardSelector);
     panel.localToLocal((wide - w) * (1 - dir) / 2, 0, cont, cardSelector,);
 
-    const bground = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.8)',)
+    const bground = new RectShape({ x, y, w, h }, 'rgba(255,255,255,.8)',)
     cardSelector.block = new RectShape({ x, y, w, h }, 'rgba(240,240,240,.4)',)
     cardSelector.addChild(cardSelector.block, bground);
     const pt0 = cardSelector.localToLocal(0, 0, table.dragger.dragCont);
