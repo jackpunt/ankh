@@ -86,15 +86,20 @@ export class GameState {
     this.gamePlay.gameSetup.scenarioParser.saveState(this.gamePlay);
   }
 
+  // [eventName, eventSpecial, phase, args]
   saveState() {
-    return (this.state.Aname === 'ConflictInRegion')
+    const phaseWithArg: [state: string, rid?: RegionId] = (this.state.Aname === 'ConflictInRegion')
     ? ['ConflictNextRegion', this.conflictRegion]
     : ['BeginTurn'];
+    return [this.eventName, this.eventSpecial, ...phaseWithArg] as [EventName, ('redzone'|'merge'), string, RegionId];
   }
 
-  parseState(phaseWithArgs: any[]) {
-    if (phaseWithArgs) {
-      const [phase, ...args] = phaseWithArgs;
+  parseState(args: any[]) {
+    const [eventName, eventSpecial, ...phaseWithArg] = args as [EventName, ('redzone'|'merge'), string, RegionId];
+    this.eventName = eventName;
+    this.eventSpecial = eventSpecial;
+    if (phaseWithArg) {
+      const [phase, ...args] = phaseWithArg;
       this.startPhase = phase;
       this.startArgs = args;
     }

@@ -192,7 +192,6 @@ export class ScenarioParser {
       events.forEach((pid, ndx) => {
         table.setEventMarker(ndx, this.gamePlay.allPlayers[pid]);
       })
-      gamePlay.gameState.eventName = gamePlay.gameState.eventSpecial = undefined; // do not saveState *during* an Event!
       map.update();
     }
     if (actions !== undefined) {
@@ -277,7 +276,7 @@ export class ScenarioParser {
     const time = stime.fs();
     if (!silent) console.log(stime(this, `.saveState: --- `), { turn, ngods, godNames })
     const unterGod = God.allGods.find(god => god.uberGod), uberGod = unterGod?.uberGod;
-    const merged = unterGod ? [unterGod?.name, uberGod?.name] : null;
+    const merged: [unter: string, uber: string] = unterGod ? [unterGod?.name, uberGod?.name] : null;
 
     const allRegions = gamePlay.hexMap.regions;
     const rawRegions = allRegions.map((region, n) => region && region[0] && ([region[0].row, region[0].col, n + 1]) as RegionElt);
