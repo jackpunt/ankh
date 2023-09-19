@@ -183,9 +183,9 @@ export class LogReader extends FileBase  {
     return fileReadPromise
   }
 
-  async readPickedFile(fileReadPromise: File | Promise<File> = this.pickFileToRead()) {
-    return this.readFile(await fileReadPromise)
-  }
+  // async readPickedFile(fileReadPromise: File | Promise<File> = this.pickFileToRead()) {
+  //   return this.readFile(await fileReadPromise)
+  // }
   async readFile(file: File) {
     let fileP = new EzPromise<string>()
     let fileReader = new FileReader()
