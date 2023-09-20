@@ -1,4 +1,4 @@
-import { C, Constructor, XY, className } from "@thegraid/common-lib";
+import { C, Constructor, XY } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
@@ -45,9 +45,10 @@ export class AnkhSource<T extends Tile> extends TileSource<T> {
 
 /** Monument, Portal  */
 export class AnkhPiece extends MapTile {
-  constructor(player: Player, serial: number, Aname?: string) {
+  /** @param Aname (required) is className. */
+  constructor(player: Player, serial: number, Aname: string) {
     super(`${Aname}-${serial}`, player);
-    this.name = className(this);         // lookup className and store it.
+    this.name = Aname;
   }
   override get hex() { return super.hex as AnkhHex; }
   override set hex(hex: AnkhHex) { super.hex = hex; }
@@ -597,8 +598,9 @@ export class Warrior extends Figure {
 
   // Warrior
   constructor(player: Player, serial: number) {
-    super(player, serial, `W:${player.index+1}`, );
-    // this.nameText.y -= this.radius / 5;
+    super(player, serial, `W:${player.index+1}`);
+    this.name = 'Warrior'; // because Aname does not contain className
+    return;
   }
 
   override get isFromStable(): boolean {
@@ -891,7 +893,7 @@ export class Scorpion extends Guardian3 {
 export class Androsphinx extends Guardian3 {
   static override source: AnkhSource<Androsphinx> = undefined;
   constructor(player: Player, serial: number) {
-    super(player, serial, `Andro-sphinx`, );
+    super(player, serial, `Andro-sphinx`);
   }
 }
 

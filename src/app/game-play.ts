@@ -11,7 +11,7 @@ import { Hex, Hex1, IHex } from "./hex";
 import { Meeple } from "./meeple";
 import type { Planner } from "./plan-proxy";
 import { Player } from "./player";
-import { ActionIdent, Scenario } from "./scenario-parser";
+import type { ActionIdent, GuardIdent, Scenario } from "./scenario-parser";
 import { Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { Tile } from "./tile";
@@ -66,7 +66,8 @@ export class GamePlay0 {
 
   logWriterLine0() {
     const setup = this.gameSetup, thus = this as any as GamePlay, turn = thus.turnNumber;
-    const scene = setup.scene, ngods = setup.ngods, gods = God.allGodNames, guards = thus.guards.map(CoG => CoG.name)
+    const scene = setup.scene, ngods = setup.ngods, gods = God.allGodNames;
+    const guards = thus.guardNames;
     let line = { time: stime.fs(), scene, turn, ngods, gods, guards };
     let line0 = json(line, true); // machine readable starting conditions
     console.log(`-------------------- ${line0}`)
@@ -242,6 +243,7 @@ export class GamePlay0 {
 export class GamePlay extends GamePlay0 {
   readonly table: Table   // access to GUI (drag/drop) methods.
   readonly guards: Constructor<Guardian>[];
+  get guardNames() { return this.guards.map(CoG => ClassByName.nameOfClass(CoG)) as GuardIdent }
   /** GamePlay is the GUI-augmented extension of GamePlay0; uses Table */
   constructor(public scenario: Scenario, table: Table, gameSetup: GameSetup) {
     super(scenario.godNames, gameSetup);            // hexMap, history, gStats...

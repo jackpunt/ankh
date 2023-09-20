@@ -1,8 +1,7 @@
 import { Constructor, stime } from "@thegraid/common-lib";
 import { NumCounter } from "./counters";
-import type { GamePlay, GamePlay0 } from "./game-play";
+import type { GamePlay } from "./game-play";
 import { God } from "./god";
-import type { Hex2 } from "./hex";
 import { HexDir } from "./hex-intfs";
 import { Meeple } from "./meeple";
 import { IPlanner, newPlanner } from "./plan-proxy";

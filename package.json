@@ -1,8 +1,12 @@
 {
   "name": "ankh",
   "version": "0.0.0",
+  "main": "main.js",
   "scripts": {
     "ng": "ng",
+    "estart": "electron .",
+    "electron-dev": "tsc main.ts preload.ts && ng build --watch --configuration development",
+    "electron-prod": "tsc main.ts preload.ts && ng build --watch",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",

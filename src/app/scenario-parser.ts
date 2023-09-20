@@ -1,7 +1,7 @@
 
 // TODO: namespace or object for GameState names
 
-import { Constructor, S, className, stime } from "@thegraid/common-lib";
+import { Constructor, S, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, RadianceMarker, Scorpion } from "./ankh-figure";
@@ -125,11 +125,11 @@ export class ScenarioParser {
       const player = (pid !== undefined) ? this.gamePlay.allPlayers[pid - 1] : undefined; // required for Figure
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
-      const source0 = cons['source'];
-      const source = ((source0 instanceof Array) ? source0[pid - 1] : source0) as AnkhSource<AnkhPiece>;
-      const godFig = (cons.name !== 'GodFigure') ? undefined : GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure;
-      const piece0 = godFig ?? ((source !== undefined) ? source.takeUnit().setPlayerAndPaint(player) : undefined);
-      const piece = piece0 ?? new cons(player, 0, cons.name);
+      const source0 = cons['source'] as AnkhSource<AnkhPiece> | AnkhSource<AnkhPiece>[];   // static source: AnkhSource;
+      const source = ((source0 instanceof Array) ? source0[pid - 1] : source0);
+      const godFig = (cons === GodFigure) ? GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure : undefined;
+      const piece0 = godFig ?? source?.takeUnit().setPlayerAndPaint(player);
+      const piece = piece0 ?? new cons(player, 0, cons0);
       if (piece instanceof Guardian) {
         // first: put in Stable, to reserve its slot for future sendHome()
         player.panel.takeGuardianIfAble(undefined, piece); // setPlayerAndPaint()
@@ -284,8 +284,8 @@ export class ScenarioParser {
     const splits = gamePlay.hexMap.splits.slice(2);
     const rmarks = RegionMarker.getLastXY();
     const events = table.eventCells.slice(0, table.nextEventIndex).map(elt => elt.pid);
-    // Guardian constructors used to fill table.guardSources:
-    const guards = gamePlay.guards.map(CoG => CoG.name) as GuardIdent;
+    // Guardian names used to fill table.guardSources:
+    const guards = gamePlay.guardNames;
     const actions: ActionElt = {};
     table.actionRows.forEach(({id}) => {
       const rowCont = table.actionPanels[id] as ActionContainer;
@@ -304,7 +304,7 @@ export class ScenarioParser {
     );
     const ankhs = gamePlay.allPlayers.map(p => p.god.ankhPowers.concat());
     const places = this.gamePlay.allTiles.filter(t => t.hex?.isOnMap && !(t instanceof AnkhToken)).map(t => {
-      const row = t.hex.row, col = t.hex.col, cons = className(t), pid = t.player ? t.player.index + 1 : undefined;
+      const row = t.hex.row, col = t.hex.col, cons = t.name, pid = t.player ? t.player.index + 1 : undefined;
       const elt4 = [];
       if (t instanceof Scorpion) elt4.unshift(t.rotDir);
       return [row, col, cons, pid, ...elt4] as PlaceElt;

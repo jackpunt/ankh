@@ -1,4 +1,4 @@
-import { C, Constructor, WH, className } from "@thegraid/common-lib";
+import { C, Constructor, WH } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape, Text } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
@@ -17,7 +17,7 @@ import { TP } from "./table-params";
 export class AnkhMarker extends Container {
   constructor(color: string, rad = TP.ankhRad) {
     super();
-    this.name = className(this);
+    this.name = 'AnkhMarker'; // className(this)
     const shape = new CircleShape(color, rad, );
     const ankh = new CenterText(TP.ankhString, rad * 2.2, C.black);
     ankh.y += rad * .1;
@@ -48,7 +48,7 @@ export class God {
     public color: string,
   ) {
     // constructor here:
-    God.byName.set(Aname, this); // Aname === className(this);
+    God.byName.set(Aname, this);
     this.name = Aname;
   }
   readonly ankhPowers: PowerIdent[] = [];

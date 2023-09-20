@@ -535,12 +535,11 @@ export class GameState {
       panels: [],
       start: () => {
         console.log(stime(this, `.${this.state.Aname}[${this.conflictRegion}]`));
-        const buildPanels = []; let pl: PowerLine;
         if (this.state.panels?.length ?? 0 === 0) {}
         const panels = this.state.panels = this.panelsInConflict.filter(panel =>
-          (pl = panel.hasCardInBattle('Build'), buildPanels.push(pl), pl) && (panel.canAffordMonument));
+          panel.hasCardInBattle('Build') && panel.canAffordMonument);
         if (panels.length === 0) {
-          console.log(stime(this, `.BuildMonument: no panels will Build ()`), ...buildPanels.map(p=>p ?p.name : ''));
+          console.log(stime(this, `.BuildMonument: no panels will Build ()`));
           this.phase('Plague');
           return;
         }

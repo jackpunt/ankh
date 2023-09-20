@@ -1,5 +1,5 @@
 import { C, Constructor, ImageLoader, S, className, stime } from "@thegraid/common-lib";
-import { Bitmap, Container, DisplayObject, MouseEvent, Text } from "@thegraid/easeljs-module";
+import { Bitmap, Container, MouseEvent, Text } from "@thegraid/easeljs-module";
 import type { GamePlay } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
@@ -117,14 +117,16 @@ export class Tile extends Tile0 implements Dragable {
 
   // Tile
   constructor(
-    /** the owning Player. */
+    /** typically: className-serial; may be supplied as 'name' or undefined */
     public readonly Aname?: string,
+    /** the owning Player. */
     player?: Player,
   ) {
     super()
     Tile.allTiles.push(this);
-    this.name = className(this);
-    if (!Aname) this.Aname = `${this.name}-${Tile.allTiles.length}`;
+    const cName = Aname?.split('-')[0] ?? className(this); // className is subject to uglification!
+    this.name = cName;  // used for saveState!
+    if (!Aname) this.Aname = `${cName}-${Tile.allTiles.length}`;
     const rad = this.radius;
     if (TP.cacheTiles > 0) this.cache(-rad, -rad, 2 * rad, 2 * rad, TP.cacheTiles);
     this.addChild(this.baseShape);
