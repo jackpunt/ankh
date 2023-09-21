@@ -716,7 +716,7 @@ export class GameState {
     Worshipful: {
       panels: [],
       start: () => {
-        const panels0 = this.panelsInThisConflict.concat();
+        const panels0 = this.panelsInThisConflict?.concat() ?? [];
         // ASSERT: panels0 is [still] sorted by player rank.
         this.state.panels = panels0.filter(panel => panel.hasAnkhPower('Worshipful') && panel.player.coins >= 2);
         this.done();

@@ -232,7 +232,7 @@ export class Table extends EventDispatcher  {
     // this.gamePlay.logWriter.writeLine(`"${line}",`);
   }
 
-  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 4, col = -9) {
+  setupUndoButtons(xOffs: number, bSize: number, skipRad: number, bgr: XYWH, row = 10, col = -9) {
     const undoC = this.undoCont; undoC.name = "undo buttons"; // holds the undo buttons.
     undoC.name = `undoCont`;
     this.setToRowCol(undoC, row, col);
@@ -1123,7 +1123,7 @@ export class Table extends EventDispatcher  {
     const nsA = scale0;
     const apt = { x: xos, y: yos }
     let nsZ = 0.647; //
-    const zpt = { x: 120, y: 104 }
+    const zpt = { x: 120, y: 118 }
 
     // set Keybindings to reset Scale:
     /** save scale & offsets for later: */

@@ -637,7 +637,7 @@ export class Guardian extends Figure {
     return guardianC.map(gs => selectN(gs, 1)[0])
   }
   static randomGuard(rank: 0 | 1 | 2) {
-    return selectN(Guardian.namesByRank[rank], 1)[0]
+    return selectN(Guardian.namesByRank[rank], 1, false)[0]
   }
 
   static makeSource(hex: Hex2, guard: Constructor<Guardian>, n = 0) {

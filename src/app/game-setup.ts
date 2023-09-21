@@ -1,5 +1,5 @@
 import { Params } from "@angular/router";
-import { C, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
+import { C, ChoiceItem, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
@@ -73,7 +73,7 @@ export class GameSetup {
   }
   /** scenario as edited by ParamGUI */
   get curScenario() {
-    this.ngods = Math.min(5, Math.max(2, this.godNames.length));
+    this.ngods = Math.min(5, Math.max(2, this.ngods));
     const scenario = this.scenarioFromSource(this.scene ?? 'MiddleKingdom');
     scenario.ngods = this.ngods;
     scenario.godNames = this.godNames.concat();
@@ -95,10 +95,10 @@ export class GameSetup {
       cont.removeAllChildren()
     }
     deContainer(this.stage)
-      this.ngods = Math.min(5, Math.max(2, this.godNames.length));
-      this.scenario = this.scenarioFromSource(this.scene ?? 'MiddleKingdom');
-      this.scenario.ngods = this.ngods;
-      this.scenario.godNames = this.godNames.concat();
+    this.ngods = Math.min(5, Math.max(2, this.godNames.length));
+    this.scenario = this.scenarioFromSource(this.scene ?? 'MiddleKingdom');
+    this.scenario.ngods = this.ngods;
+    this.scenario.godNames = this.godNames.concat();
     this.startScenario(scenario);  // running async...?
     this.netState = " "      // onChange->noop; change to new/join/ref will trigger onChange(val)
     // next tick, new thread...
@@ -252,11 +252,19 @@ export class GameSetup {
         this.godNames.push(name);
         item.button.style.textColor = item.button.style.textColorOver = 'green';
       }
+      this.ngods = Math.min(5, Math.max(2, this.godNames.length));
       const ngodsChooser = gui.findLine('ngods').chooser;
       ngodsChooser.select(ngodsChooser.items[this.ngods - 2]);
-      console.log(stime(this, `.onChange: gods=`), this.godNames)
+      console.log(stime(this, `.onChange: gods=${this.godNames}, ngods=${this.ngods}`));
       return;
     };
+    Guardian.namesByRank.forEach((guards, n) => {
+      const gn = `guard-${n+1}`;
+      this[gn] = this.guards[n];
+      gui.makeParamSpec(gn, guards, { fontColor: "blue" });
+      gui.spec(gn).onChange = ((item: ChoiceItem) => { this.guards[n] = item.text });
+    })
+
     gui.makeLines();
     console.log(stime(this, `.makeGUI: gods=`), this.godNames);
     gui.findLine('godNames').chooser.items.forEach((item: MultiItem, n) => {

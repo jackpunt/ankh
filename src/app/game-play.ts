@@ -272,9 +272,9 @@ export class GamePlay extends GamePlay0 {
     // KeyBinder.keyBinder.setKey('p', { thisArg: this, func: roboPause })
     // KeyBinder.keyBinder.setKey('r', { thisArg: this, func: roboResume })
     // KeyBinder.keyBinder.setKey('s', { thisArg: this, func: roboStep })
-    KeyBinder.keyBinder.setKey('R', { thisArg: this, func: () => this.runRedo = true })
-    KeyBinder.keyBinder.setKey('q', { thisArg: this, func: () => this.runRedo = false })
-    KeyBinder.keyBinder.setKey(/1-9/, { thisArg: this, func: (e: string) => { TP.maxBreadth = Number.parseInt(e) } })
+    // KeyBinder.keyBinder.setKey('R', { thisArg: this, func: () => this.runRedo = true })
+    // KeyBinder.keyBinder.setKey('q', { thisArg: this, func: () => this.runRedo = false })
+    // KeyBinder.keyBinder.setKey(/1-9/, { thisArg: this, func: (e: string) => { TP.maxBreadth = Number.parseInt(e) } })
 
     KeyBinder.keyBinder.setKey('M-z', { thisArg: this, func: this.undoMove })
     KeyBinder.keyBinder.setKey('b', { thisArg: this, func: this.undoMove })
@@ -299,16 +299,17 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('M-l', () => this.logWriter.closeFile());
     KeyBinder.keyBinder.setKey('C-l', () => this.readFileState());
     KeyBinder.keyBinder.setKey('r', () => this.readFileState());
+    KeyBinder.keyBinder.setKey('h', () => {this.table.textLog.visible = !this.table.textLog.visible; this.hexMap.update()});
 
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
     KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
-    KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
+    // KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
-    KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
+    // KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
     KeyBinder.keyBinder.setKey('D', () => this.fixit())
     KeyBinder.keyBinder.setKey('C', () => {
@@ -327,6 +328,7 @@ export class GamePlay extends GamePlay0 {
     table.redoShape.on(S.click, () => this.redoMove(), this)
   }
 
+  /** enter debugger, with interesting values in local scope */
   fixit() {
     const table = this.table, gameState = this.gameState, player = this.curPlayer
     const panel = player.panel, godByName = God.byName, hexMap = this.hexMap, state = gameState.state
@@ -380,7 +382,7 @@ export class GamePlay extends GamePlay0 {
     this.backStates.unshift(state);
     console.log(stime(this, `.saveState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}`), state);
   }
-  // TODO: setup undo index to go fwd and back? wire into undoPanel?
+  // TODO: setup undo index to go fwd and back? wire into undoCont?
   nstate = 0;
   /** move nstate to older(back=true, S-P) or newer(back=false, C-P) states in backStates */
   pickState(back = true) {
