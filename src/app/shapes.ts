@@ -32,7 +32,7 @@ export class ColorGraphics extends Graphics {
 
   static circleShape(rad = 30, fillc0 = C.white, strokec = C.black, g0?: Graphics): CGF {
     return (fillc = fillc0) => {
-      const g = g0.clone() ?? new Graphics();
+      const g = g0?.clone() ?? new Graphics();
       (fillc ? g.f(fillc) : g.ef());
       (strokec ? g.s(strokec) : g.es());
       g.dc(0, 0, rad);
