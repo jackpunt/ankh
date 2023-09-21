@@ -48,16 +48,30 @@ While holding the Shift key, you can 'cheat'; reposition things on the board to 
 * Amun: if you select 2 battle cards, the "Two Cards" token will flip to face down.
 * Bastet: Deploy - drag the Bastet Cat marker to a Monument; Disarm - drag the Cat marker to an adjacent Figure.
 * Horus: At the beginning of Conflict drag the (darkred) region markers to regions where you want to impose constraints on the cards to be played.
-* Osirs: drag the Portal to a hex in the region where you lost a battle.
+* Osiris: drag the Portal to a hex in the region where you lost a battle.
 * Ra: drag a Radiance marker onto your Figure after Summoning.
 
 #### Keyboard
+* m - take Move action
+* s - take Summon action
+* g - take Gain Followers action
+* w - take Ankh Power action
+* u - undo/reset Move in progress
+* c - 'cancel' confirmation
+* y - 'yes' confirmation
+* d - done
+* C - show/hide battle cards (shift-C)
+* 
 * a - reset zoom
 * z - zoom in
-* C-s - restart
+* C-s - restart (Ctrl-s)
 * l - SaveLog to file
+* h - hide/show log on screen
+* t - hide/show hex & Figure identifiers
+* ESC - reset drag & drop (incase of failure)
   
 (there are a dozen others, search for KeyBinder in game-play.ts)
+
 ------
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 14.1.1.
