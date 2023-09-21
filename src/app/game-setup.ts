@@ -1,10 +1,10 @@
 import { Params } from "@angular/router";
-import { C, CycleChoice, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
+import { C, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
-import { blinkAndThen, selectN, uniq } from "./functions";
+import { blinkAndThen, removeEltFromArray, selectN, uniq } from "./functions";
 // import { parse as JSON5_parse } from 'json5';
 import json5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";
@@ -21,6 +21,19 @@ import { Tile } from "./tile";
 stime.anno = (obj: string | { constructor: { name: string; }; }) => {
   let stage = obj?.['stage'] || obj?.['table']?.['stage']
   return !!stage ? (!!stage.canvas ? " C" : " R") : " -" as string
+}
+
+interface MultiItem extends DropdownItem { }
+
+class MultiChoice extends DropdownChoice {
+  // constructor(items: MultiItem[], item_w: number, item_h: number, style?: DropdownStyle) {
+  //   super(items, item_w, item_h, style);
+  // }
+
+  override select(item: MultiItem): MultiItem {
+    this.changed(item);
+    return item;
+  }
 }
 
 /** initialize & reset & startup the application/game. */
@@ -58,9 +71,17 @@ export class GameSetup {
     const logWriter = new LogWriter(logTime_js, '[\n', ']\n'); // terminate array, but insert before terminal
     return logWriter;
   }
+  /** scenario as edited by ParamGUI */
+  get curScenario() {
+    this.ngods = Math.min(5, Math.max(2, this.godNames.length));
+    const scenario = this.scenarioFromSource(this.scene ?? 'MiddleKingdom');
+    scenario.ngods = this.ngods;
+    scenario.godNames = this.godNames.concat();
+    return scenario
+  }
 
   /** C-s ==> kill game, start a new one, possibly with new dbp */
-  restart(scenario = this.scenario) {
+  restart(scenario = this.curScenario) {
     let netState = this.netState
     // this.gamePlay.closeNetwork('restart')
     // this.gamePlay.logWriter?.closeFile()
@@ -74,6 +95,10 @@ export class GameSetup {
       cont.removeAllChildren()
     }
     deContainer(this.stage)
+      this.ngods = Math.min(5, Math.max(2, this.godNames.length));
+      this.scenario = this.scenarioFromSource(this.scene ?? 'MiddleKingdom');
+      this.scenario.ngods = this.ngods;
+      this.scenario.godNames = this.godNames.concat();
     this.startScenario(scenario);  // running async...?
     this.netState = " "      // onChange->noop; change to new/join/ref will trigger onChange(val)
     // next tick, new thread...
@@ -121,7 +146,7 @@ export class GameSetup {
     const scene2 = AnkhScenario[this.scene] as (Scenario[]) ?? AnkhScenario.OldKingdom;
     const scenario = scene1?.['ngods'] ? scene1 : scene2?.find(scen => (scen.ngods === this.ngods));
     console.log(stime(this, `.scenarioFromSource: ${scene} ngods=${this.ngods} scenario=`), scenario);
-    return scenario;
+    return { ...scenario };
   }
   /**
    * Make new Table/layout & gamePlay/hexMap & Players.
@@ -196,6 +221,8 @@ export class GameSetup {
     //   // table.miniMap.mapCont.y = Math.max(gui.ymax, gui2.ymax) + gui.y + table.miniMap.wh.height / 2
     //   console.groupEnd()
     // }
+    this.godNames = scenario.godNames ?? this.godNames;
+    this.makeParamGUI0(table.scaleCont, -340, 260);
     table.startGame(scenario); // parseScenario; allTiles.makeDragable(); setNextPlayer();
     return gamePlay
   }
@@ -208,6 +235,39 @@ export class GameSetup {
     scenarioParser.parseScenario(scenario);
   }
 
+  makeParamGUI0(parent: Container, x: number, y: number) {
+    const gui = new ParamGUI(this, { textAlign: 'right'});
+    parent.addChild(gui);
+    gui.x = x;
+    gui.y = y;
+    gui.makeParamSpec('scene', ['MiddleKingdom', 'OldKingdom']);
+    gui.makeParamSpec('ngods', [2, 3, 4, 5], { fontColor: "blue" });
+    gui.makeParamSpec('godNames', God.allNames, { fontColor: "blue", chooser: MultiChoice });
+    gui.spec("godNames").onChange = (item: MultiItem) => {
+      const name = item.text; // God name
+      if (this.godNames.includes(name)) {
+        removeEltFromArray(name, this.godNames);
+        item.button.style.textColor = item.button.style.textColorOver = 'white';
+      } else {
+        this.godNames.push(name);
+        item.button.style.textColor = item.button.style.textColorOver = 'green';
+      }
+      const ngodsChooser = gui.findLine('ngods').chooser;
+      ngodsChooser.select(ngodsChooser.items[this.ngods - 2]);
+      console.log(stime(this, `.onChange: gods=`), this.godNames)
+      return;
+    };
+    gui.makeLines();
+    console.log(stime(this, `.makeGUI: gods=`), this.godNames);
+    gui.findLine('godNames').chooser.items.forEach((item: MultiItem, n) => {
+      const render = (item: MultiItem, color: string) => {
+        item.button.style.textColor = item.button.style.textColorOver = color;
+        item.button.render();
+      }
+      render(item, (this.godNames.includes(item.text)) ? 'green' : 'white');
+    });
+    return;
+  }
 
   /** affects the rules of the game & board
    *
