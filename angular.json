@@ -28,6 +28,9 @@
             "scripts": []
           },
           "configurations": {
+            "electron": {
+              "outputPath": "electron/ankh"
+            },
             "production": {
               "budgets": [
                 {

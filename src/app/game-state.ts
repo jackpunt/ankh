@@ -526,7 +526,6 @@ export class GameState {
       done: () => {
         const gamePlay = this.gamePlay;
         this.state.panels.forEach(panel => panel.revealCards(false));
-        gamePlay.cardShowing = false;
         gamePlay.hexMap.update();
         this.phase('BuildMonument');
       }

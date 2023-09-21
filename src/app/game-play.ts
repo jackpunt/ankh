@@ -305,24 +305,21 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
     KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
     KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
-    KeyBinder.keyBinder.setKey('o', { thisArg: this, func: this.showCards, argVal: undefined })
     // KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     // KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
     KeyBinder.keyBinder.setKey('D', () => this.fixit())
+    let cardSelectorsUp = false;
     KeyBinder.keyBinder.setKey('C', () => {
       const vis = (cardSelectorsUp = !cardSelectorsUp);
-      this.table.allPlayerPanels.forEach(panel => {
-        panel.showCardSelector(vis);
-      });
+      this.table.allPlayerPanels.forEach(panel => panel.showCardSelector(vis));
     });
     KeyBinder.keyBinder.setKey('C-s', () => {  // C-s START
       blinkAndThen(this.hexMap.mapCont.markCont, () => this.gameSetup.restart());
     });
 
-    let cardSelectorsUp = false;
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
@@ -392,16 +389,6 @@ export class GamePlay extends GamePlay0 {
     this.gameSetup.parseScenenario(state); // typically sets gamePlay.turnNumber
     console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
     this.setNextPlayer(this.turnNumber);
-  }
-
-  cardShowing: boolean = false;
-  showCards(vis0?: boolean) {
-    this.cardShowing = !this.cardShowing;
-    this.forEachPlayer(player => {
-    const panel = player.panel, vis = vis0 !== undefined ? vis0 : (panel.cardsInBattle.length > 0);
-      panel.showCardSelector(vis);
-    });
-    this.hexMap.update();
   }
 
   chooseAction(action: ActionIdent) {
