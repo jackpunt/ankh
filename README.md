@@ -1,5 +1,25 @@
 # Ankh
 
+Play the game a Ankh (Gods of Egypt) 
+
+2 -- 5 players (for now, hot-seat/shared screen)
+
+Configure the Gods for each player (Anubis, Amun, Bastet, Hathor, Horus, Isis, Osiris, Set, Ra) or get a random selection or permutation.
+
+Configure the Guardians (Satet, Cat-Mummy, Apep, Mummy, Androsphinx, Giant Scorpion) or get a random selection.
+
+Select your Action; Drag-and-Drop to Summon or Move Figures, click to select Ankh powers.
+
+Claim monuments, split regions (and reassign the battle order), and run Battles in each region during Conflict events.
+
+Select battle cards, build monuments, bid for Plague-of-Locusts, all the features are implemented.
+
+The game generates a transcript/log of the game including status objects before each turn and each battle. You can reload back to any previous state.
+
+(copy the state object into the SetState text field, and click SetState)
+
+------
+
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 14.1.1.
 
 ## Development server
