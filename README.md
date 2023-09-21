@@ -8,7 +8,9 @@ Configure the Gods for each player (Anubis, Amun, Bastet, Hathor, Horus, Isis, O
 
 Configure the Guardians (Satet, Cat-Mummy, Apep, Mummy, Androsphinx, Giant Scorpion) or get a random selection.
 
-Select your Action; Drag-and-Drop to Summon or Move Figures, click to select Ankh powers.
+Play proceed clockwise from the upper-left panel.
+
+Select your Action(s); Drag-and-Drop to Summon or Move Figures, click to select Ankh powers.
 
 Claim monuments, split regions (and reassign the battle order), and run Battles in each region during Conflict events.
 
