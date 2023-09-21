@@ -14,12 +14,13 @@ Select your Action(s); Drag-and-Drop to Summon or Move Figures, click to select 
 
 Claim monuments, split regions (and reassign the battle order), and run Battles in each region during Conflict events.
 
-Select battle cards, build monuments, bid for Plague-of-Locusts, all the features are implemented.
+Select battle cards*, build monuments, bid for Plague-of-Locusts, all the features are implemented.
 
 The game generates a transcript/log of the game including status objects before each turn and each battle. You can reload back to any previous state.
 
 (copy the state object into the SetState text field, and click SetState)
 
+*For multiple-players, manually commit to your cards in secret, then click to record them to the GUI.
 
 Run as web app or use Electron.
 
