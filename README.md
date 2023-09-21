@@ -18,6 +18,9 @@ The game generates a transcript/log of the game including status objects before 
 
 (copy the state object into the SetState text field, and click SetState)
 
+
+Run as web app or use Electron.
+
 ------
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 14.1.1.
