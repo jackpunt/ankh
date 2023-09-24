@@ -246,8 +246,8 @@ export class TileShape extends HexShape {
     if (!this.cacheID) this.setCacheID();
     else this.updateCache();               // write curent graphics to cache
     const g = this.graphics;
-    // g.c().f(C.BLACK).dc(0, 0, r2);       // bits to remove
-    // this.updateCache("destination-out"); // remove disk from solid hexagon
+    g.c().f(C.BLACK).dc(0, 0, r2);       // bits to remove
+    this.updateCache("destination-out"); // remove disk from solid hexagon
     g.c().f(colorn).dc(0, 0, r2);        // fill with translucent disk
     this.updateCache("source-over");     // update with new disk
     return g;
@@ -259,7 +259,7 @@ export class TileShape extends HexShape {
     // HexShape.cgf(rgba(C.WHITE, .8))
     const g = this.graphics = super_cgf.call(this, this.bgColor); // paint HexShape(White)
     const fillColor = C.nameToRgbaString(colorn, .8);
-    //this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
+    this.replaceDisk(fillColor, this.radius * H.sqrt3_2 * (55 / 60));
     return this.graphics = g;
   }
 }
