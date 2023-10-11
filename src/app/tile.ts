@@ -1,5 +1,6 @@
 import { C, Constructor, ImageLoader, S, className, stime } from "@thegraid/common-lib";
 import { Bitmap, Container, MouseEvent, Text } from "@thegraid/easeljs-module";
+import { removeChildType } from "./functions";
 import type { GamePlay } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
@@ -7,7 +8,6 @@ import { C1, CenterText, HexShape, PaintableShape, TileShape } from "./shapes";
 import type { DragContext, Dragable, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
-import { removeChildType } from "./functions";
 
 
 declare module "@thegraid/easeljs-module" {
@@ -85,10 +85,14 @@ class Tile0 extends Container {
 
 }
 
-/** all the [Hexagonal] game pieces that appear; can be dragged/dropped. */
+/** all the [Hexagonal] game pieces that appear; can be dragged/dropped.
+ *
+ * Two subspecies: MapTile are 'stationary' on the HexMap, Meeple are 'mobile'.
+ */
 export class Tile extends Tile0 implements Dragable {
   static allTiles: Tile[] = [];
-  static textSize = 20;
+  static textSize = TP.hexRad / 3;
+  // static source: any[] = [];
 
   static makeSource0<T extends Tile, TS extends TileSource<T>>(
     unitSource: new (type: Constructor<Tile>, p: Player, hex: Hex2) => TS,

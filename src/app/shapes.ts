@@ -1,9 +1,9 @@
-import { C, F, XY, XYWH } from "@thegraid/common-lib";
+import { C, F, XY, XYWH, className } from "@thegraid/common-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
 import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
-import { Tile } from "./tile";
+import type { Tile } from "./tile";
 
 export class C1 {
   static GREY = 'grey';
@@ -56,6 +56,7 @@ export class ColorGraphics extends Graphics {
 export class PaintableShape extends Shape implements Paintable {
   constructor(public _cgf: CGF, public colorn?: string) {
     super();
+    this.name = className(this);
   }
   get cgf() { return this._cgf; }
   set cgf(cgf: CGF) {
@@ -73,10 +74,11 @@ export class PaintableShape extends Shape implements Paintable {
       // need to repaint, even if same color:
       this.graphics.clear();
       this.graphics = this.cgfGraphics = this.cgf(this.colorn = colorn);
-      if (this.cacheID) this.updateCache();
+      if (this.updateCacheInPaint && this.cacheID) this.updateCache();
     }
     return this.graphics;
   }
+  updateCacheInPaint = true;
 }
 
 /**
@@ -218,10 +220,11 @@ export class InfRays extends Shape {
   }
 }
 
-export class InfShape extends PaintableShape {
+export class InfShape extends HexShape {
   /** hexagon scaled by TP.hexRad/4 */
   constructor(bgColor = 'grey') {
-    super((fillc) => this.iscgf(fillc));
+    super();
+    this.cgf = this.iscgf;
     this.paint(bgColor);
   }
 
@@ -237,11 +240,9 @@ export class TileShape extends HexShape {
   static fillColor = C1.lightgrey_8;// 'rgba(200,200,200,.8)'
   constructor(radius?: number, tilt?: number) {
     super(radius, tilt); // sets Bounnds & this.cgf
-    const super_cgf = this.cgf;
-    this.cgf = (colorn: string) => {
-      return this.tscgf(colorn, super_cgf);
-    }
+    this.cgf = this.tscgf;
   }
+
   replaceDisk(colorn: string, r2 = this.radius) {
     if (!this.cacheID) this.setCacheID();
     else this.updateCache();               // write curent graphics to cache

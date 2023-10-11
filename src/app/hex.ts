@@ -31,8 +31,6 @@ class HexCont extends Container {
 
 /** Base Hex, has no connection to graphics.
  * topological links to adjacent hex objects.
- *
- * each Hex may contain Tile and/or Meeple. (Planet, Ship)
  */
 export class Hex {
   /** return indicated Hex from otherMap */
@@ -175,7 +173,9 @@ export class Hex {
   }
 }
 
-/** Hex with tile & meep, occupied, piece */
+/**
+ * Hex1 may be occupied by [tile?: MapTile, meep?: Meeple].
+ */
 export class Hex1 extends Hex {
 
   _tile: MapTile;
@@ -198,6 +198,7 @@ export class Hex1 extends Hex {
     return `${TP.colorScheme[sc] || 'Empty'}@${this.rcsp}`
   }
 }
+
 /** One Hex cell in the game, shown as a polyStar Shape */
 export class Hex2 extends Hex1 {
   /** Child of mapCont.hexCont: HexCont holds hexShape(color), rcText, distText, capMark */

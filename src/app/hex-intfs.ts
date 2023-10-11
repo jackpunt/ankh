@@ -12,9 +12,6 @@ export type TopoEW = { [key in EwDir]: DCR }
 export type TopoNS = { [key in NsDir]: DCR }
 export type Topo = TopoEW | TopoNS
 
-// export type InfDir = EwDir; // for hexline & hextown
-// export type HexAxis = Exclude<InfDir, 'SW' | 'W' | 'NW'>; // reduced to 3 visual axies
-
 /** Hex things */
 export namespace H {
   // export const axis: HexAxis[] = [NE, E, SE];           // minimal reference directions
