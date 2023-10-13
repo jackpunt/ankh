@@ -14,11 +14,6 @@ export type Topo = TopoEW | TopoNS
 
 /** Hex things */
 export namespace H {
-  // export const axis: HexAxis[] = [NE, E, SE];           // minimal reference directions
-  // export const infDirs: InfDir[] = dirs as InfDir[]     // until we extract from typeof InfDir
-  // export const dnToAxis: { [key in InfDir]: HexAxis } = { NW: 'SE', W: 'E', SW: 'NE', NE: 'NE', E: 'E', SE: 'SE' }
-  // export const dnToAxis2: { [key in InfDir]: InfDir } = { NW: 'NW', W: 'W', SW: 'SW', NE: 'NE', E: 'E', SE: 'SE' }
-
   export const degToRadians = Math.PI / 180;
   export const sqrt3 = Math.sqrt(3)  // 1.7320508075688772
   export const sqrt3_2 = H.sqrt3 / 2;
@@ -36,8 +31,8 @@ export namespace H {
   export const ES: HexDir = "ES"
   export const WS: HexDir = "WS"
   export const WN: HexDir = "WN"
-  export function hexBounds(r = this.radius, tilt = 0) {
-    // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
+  export function hexBounds(r: number, tilt = 0) {
+    // dp(...6), so tilt: 30 | 0; being nsAxis (ewTopo) or ewAxis (nsTopo);
     const w = r * Math.cos(H.degToRadians * tilt);
     const h = r * Math.cos(H.degToRadians * (tilt - 30));
     return { x: -w, y: -h, width: 2 * w, height: 2 * h };

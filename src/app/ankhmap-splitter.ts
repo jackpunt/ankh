@@ -1,9 +1,8 @@
-import { C, XY, stime } from "@thegraid/common-lib";
+import { Arrays_intersect, C, XY, stime } from "@thegraid/common-lib";
 import { DragInfo } from "@thegraid/easeljs-lib";
 import { DisplayObject } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhHex, RegionId } from "./ankh-map";
-import { Arrays_intersect } from "./functions";
 import { GamePlay } from "./game-play";
 import { GameState, SplitterShape } from "./game-state";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";

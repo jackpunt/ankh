@@ -1,6 +1,5 @@
 import { C, Constructor, ImageLoader, S, className, stime } from "@thegraid/common-lib";
 import { Bitmap, Container, MouseEvent, Text } from "@thegraid/easeljs-module";
-import { removeChildType } from "./functions";
 import type { GamePlay } from "./game-play";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
@@ -9,13 +8,6 @@ import type { DragContext, Dragable, Table } from "./table";
 import { PlayerColor, TP } from "./table-params";
 import { TileSource } from "./tile-source";
 
-
-declare module "@thegraid/easeljs-module" {
-  interface Container {
-    removeChildType<T extends DisplayObject>(type: Constructor<T>, pred?: (dobj: T) => boolean ): T[];
-  }
-}
-Container.prototype.removeChildType = removeChildType;
 
 class TileLoader {
   Uname = ['Univ0', 'Univ1'];

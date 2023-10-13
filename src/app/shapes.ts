@@ -94,17 +94,14 @@ export class HexShape extends PaintableShape {
     this.setHexBounds(); // Assert radius & tilt are readonly, so bounds never changes!
   }
 
+  setHexBounds(r = this.radius, tilt = this.tilt) {
+    const b = H.hexBounds(r, tilt);
+    this.setBounds(b.x, b.y, b.width, b.height);
+  }
+
   setCacheID() {
     const b = this.getBounds();              // Bounds are set
     this.cache(b.x, b.y, b.width, b.height);
-  }
-
-  setHexBounds(r = this.radius, tilt = this.tilt) {
-    // dp(...6), so tilt: 30 | 0; being nsAxis or ewAxis;
-    const w = r * Math.cos(H.degToRadians * tilt);
-    const h = r * Math.cos(H.degToRadians * (tilt - 30));
-    this.setBounds(-w, -h, 2 * w, 2 * h);
-    return { x: -2, y: -H, w: 2 * w, h: 2 * h };
   }
 
   /**
@@ -170,13 +167,10 @@ export class RectShape extends PaintableShape {
   rect: XYWH;
   constructor({ x = 0, y = 0, w = 30, h = 30 }: XYWH, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
     super((fillc) => this.rscgf(fillc));
-    this.rect = { x, y, w: w, h: h }
+    this.rect = { x, y, w, h }
     this.g0 = g0?.clone();
     this.paint(fillc);
-    const g = this.graphics;
-    if (fillc) g.f(fillc);
-    if (strokec) g.s(strokec);
-    g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+    // TODO: rounded rectangle!
   }
 
   rscgf(fillc: string) {
@@ -238,6 +232,7 @@ export class InfShape extends HexShape {
 
 export class TileShape extends HexShape {
   static fillColor = C1.lightgrey_8;// 'rgba(200,200,200,.8)'
+
   constructor(radius?: number, tilt?: number) {
     super(radius, tilt); // sets Bounnds & this.cgf
     this.cgf = this.tscgf;

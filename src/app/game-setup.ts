@@ -1,10 +1,10 @@
 import { Params } from "@angular/router";
-import { C, ChoiceItem, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
+import { removeEltFromArray, selectN, uniq } from "@thegraid/common-lib";
+import { blinkAndThen, C, ChoiceItem, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
 import { Container, Stage } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
-import { blinkAndThen, removeEltFromArray, selectN, uniq } from "./functions";
 // import { parse as JSON5_parse } from 'json5';
 import json5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";

@@ -1,14 +1,13 @@
 
 // TODO: namespace or object for GameState names
 
-import { Constructor, S, stime } from "@thegraid/common-lib";
+import { Constructor, S, removeEltFromArray, stime } from "@thegraid/common-lib";
 import { KeyBinder } from "@thegraid/easeljs-lib";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhPiece, AnkhSource, Figure, GodFigure, Guardian, Monument, RadianceMarker, Scorpion } from "./ankh-figure";
 import type { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { ClassByName } from "./class-by-name";
-import { removeEltFromArray } from "./functions";
 import type { GamePlay } from "./game-play";
 import { AnkhMarker, God } from "./god";
 import { EwDir, HexDir } from "./hex-intfs";

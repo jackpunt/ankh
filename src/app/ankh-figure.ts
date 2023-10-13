@@ -1,9 +1,8 @@
-import { C, Constructor, XY } from "@thegraid/common-lib";
+import { C, Constructor, XY, selectN } from "@thegraid/common-lib";
 import { Container, Graphics, Shape } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter } from "./counters";
-import { selectN } from "./functions";
 import { Anubis, Bastet, God, Hathor, Osiris, Ra, SetGod } from "./god";
 import { Hex, Hex1, Hex2 } from "./hex";
 import { EwDir, H } from "./hex-intfs";

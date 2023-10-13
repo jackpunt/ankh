@@ -1,10 +1,9 @@
-import { C, DragInfo, S, ValueEvent, XY, stime } from "@thegraid/easeljs-lib";
+import { afterUpdate, C, DragInfo, S, ValueEvent, XY, stime } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, MouseEvent, Shape, Text } from "@thegraid/easeljs-module";
 import { Androsphinx, AnkhSource, Figure, Guardian, Monument, Temple, Warrior } from "./ankh-figure";
 import { AnkhHex, RegionId, StableHex } from "./ankh-map";
 import { AnkhToken } from "./ankh-token";
 import { NumCounter, NumCounterBox } from "./counters";
-import { afterUpdate } from "./functions";
 import { Anubis, Bastet } from "./god";
 import { Player } from "./player";
 import { PowerIdent } from "./scenario-parser";

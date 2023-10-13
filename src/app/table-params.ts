@@ -20,7 +20,6 @@ export function buildURL(scheme = 'wss', host = TP.ghost, domain = TP.gdomain, p
 export class TP {
   static cacheTiles = 2;
   static snapToPixel = true;
-  static useEwTopo = false;
   static ankhRad = 20;  // AnkhToken
   static ankh1Rad = 36; // Warrior, Rank 1 Guardian
   static ankh2Rad = 42; // Rank 2,3 Guardian; GodFigure
@@ -31,6 +30,7 @@ export class TP {
   static textLogLines = 13;
   static placeAdjacent = true;
   static alwaysShift = false;
+  static useEwTopo = false;
   static parallelAttack = true;  // true --> N intersects S
   static allowSacrifice = true;
   static yield = true

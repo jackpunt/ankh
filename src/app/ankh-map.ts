@@ -1,7 +1,7 @@
-import { C, Constructor, KeyBinder, RC, XY, stime } from "@thegraid/easeljs-lib";
+import { Constructor, permute, XY, stime, RC } from "@thegraid/common-lib";
+import { C, KeyBinder } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import { AnkhMeeple, AnkhPiece, Figure, Guardian } from "./ankh-figure";
-import { permute } from "./functions";
 import { Hex, Hex2, HexConstructor, HexMap } from "./hex";
 import { EwDir, H, HexDir, NsDir } from "./hex-intfs";
 import type { Meeple } from "./meeple";

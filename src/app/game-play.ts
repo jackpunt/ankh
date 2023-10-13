@@ -1,9 +1,8 @@
 import { Constructor, json } from "@thegraid/common-lib";
-import { KeyBinder, S, Undo, stime } from "@thegraid/easeljs-lib";
+import { KeyBinder, S, Undo, blinkAndThen, stime } from "@thegraid/easeljs-lib";
 import { Guardian } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { ClassByName } from "./class-by-name";
-import { blinkAndThen } from "./functions";
 import type { GameSetup } from "./game-setup";
 import { GameState } from "./game-state";
 import { God } from "./god";
