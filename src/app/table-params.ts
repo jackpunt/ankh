@@ -54,9 +54,9 @@ export class TP {
   static colorScheme = TP.Blue_Red;
   static numPlayers = 2;
   /** Order [number of rings] of metaHexes */
-  static mHexes = 1;   // number hexes on side of Meta-Hex
+  static mHexes = 11;   // number hexes on side of Meta-Hex (nWide for RectMap)
   /** Order [number of Hexs on side] of District [# rings of Hexes in each metaHex] */
-  static nHexes = 10;    // number of Hexes on side of District
+  static nHexes = 10;    // number of Hexes on side of District (nHigh for RectMap)
   static nDistricts = 1;
   static nVictory = 3  // number of Colony to win
   static tHexes = TP.ftHexes(this.mHexes) * TP.ftHexes(this.nHexes)

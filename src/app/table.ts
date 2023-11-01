@@ -335,6 +335,8 @@ export class Table extends EventDispatcher  {
     bpanel.addChild(bs)
     return bpanel
   }
+
+  /** all the non-map hexes created by newHex2 */
   newHexes: Hex2[] = [];
   newHex2(row = 0, col = 0, name: string, claz: Constructor<Hex2> = Hex2, sy = 0) {
     const hex = new claz(this.hexMap, row, col, name);
@@ -835,7 +837,7 @@ export class Table extends EventDispatcher  {
   }
 
   startGame(scenario: Scenario) {
-    // All Tiles (& Meeple) are Draggable:
+    // All Tiles (& Meeple) are Dragable:
     Tile.allTiles.forEach(tile => {
       this.makeDragable(tile);
     })

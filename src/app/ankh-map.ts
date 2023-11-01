@@ -12,7 +12,7 @@ import { Tile } from "./tile";
 
 export type RegionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 ;
 export type RegionNdx = number;
-export class SquareMap<T extends Hex> extends HexMap<T> {
+export class RectMap<T extends Hex> extends HexMap<T> {
   constructor(radius: number = TP.hexRad, addToMapCont = false, hexC?: HexConstructor<T>) {
     super(radius, addToMapCont, hexC);
     this.topo = TP.useEwTopo ? H.ewTopo : H.nsTopo;
@@ -21,7 +21,7 @@ export class SquareMap<T extends Hex> extends HexMap<T> {
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): T[] {
     if (TP.useEwTopo) return super.makeAllDistricts();
     else {
-      const hexAry = this.makeRect(nh, nh + 1);
+      const hexAry = this.makeRect(nh, mh);
       this.mapCont.hexCont && this.centerOnContainer();
       return hexAry;
     }
@@ -258,7 +258,7 @@ export type hexSpec = [r: number, c: number];
 export type hexSpecr = [r: number, c: number, ...e: HexDir[]];
 
 
-export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
+export class AnkhMap<T extends AnkhHex> extends RectMap<T> {
   static fspec: hexSpec[] = [
     [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8], [2, 9], [2, 10], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8], [4, 4], [4, 5], [4, 6], [5, 5], [5, 6], [6, 5], [6, 6], [7, 4], [7, 5], [8, 4], [8, 5], [9, 4]
   ];
@@ -299,7 +299,7 @@ export class AnkhMap<T extends AnkhHex> extends SquareMap<T> {
     return super.addToMapCont(hexC ?? AnkhHex as any as HexConstructor<T>);
   }
 
-    override makeAllDistricts(nh?: number, mh?: number) {
+  override makeAllDistricts(nh?: number, mh?: number) {
     const rv = super.makeAllDistricts(nh, mh);
     this.regions[0] = this.hexAry.concat();
     this.setRegionId(1)

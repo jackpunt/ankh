@@ -331,7 +331,7 @@ export class Hex2 extends Hex1 {
     return Math.sqrt(dx * dx + dy * dy); // tw == H.sqrt3
   }
   /** location of corner between dir0 and dir1; in parent coordinates. */
-  // hexmarket uses to find ewDir corner between two nwDir edges.
+  // hexmarket uses to find ewDir corner between two nsDir edges.
   cornerPoint(dir0: HexDir, dir1: HexDir) {
     let d0 = H.ewDirRot[dir0], d1 = H.ewDirRot[dir1]
     let a2 = (d0 + d1) / 2, h = this.radius
@@ -355,7 +355,7 @@ export class HexMark extends HexShape {
     super(radius);
     const mark = this;
     const cm = "rgba(127,127,127,.3)";
-    this.graphics.f(cm).dp(0, 0, this.radius, 6, 0, this.tilt);
+    mark.graphics.f(cm).dp(0, 0, this.radius, 6, 0, this.tilt);
     mark.cache(-radius, -radius, 2 * radius, 2 * radius)
     mark.graphics.c().f(C.BLACK).dc(0, 0, radius0)
     mark.updateCache("destination-out")

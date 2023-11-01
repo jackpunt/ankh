@@ -17,6 +17,7 @@ export class StageComponent implements OnInit {
   getId(): string {
     return "T" + (StageComponent.idnum = StageComponent.idnum + 1);
   };
+
   /** the query string: ?a=...&b=...&c=... =>{a: ..., b: ..., c:...} */
   @Input('params')
   qParams: Params;
@@ -47,9 +48,6 @@ export class StageComponent implements OnInit {
   ngAfterViewInit2() {
     let href: string = document.location.href;
     console.log(stime(this, ".ngAfterViewInit---"), href, "qParams=", this.qParams)
-    if (href.endsWith("startup")) {
-
-    }
     // disable browser contextmenu
     // console.log(stime(this, `.ngAfterViewInit--- preventDefault contextmenu`))
     window.addEventListener('contextmenu', (evt: MouseEvent) => evt.preventDefault())
@@ -61,6 +59,9 @@ export class StageComponent implements OnInit {
     this.titleService.setTitle(`Ankh ${scene?` scene=${scene}`:''}${n?` n=${n}`:''}${gods?` gods=${gods}`:''}${file?`file=${file}`:''}`)
     ;(document.getElementById('readFileName') as HTMLInputElement).value = file ?? 'scene@0';
     new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
+    if (href.endsWith("startup")) {
+
+    }
   }
   // see: stream-writer.setButton
   // static enableOpenFilePicker(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
