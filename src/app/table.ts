@@ -1,4 +1,4 @@
-import { AT, C, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
+import { AT, C, CenterText, Constructor, Dragger, DragInfo, F, KeyBinder, S, ScaleableContainer, stime, XY } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, EventDispatcher, Graphics, MouseEvent, Shape, Stage, Text } from "@thegraid/easeljs-module";
 import { AnkhSource, Guardian, Monument } from "./ankh-figure";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
@@ -12,7 +12,7 @@ import { Player } from "./player";
 import { PlayerPanel } from "./player-panel";
 import { RegionMarker } from "./RegionMarker";
 import { ActionIdent, MapXY, Scenario } from "./scenario-parser";
-import { CenterText, CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
+import { CircleShape, HexShape, PaintableShape, RectShape, UtilButton } from "./shapes";
 import { PlayerColor, playerColor0, playerColor1, TP } from "./table-params";
 import { Tile } from "./tile";
 import { TileSource } from "./tile-source";
@@ -574,7 +574,7 @@ export class Table extends EventDispatcher  {
   }
 
   setActionMarker(button: ActionButton, player = this.gamePlay.curPlayer, color?: string) {
-    const rad = (button.children[0] as CircleShape).rad;
+    const rad = (button.children[0] as CircleShape).radx;
     const god = player.god;
     const ankhToken = god.getAnkhMarker(rad);
     if (color) {

@@ -1,10 +1,10 @@
-import { C, DragInfo, XY } from "@thegraid/easeljs-lib";
+import { C, CenterText, DragInfo, XY } from "@thegraid/easeljs-lib";
 import { Text } from "@thegraid/easeljs-module";
 import { AnkhHex, AnkhMap, RegionId } from "./ankh-map";
 import { Hex2 } from "./hex";
 import { Player } from "./player";
 import { MapXY } from "./scenario-parser";
-import { CenterText, PaintableShape, PolyShape } from "./shapes";
+import { PaintableShape, PolyShape } from "./shapes";
 import { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 import { Tile } from "./tile";

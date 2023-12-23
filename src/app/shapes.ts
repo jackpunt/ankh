@@ -1,4 +1,5 @@
-import { C, F, XY, XYWH, className } from "@thegraid/common-lib";
+import { C, XY, XYWH, className } from "@thegraid/common-lib";
+import { CenterText } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
@@ -12,21 +13,13 @@ export class C1 {
   static lightgrey_8 = 'rgb(225,225,225,.8)' // needs to contrast with WHITE influence lines
 }
 
-export class CenterText extends Text {
-  constructor(text?: string, size = TP.hexRad / 2, color?: string) {
-    super(text, F.fontSpec(size), color);
-    this.textAlign = 'center';
-    this.textBaseline = 'middle';
-  }
-}
-
 export interface Paintable extends DisplayObject {
   /** paint with new player color; updateCache() */
   paint(colorn: string, force?: boolean): Graphics;
 }
 
-/** Color Graphics Function */
-export type CGF = (color?: string) => Graphics;
+/** Create/Color Graphics Function (color, g0); extend graphics with additional instructions. */
+export type CGF = (color?: string, g?: Graphics) => Graphics;
 
 export class ColorGraphics extends Graphics {
 
@@ -41,32 +34,38 @@ export class ColorGraphics extends Graphics {
   }
 }
 /**
- * Usage:
+ * Usage: ??? [obsolete?]
  * - ps = super.makeShape(); // ISA PaintableShape
- * - ps.gf = (color) => new CG(color);
+ * - ps.cgf = (color) => new CGF(color);
  * - ...
  * - ps.paint(red); --> ps.graphics = gf(red) --> new CG(red);
  * -
- * - const cgf: CGF = (color: string) => {
- * -     return new Graphics().f(this.color).dc(0, 0, rad);
+ * - const cgf: CGF = (color: string, g = new Graphics()) => {
+ * -     return g.f(this.color).dc(0, 0, rad);
  * -   }
  * - }
  */
 
 export class PaintableShape extends Shape implements Paintable {
+  /**
+   *
+   * @param _cgf Create Graphics Function
+   * @param colorn paint with this color
+   */
   constructor(public _cgf: CGF, public colorn?: string) {
     super();
     this.name = className(this);
   }
+  updateCacheInPaint = true;      // except for unusual cases
   get cgf() { return this._cgf; }
+  /** set new cgf; and clear "previously rendered Graphics" */
   set cgf(cgf: CGF) {
     this._cgf = cgf;
     if (this.cgfGraphics) {
-      this.cgfGraphics = undefined;
-      this.paint(this.colorn);
+      this.paint(this.colorn, true);
     }
   }
-  /** previous/current graphics that were rendered. */
+  /** previous/current Graphics that were rendered. (optimization... paint(color, true) to overrixe) */
   cgfGraphics: Graphics;
   /** render graphics from cgf. */
   paint(colorn: string = this.colorn, force = false): Graphics {
@@ -78,7 +77,6 @@ export class PaintableShape extends Shape implements Paintable {
     }
     return this.graphics;
   }
-  updateCacheInPaint = true;
 }
 
 /**
@@ -109,28 +107,47 @@ export class HexShape extends PaintableShape {
    * overrides should include call to setHexBounds(radius, angle)
    * or in other way setBounds().
    */
-  hscgf(color: string) {
-    return this.graphics.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
+  hscgf(color: string, g0 = this.graphics) {
+    return g0.f(color).dp(0, 0, Math.floor(this.radius * 59 / 60), 6, 0, this.tilt); // 30 or 0
   }
 }
 
 
-export class CircleShape extends PaintableShape {
+
+export class EllipseShape extends PaintableShape {
   g0: Graphics;
-  constructor(public fillc = C.white, public rad = 30, public strokec = C.black, g0?: Graphics) {
+  /**
+   * ellipse centered on (0,0), axis is NS/EW, rotate after.
+   * @param radx radius in x dir
+   * @param rady radisu in y dir
+   * retain g0, to use as baseline Graphics for each paint()
+   */
+  constructor(public fillc = C.white, public radx = 30, public rady = 30, public strokec = C.black, g0?: Graphics) {
     super((fillc) => this.cscgf(fillc));
     this.g0 = g0?.clone();
     this.paint(fillc);
   }
 
-  cscgf(fillc: string) {
-    const g = this.g0 ? this.g0.clone() : new Graphics();
+  cscgf(fillc: string, g = this.g0?.clone() ?? new Graphics()) {
     ((this.fillc = fillc) ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
-    g.dc(0, 0, this.rad);  // presumably easlejs can determine Bounds of Circle.
+    g.de(-this.radx, -this.rady, 2 * this.radx, 2 * this.rady);  // easlejs can determine Bounds of Ellipse
     return g;
   }
 }
+
+/**
+ * Circle centered on (0,0)
+ * @param rad radius
+ * retain g0, to use as baseline Graphics for each paint()
+ */
+export class CircleShape extends EllipseShape {
+  /** retain g0, to use as baseline Graphics for each paint() */
+  constructor(fillc = C.white, rad = 30, strokec = C.black, g0?: Graphics) {
+    super(fillc, rad, rad, strokec, g0);
+  }
+}
+
 export class PolyShape extends PaintableShape {
   g0: Graphics;
   constructor(public nsides = 4, public tilt = 0, public fillc = C.white, public rad = 30, public strokec = C.black, g0?: Graphics) {
@@ -139,18 +156,23 @@ export class PolyShape extends PaintableShape {
     this.paint(fillc);
   }
 
-  pscgf(fillc: string) {
-    const g = this.g0 ? this.g0.clone() : new Graphics();
+  pscgf(fillc: string, g = this.g0?.clone() ?? new Graphics()) {
     ((this.fillc = fillc) ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
     g.dp(0, 0, this.rad, this.nsides, 0, this.tilt * H.degToRadians);
     return g;
   }
 }
+
 export class RectShape extends PaintableShape {
   static rectWHXY(w: number, h: number, x = -w / 2, y = -h / 2, g0 = new Graphics()) {
     return g0.dr(x, y, w, h)
   }
+
+  static rectWHXYr(w: number, h: number, x = -w / 2, y = -h / 2, r = 0, g0 = new Graphics()) {
+    return g0.rr(x, y, w, h, r);
+  }
+
   /** draw rectangle suitable for given Text; with border, textAlign. */
   static rectText(t: Text | string, fs?: number, b?: number, align = (t instanceof Text) ? t.textAlign : 'center', g0 = new Graphics()) {
     const txt = (t instanceof Text) ? t : new CenterText(t, fs ?? 30);
@@ -163,73 +185,38 @@ export class RectShape extends PaintableShape {
     return RectShape.rectWHXY(w, h, -x, -h / 2, g0);
   }
 
-  g0: Graphics;
+  g0: Graphics;    // cgf prepends g0 generate to this.Graphics.
   rect: XYWH;
-  constructor({ x = 0, y = 0, w = 30, h = 30 }: XYWH, public fillc = C.white, public strokec = C.black, g0?: Graphics) {
-    super((fillc) => this.rscgf(fillc));
-    this.rect = { x, y, w, h }
-    this.g0 = g0?.clone();
-    this.paint(fillc);
-    // TODO: rounded rectangle!
+  rc: number = 0;
+  constructor(
+    { x = 0, y = 0, w = 30, h = 30, r = 0 }: XYWH & { r?: number },
+    public fillc = C.white,
+    public strokec = C.black,
+    g0?: Graphics,
+  ) {
+    super((fillc) => this.rscgf(fillc as string));
+    this.rect = { x, y, w, h };
+    this.setBounds(x, y, w, h);
+    this.rc = r;
+    this.g0 = g0?.clone() ?? new Graphics();
+    this.paint(fillc, true); // this.graphics = rscgf(...)
   }
 
-  rscgf(fillc: string) {
-    const g = this.g0 ? this.g0.clone() : new Graphics();
+  rscgf(fillc: string, g = this.g0?.clone() ?? new Graphics()) {
     const { x, y, w, h } = this.rect;
     (fillc ? g.f(fillc) : g.ef());
     (this.strokec ? g.s(this.strokec) : g.es());
-    g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+    if (this.rc === 0) {
+      g.dr(x ?? 0, y ?? 0, w ?? 30, h ?? 30);
+    } else {
+      g.rr(x ?? 0, y ?? 0, w ?? 30, h ?? 30, this.rc);
+    }
     return g;
   }
 }
 
-/** lines showing influence of a Tile. */
-export class InfRays extends Shape {
-  /**
-   * draw 6 rays (around a HexShape)
-   * @param inf number of rays to draw (degree of influence)
-   * @param infColor color of ray
-   * @param yIn start ray @ yIn X TP.hexRad
-   * @param yOut end ray @ YOut X TP.hexRad
-   * @param xw width of each ray
-   */
-  constructor(inf = 1, colorn: string, yIn = .7, yOut = .9, xw = 3, g = new Graphics()) {
-    super(g);
-    const rad = TP.hexRad, y1 = yIn * rad, y2 = yOut * rad;
-    const xs = [[0], [-.1 * rad, +.1 * rad], [-.1 * rad, 0, +.1 * rad]][Math.abs(inf) - 1];
-    const pts = xs.map(x => { return { mt: { x: x, y: y1 }, lt: { x: x, y: y2 } } })
-    const rotpt = (rot: number, x: number, y: number) => {
-      return { x: Math.cos(rot) * x + Math.sin(rot) * y, y: Math.cos(rot) * y - Math.sin(rot) * x }
-    }
-    g.ss(xw).s(colorn);
-    const hexDirs = TP.useEwTopo ? H.ewDirs : H.nsDirs;
-    hexDirs.forEach((dir: HexDir) => {
-      const rot = H.dirRot[dir] * H.degToRadians;
-      pts.forEach(mtlt => {
-        const mt = rotpt(rot, mtlt.mt.x, mtlt.mt.y), lt = rotpt(rot, mtlt.lt.x, mtlt.lt.y);
-        g.mt(mt.x, mt.y).lt(lt.x, lt.y);
-      });
-    })
-    this.cache(-rad, -rad, 2 * rad, 2 * rad);
-  }
-}
 
-export class InfShape extends HexShape {
-  /** hexagon scaled by TP.hexRad/4 */
-  constructor(bgColor = 'grey') {
-    super();
-    this.cgf = this.iscgf;
-    this.paint(bgColor);
-  }
-
-  iscgf(colorn: string) {
-    const g = this.graphics;
-    g.c().f(colorn).dp(0, 0, TP.hexRad, 6, 0, 30);
-    new InfRays(1, undefined, .3, .9, 10, g); // short & wide; it gets scaled down
-    return this.graphics;
-  }
-}
-
+/** from hextowns, with translucent center. */
 export class TileShape extends HexShape {
   static fillColor = C1.lightgrey_8;// 'rgba(200,200,200,.8)'
 
@@ -251,7 +238,7 @@ export class TileShape extends HexShape {
 
   readonly bgColor = C.nameToRgbaString(C.WHITE, .8);
   /** colored HexShape filled with very-lightgrey disk: */
-  tscgf(colorn: string, super_cgf = () => new Graphics()) {
+  tscgf(colorn: string, g0 = this.cgfGraphics?.clone() ?? new Graphics(), super_cgf = (color: string) => new Graphics()) {
     // HexShape.cgf(rgba(C.WHITE, .8))
     const g = this.graphics = super_cgf.call(this, this.bgColor); // paint HexShape(White)
     const fillColor = C.nameToRgbaString(colorn, .8);
@@ -358,8 +345,8 @@ export class UtilButton extends Container implements Paintable {
     this.addChild(this.shape, this.label);
   }
 
-  ubcsf(color: string) {
-    return RectShape.rectText(this.label.text, this.fontSize, this.fontSize * .3, this.label.textAlign, new Graphics().f(color))
+  ubcsf(color: string, g = new Graphics()) {
+    return RectShape.rectText(this.label.text, this.fontSize, this.fontSize * .3, this.label.textAlign, g.f(color))
   }
 
   paint(color = this.shape.colorn, force = false ) {
@@ -375,6 +362,7 @@ export class UtilButton extends Container implements Paintable {
    * @param hide true to hide and disable the turnButton
    * @param afterUpdate callback ('drawend') when stage.update is done [none]
    * @param scope thisArg for afterUpdate [this TurnButton]
+   * @deprecated use easeljs-lib afterUpdate(container, function)
    */
   updateWait(hide: boolean, afterUpdate?: (evt?: Object, ...args: any) => void, scope: any = this) {
     this.blocked = hide;

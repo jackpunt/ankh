@@ -1,10 +1,10 @@
 import { C, Constructor } from "@thegraid/common-lib";
+import { CenterText } from "@thegraid/easeljs-lib";
 import { Graphics } from "@thegraid/easeljs-module";
 import { AnkhMeeple, AnkhSource, Monument } from "./ankh-figure";
 import type { AnkhHex } from "./ankh-map";
 import { Hex1, Hex2 } from "./hex";
 import type { Player } from "./player";
-import { CenterText } from "./shapes";
 import type { DragContext } from "./table";
 import { TP } from "./table-params";
 

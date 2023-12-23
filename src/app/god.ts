@@ -1,5 +1,5 @@
 import { C, Constructor, WH } from "@thegraid/common-lib";
-import { DragInfo } from "@thegraid/easeljs-lib";
+import { CenterText, DragInfo } from "@thegraid/easeljs-lib";
 import { Container, Shape, Text } from "@thegraid/easeljs-module";
 import { RegionMarker } from "./RegionMarker";
 import { AnkhMeeple, AnkhSource, BastetMark, Figure, GodFigure, Portal, RadianceMarker, Warrior } from "./ankh-figure";
@@ -8,7 +8,7 @@ import type { Hex, Hex2, HexMap } from "./hex";
 import { Player } from "./player";
 import { CardSelector, PlayerPanel } from "./player-panel";
 import { PowerIdent } from "./scenario-parser";
-import { CenterText, CircleShape, PaintableShape, PolyShape, UtilButton } from "./shapes";
+import { CircleShape, PaintableShape, PolyShape, UtilButton } from "./shapes";
 import type { DragContext, Table } from "./table";
 import { TP } from "./table-params";
 
