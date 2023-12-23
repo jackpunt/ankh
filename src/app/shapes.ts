@@ -1,10 +1,9 @@
-import { C, XY, XYWH, className } from "@thegraid/common-lib";
+import { C, XYWH, className } from "@thegraid/common-lib";
 import { CenterText } from "@thegraid/easeljs-lib";
 import { Container, DisplayObject, Graphics, Shape, Text } from "@thegraid/easeljs-module";
 import type { Hex2 } from "./hex";
 import { H, HexDir } from "./hex-intfs";
-import { PlayerColor, PlayerColorRecord, TP, playerColorRecord } from "./table-params";
-import type { Tile } from "./tile";
+import { TP } from "./table-params";
 
 export class C1 {
   static GREY = 'grey';
