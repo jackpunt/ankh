@@ -21,18 +21,6 @@ export interface Paintable extends DisplayObject {
 /** Create/Color Graphics Function (color, g0); extend graphics with additional instructions. */
 export type CGF = (color?: string, g?: Graphics) => Graphics;
 
-export class ColorGraphics extends Graphics {
-
-  static circleShape(rad = 30, fillc0 = C.white, strokec = C.black, g0?: Graphics): CGF {
-    return (fillc = fillc0) => {
-      const g = g0?.clone() ?? new Graphics();
-      (fillc ? g.f(fillc) : g.ef());
-      (strokec ? g.s(strokec) : g.es());
-      g.dc(0, 0, rad);
-      return g;
-    }
-  }
-}
 /**
  * Usage: ??? [obsolete?]
  * - ps = super.makeShape(); // ISA PaintableShape
