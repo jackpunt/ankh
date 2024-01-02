@@ -106,6 +106,14 @@ export class ScenarioParser {
     map.update();
   }
 
+  classByName(name: string) {
+    const gbn = God.byName;       // for reference in debugger
+    const cbn = ClassByName.classByName;
+    const cls = cbn[name];
+    const rv = cls ?? GodFigure; // if not Figure|Piece|Token, must be a GodFigure
+    return rv;
+  }
+
   /** Place (or replace) all the Figures on the map. */
   parsePlaces(place: PlaceElt[], unplaceAnkhs = false) {
     const map = this.map;
@@ -119,16 +127,18 @@ export class ScenarioParser {
     //console.groupCollapsed('place');
     place.forEach(elt => {
       const [row, col, cons0, pid, ...elt4] = elt;
-      const cons = (typeof cons0 === 'string') ? ClassByName.classByName[cons0] : cons0;
+      const cons = (typeof cons0 === 'string') ? this.classByName(cons0) : cons0;
       const hex = map[row][col];
       const player = (pid !== undefined) ? this.gamePlay.allPlayers[pid - 1] : undefined; // required for Figure
       // find each piece, place on map
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'] as AnkhSource<AnkhPiece> | AnkhSource<AnkhPiece>[];   // static source: AnkhSource;
       const source = ((source0 instanceof Array) ? source0[pid - 1] : source0);
-      const godFig = (cons === GodFigure) ? GodFigure.named(player.god.Aname) ?? new cons(player, 0, player.god) as GodFigure : undefined;
-      const piece0 = godFig ?? source?.takeUnit().setPlayerAndPaint(player);
-      const piece = piece0 ?? new cons(player, 0, cons0);
+      // if (godFig) { use pid/player vs cons0: ASSERT player.god.Aname === cons0 }
+      // if (!godFig) { get piece from Figure[source].takeUnit() }
+      const piece = (cons === GodFigure)
+        ? GodFigure.named(player.god.Aname) ?? new GodFigure(player, 0, player.god)
+        : source?.takeUnit().setPlayerAndPaint(player)// ?? new cons(player, 0, cons);
       if (piece instanceof Guardian) {
         // first: put in Stable, to reserve its slot for future sendHome()
         player.panel.takeGuardianIfAble(undefined, piece); // setPlayerAndPaint()

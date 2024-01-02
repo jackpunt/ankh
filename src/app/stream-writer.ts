@@ -1,5 +1,4 @@
 import { AT, S, stime } from "@thegraid/common-lib";
-import { EzPromise } from "@thegraid/ezpromise";
 import {} from "wicg-file-system-access"
 
 export interface ILogWriter {
@@ -14,13 +13,22 @@ class FileBase {
   /** stime ident string in 'red' */
   ident(id: string, color: AT.AnsiKey = 'red') { return AT.ansiText([color], `.${id}:`) }
 
-  /** multi-purpose picker button: (callback arg-type changes) */
+  /** multi-purpose picker button: (callback arg-type changes)
+   *
+   * @param method 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker'
+   * @param options from "wicg-file-system-access":
+   * - OpenFilePickerOptions { multiple?: boolean }
+   * - SaveFilePickerOptions { suggestedName?: string }
+   * - DirectoryPickerOptions {}
+   * @param cb returns the fileHandle/fileHandleAry
+   * @param inText set innerText of button ['OpenFile', 'SaveFile', 'Directory'] based on method
+   */
   setButton(method: 'showOpenFilePicker' | 'showSaveFilePicker' | 'showDirectoryPicker',
     options: (OpenFilePickerOptions | SaveFilePickerOptions | DirectoryPickerOptions),
     cb: (fileHandleAry: any) => void, inText = method.substring(4, method.length - 6))
   {
     const picker = window[method]  // showSaveFilePicker showDirectoryPicker
-    const fsOpenButton = document.getElementById(this.buttonId)
+    const fsOpenButton = document.getElementById(this.buttonId) as HTMLElement; // must exist!
     fsOpenButton.innerText = inText
     fsOpenButton.onclick = () => {
       picker(options).then((value: any) => cb(value),
@@ -42,7 +50,7 @@ class FileBase {
  */
 export class LogWriter extends FileBase implements ILogWriter {
   /** when fulfilled, value is a WriteableFileStream; from createWriteable(). */
-  streamPromise: Promise<FileSystemWritableFileStream>;
+  streamPromise: Promise<FileSystemWritableFileStream> | undefined;
 
   /** WriteableFileStream Promise that is fulfilled when stream is open & ready for write */
   async openWriteStream(fileHandle: FileSystemFileHandle = this.fileHandle,
@@ -82,8 +90,8 @@ export class LogWriter extends FileBase implements ILogWriter {
       this.openWriteStream(fileHandle);
     }, 'SaveLog')
   }
-  fileName: string;
-  xfileName: string; // retain last fileName when file is closed
+  fileName?: string;
+  xfileName?: string; // retain last fileName when file is closed
 
   backlog: string[] = [];
   writeLine(text = '') {
@@ -107,7 +115,7 @@ export class LogWriter extends FileBase implements ILogWriter {
   async writeBacklog(thus = this) {
     //console.log(stime(this, ident), `Backlog:`, this.backlog.length, this.backlog)
     if (thus.backlog.length > 0) try {
-      const stream = await thus.streamPromise;     // indicates writeable is ready
+      const stream = await thus.streamPromise as FileSystemWritableFileStream;     // indicates writeable is ready
       const fileHandle = await thus.fileHandle.getFile();
       const size = fileHandle.size;
       const line0 = (size === 0) ? this.atZero : '';
@@ -138,7 +146,7 @@ export class LogWriter extends FileBase implements ILogWriter {
   }
 
   pickLogFile(name = this.name) {
-    const fsOpenButton = document.getElementById(this.buttonId)
+    const fsOpenButton = document.getElementById(this.buttonId) as HTMLElement;
     this.setButtonToSaveLog(name)
     fsOpenButton.click()
   }
@@ -162,7 +170,7 @@ export class LogReader extends FileBase  {
   }
 
   pickFileToRead() {
-    const fsOpenButton = document.getElementById(this.buttonId)
+    const fsOpenButton = document.getElementById(this.buttonId) as HTMLElement; // ASSERT: button element exists.
     let fileReadPromise = this.setButtonToReadFile()
     fsOpenButton.click();
     return fileReadPromise
@@ -174,25 +182,24 @@ export class LogReader extends FileBase  {
    * - multiple?: false;
    */
   setButtonToReadFile() {
-    let options: OpenFilePickerOptions = {}
-    let fileReadPromise = new EzPromise<File>()
-    this.setButton('showOpenFilePicker', options, ([fileHandle]) => {
+    return new Promise<File>((fulfill => {
+      this.setButton('showOpenFilePicker', {}, ([fileHandle]) => {
         this.fileHandle = fileHandle as FileSystemFileHandle;
-        fileReadPromise.fulfill(this.fileHandle.getFile());
+        fulfill(this.fileHandle.getFile());
       }, 'LoadFile');
-    return fileReadPromise
+    }))
   }
 
   // async readPickedFile(fileReadPromise: File | Promise<File> = this.pickFileToRead()) {
   //   return this.readFile(await fileReadPromise)
   // }
   async readFile(file: File) {
-    let fileP = new EzPromise<string>()
-    let fileReader = new FileReader()
-    fileReader.onload = () => {
-      fileP.fulfill(fileReader.result as string)
-    }
-    fileReader.readAsText(file) // , encoding=utf-8 => void!
-    return fileP
+    return new Promise<string>((fulfill) => {
+      let fileReader = new FileReader()
+      fileReader.onload = () => {
+        fulfill(fileReader.result as string)
+      }
+      fileReader.readAsText(file) // , encoding=utf-8 => void!
+    })
   }
 }

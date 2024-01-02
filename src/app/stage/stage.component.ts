@@ -58,9 +58,9 @@ export class StageComponent implements OnInit {
     const {n, gods, scene, file} = this.qParams;
     this.titleService.setTitle(`Ankh ${scene?` scene=${scene}`:''}${n?` n=${n}`:''}${gods?` gods=${gods}`:''}${file?`file=${file}`:''}`)
     ;(document.getElementById('readFileName') as HTMLInputElement).value = file ?? 'scene@0';
-    new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
-    if (href.endsWith("startup")) {
-
+    const gs = new GameSetup(this.mapCanvasId, this.qParams);    // load images; new GamePlay(qParams);
+    if (href.endsWith("startup") && false) {
+      gs.startup(this.qParams);
     }
   }
   // see: stream-writer.setButton

@@ -104,38 +104,6 @@ export class GamePlay0 {
     if (this instanceof GamePlay) this.table.logText(line, from);
   }
 
-  // permute(stack: any[]) {
-  //   for (let i = 0, len = stack.length; i < len; i++) {
-  //     let ndx: number = Math.floor(Math.random() * (len - i)) + i
-  //     let tmp = stack[i];
-  //     stack[i] = stack[ndx]
-  //     stack[ndx] = tmp;
-  //   }
-  //   return stack;
-  // }
-
-  // eventInProcess: EzPromise<void>;
-  // async awaitEvent(init: () => void) {
-  //   this.eventInProcess = new EzPromise<void>();
-  //   init(); // tile0.moveTo(eventHex);
-  //   return this.eventInProcess;
-  // }
-  // /** when Player click's 'Done' ? */
-  // finishEvent() {
-  //   this.eventInProcess.fulfill();
-  // }
-
-  // async processEventTile(tile0: Tile) {
-  //   // manually D&D event (to Player.Policies or RecycleHex)
-  //   // EventTile.dropFunc will: gamePlay.finishEvent();
-  //   await this.awaitEvent(() => {
-  //     // tile0.setPlayerAndPaint(this.curPlayer);
-  //     // tile0.moveTo(this.eventHex);
-  //     this.hexMap.update();
-  //   });
-  // }
-
-
   /**
    * When player has completed Actions and Event, do next player.
    */
