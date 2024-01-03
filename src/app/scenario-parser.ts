@@ -110,7 +110,7 @@ export class ScenarioParser {
     const gbn = God.byName;       // for reference in debugger
     const cbn = ClassByName.classByName;
     const cls = cbn[name];
-    const rv = cls ?? GodFigure; // if not Figure|Piece|Token, must be a GodFigure
+    const rv = cls ?? GodFigure; // if not in classByName, is old version: God.Aname -> 'GodFigure'
     return rv;
   }
 
@@ -134,11 +134,9 @@ export class ScenarioParser {
       // console.log(stime(this, `.place0:`), { hex: `${hex}`, cons: cons.name, pid });
       const source0 = cons['source'] as AnkhSource<AnkhPiece> | AnkhSource<AnkhPiece>[];   // static source: AnkhSource;
       const source = ((source0 instanceof Array) ? source0[pid - 1] : source0);
-      // if (godFig) { use pid/player vs cons0: ASSERT player.god.Aname === cons0 }
-      // if (!godFig) { get piece from Figure[source].takeUnit() }
       const piece = (cons === GodFigure)
         ? GodFigure.named(player.god.Aname) ?? new GodFigure(player, 0, player.god)
-        : source?.takeUnit().setPlayerAndPaint(player)// ?? new cons(player, 0, cons);
+        : source.takeUnit().setPlayerAndPaint(player)// ?? new cons(player, 0, cons);
       if (piece instanceof Guardian) {
         // first: put in Stable, to reserve its slot for future sendHome()
         player.panel.takeGuardianIfAble(undefined, piece); // setPlayerAndPaint()
