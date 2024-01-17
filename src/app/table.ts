@@ -417,6 +417,7 @@ export class Table extends EventDispatcher  {
   }
 
   readonly allPlayerPanels: PlayerPanel[] = [];
+  /** setup playerPanels, player.makePlayerBits(), this.setPlayerScore() */
   makePerPlayer(c0 = -7.4, c1 = TP.nHexes + .9, r0 = -.3, dr = 3.4) {
     const panelLocs = [[r0, c0], [r0 + dr, c0], [r0 + 2 * dr, c0], [r0, c1], [r0 + dr, c1]];
     const seq = [[], [0], [0, 3], [0, 3, 1], [0, 3, 4, 1], [0, 3, 4, 2, 1]];
@@ -427,6 +428,7 @@ export class Table extends EventDispatcher  {
       const [row, col] = panelLocs[ndx];
       this.allPlayerPanels[pIndex] = player.panel = new PlayerPanel(this, player, row, col, ndx < 3 ? -1 : 1);
       player.makePlayerBits();
+      this.setPlayerScore(player, 0);
     });
   }
 

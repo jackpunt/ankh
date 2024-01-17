@@ -244,6 +244,7 @@ export class GameState {
           this.curPlayer.panel.areYouSure('You have not moved any Figures', () => {
             setTimeout(() => this.state.done(true), 50); // new thread
           }, () => {
+            this.doneButton('Move done');
             console.log(stime(this, `.Move done: cancel`), this.selectedActions)
           });
           return;

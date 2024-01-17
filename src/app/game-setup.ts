@@ -208,7 +208,6 @@ export class GameSetup {
 
     // Inject GamePlay to Table; all the GUI components, makeAllDistricts(), addTerrain, initialRegions
     table.layoutTable(gamePlay);     // mutual injection & make all panelForPlayer
-    gamePlay.forEachPlayer(p => table.setPlayerScore(p, 0));
 
     this.gamePlay.turnNumber = -1;   // in prep for setNextPlayer or parseScenario
     // Place Pieces and Figures on map:
