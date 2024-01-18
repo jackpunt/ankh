@@ -628,11 +628,11 @@ export class HexMap<T extends Hex> extends Array<Array<T>> implements HexM<T> {
    */
   makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes) {
     const hexAry = this.makeDistrict(nh, 0, mh, 0);    // nh hexes on outer ring; single meta-hex
-    this.mapCont.hexCont && this.centerOnContainer();
+    this.mapCont.hexCont && this.centerContainers();
     this.hexAry = hexAry;
     return hexAry;
   }
-  centerOnContainer() {
+  centerContainers() {
     let mapCont = this.mapCont
     let hexRect = mapCont.hexCont.getBounds(); // based on aggregate of Hex2.cont.cache(bounds);
     let x0 = hexRect.x + hexRect.width/2, y0 = hexRect.y + hexRect.height/2;

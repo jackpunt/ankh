@@ -21,8 +21,8 @@ export class RectMap<T extends Hex> extends HexMap<T> {
   override makeAllDistricts(nh = TP.nHexes, mh = TP.mHexes): T[] {
     if (TP.useEwTopo) return super.makeAllDistricts();
     else {
-      const hexAry = this.makeRect(nh, mh);
-      this.mapCont.hexCont && this.centerOnContainer();
+      const hexAry = this.makeRect(nh, mh); // implicit: district = 0;
+      this.mapCont.hexCont && this.centerContainers();
       return hexAry;
     }
   }
@@ -40,7 +40,7 @@ export class RectMap<T extends Hex> extends HexMap<T> {
     //console.groupCollapsed(`makelDistrict [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}:${district}-${dcolor}`)
     //console.log(`.makeDistrict: [mr: ${mr}, mc: ${mc}] hex0= ${hex.Aname}`, hex)
     const nc0 = roundCorner ? nc - 1 - (nc % 2) : nc
-    const ncf = roundCorner ? nc -3 : nc;
+    const ncf = roundCorner ? nc - 3 : nc;
     this.newHexesOnRow(nc0, { row: 0, col: roundCorner ? 1 : 0 }, district, hexAry);
     for (let row = 1; row < nr - 1; row++) {
       // place 'row' of hexes
