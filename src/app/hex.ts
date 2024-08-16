@@ -409,7 +409,7 @@ export interface HexM<T extends Hex> {
   readonly district: T[][]        // all the Hex in a given district
   readonly mapCont: MapCont
   rcLinear(row: number, col: number): number
-  forEachHex<K extends T>(fn: (hex: K) => void): void // stats forEachHex(incCounters(hex))
+  forEachHex(fn: (hex: T) => void): void // stats forEachHex(incCounters(hex))
   update(): void
   showMark(hex: T): void
 
