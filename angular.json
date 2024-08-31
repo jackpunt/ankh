@@ -70,6 +70,7 @@
               "browserTarget": "ankh:build:production"
             },
             "development": {
+              "port": 4203,
               "browserTarget": "ankh:build:development"
             }
           },
