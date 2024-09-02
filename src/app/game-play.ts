@@ -377,7 +377,7 @@ export class GamePlay extends GamePlay0 {
     this.hexMap.update()
     let isPaused = !(p.planner as Planner).pauseP.resolved
     if (isPaused) {
-      console.log(stime(this, `.waitPaused: ${p.color} ${ident} waiting...`))
+      console.log(stime(this, `.waitPaused: ${p.colorn} ${ident} waiting...`))
       await p.planner.waitPaused(ident)
       console.log(stime(this, `.waitPaused: ${p.color} ${ident} running`))
     }

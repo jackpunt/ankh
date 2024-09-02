@@ -57,6 +57,7 @@ export class Player {
   set coins(v: number) { this.coinCounter?.updateValue(v); }
 
   get otherPlayer() { return Player.allPlayers[1 - this.index] }
+  get colorn(): string { return `$Plyr${this.index}` }
 
   planner: IPlanner;
   /** if true then invoke plannerMove */
