@@ -330,7 +330,7 @@ export class Tile extends Tile0 implements Dragable {
   logRecycle(verb: string) {
     const cp = this.gamePlay.curPlayer;
     const loc = this.hex?.isOnMap ? 'onMap' : 'offMap';
-    const info = { Aname: this.Aname, fromHex: this.fromHex?.Aname, cp: cp.colorn, tile: {...this} }
+    const info = { Aname: this.Aname, fromHex: this.fromHex?.Aname, cp: cp.color, tile: {...this} }
     console.log(stime(this, `.recycleTile[${loc}]: ${verb}`), info);
     this.gamePlay.logText(`${cp.Aname} ${verb} ${this}`, `GamePlay.recycle`);
   }

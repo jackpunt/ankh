@@ -32,6 +32,7 @@ export class Player {
   /** much useful context about this Player. */
   panel: PlayerPanel;
   get color() { return this.god.color; }
+
   get stableHexes() { return this.panel.stableHexes; }
 
   allOf<T extends Tile>(claz: Constructor<T>) { return (Tile.allTiles as T[]).filter(t => t instanceof claz && t.player === this); }
@@ -56,7 +57,6 @@ export class Player {
   set coins(v: number) { this.coinCounter?.updateValue(v); }
 
   get otherPlayer() { return Player.allPlayers[1 - this.index] }
-  get colorn(): string { return TP.colorScheme[this.color] }
 
   planner: IPlanner;
   /** if true then invoke plannerMove */
@@ -106,7 +106,7 @@ export class Player {
     let running = this.plannerRunning
     // feedback for KeyMove:
 
-    TP.log > 0 && console.log(stime(this, `(${this.colorn}).playerMove(${useRobo}): useRobo=${this.useRobo}, running=${running}`))
+    TP.log > 0 && console.log(stime(this, `(${this.color}).playerMove(${useRobo}): useRobo=${this.useRobo}, running=${running}`))
     if (running) return
     if (useRobo || this.useRobo) {
     // start plannerMove from top of stack:

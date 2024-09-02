@@ -377,21 +377,21 @@ export class GamePlay extends GamePlay0 {
     this.hexMap.update()
     let isPaused = !(p.planner as Planner).pauseP.resolved
     if (isPaused) {
-      console.log(stime(this, `.waitPaused: ${p.colorn} ${ident} waiting...`))
+      console.log(stime(this, `.waitPaused: ${p.color} ${ident} waiting...`))
       await p.planner.waitPaused(ident)
-      console.log(stime(this, `.waitPaused: ${p.colorn} ${ident} running`))
+      console.log(stime(this, `.waitPaused: ${p.color} ${ident} running`))
     }
     this.hexMap.update();
   }
   pauseGame(p = this.curPlayer) {
     p.planner?.pause();
     this.hexMap.update();
-    console.log(stime(this, `.pauseGame: ${p.colorn}`))
+    console.log(stime(this, `.pauseGame: ${p.color}`))
   }
   resumeGame(p = this.curPlayer) {
     p.planner?.resume();
     this.hexMap.update();
-    console.log(stime(this, `.resumeGame: ${p.colorn}`))
+    console.log(stime(this, `.resumeGame: ${p.color}`))
   }
   /** tell [robo-]Player to stop thinking and make their Move; also set useRobo = false */
   stopPlayer() {
@@ -457,7 +457,7 @@ export class GamePlay extends GamePlay0 {
   roboPlay(pid = 0, useRobo = true) {
     let p = this.allPlayers[pid]
     p.useRobo = useRobo
-    console.log(stime(this, `.autoPlay: ${p.colorn}.useRobo=`), p.useRobo)
+    console.log(stime(this, `.autoPlay: ${p.color}.useRobo=`), p.useRobo)
   }
   /** when true, run all the redoMoves. */
   set runRedo(val: boolean) { (this._runRedo = val) && this.makeMove() }

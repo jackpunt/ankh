@@ -828,7 +828,7 @@ export class Scorpion extends Guardian3 {
     const y = 3, py = -cl;
     return g.s(color).ss(7, 'butt', 'miter').mt(-1, y).lt(0, py).lt(1, y);
   }
-  makeClaw(cl = 5, color = this.player?.colorn ?? C.black) {
+  makeClaw(cl = 5, color = this.player?.color ?? C.black) {
     const clf = cl + 1, uparrow = '\u2191';
     const sc = new Shape(this.drawClaw(new Graphics(), 'black', cl));
     sc.setBounds(-4, -clf, 8, clf + 1);
