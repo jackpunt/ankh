@@ -543,7 +543,7 @@ export class Table extends EventDispatcher  {
       rowCont.name = `rowCont-${id}`;
       rowCont.y = rn * rh;
       actionCont.addChild(rowCont);
-      const overName = `over${actionRow.id}`; // 'overGain'
+      const overName = `over${actionRow.id}`; // 'overGain' method name
       rowCont.rollover = rowCont[overName] as (button: ActionButton, over: boolean) => void;
       const k = firstChar(actionRow.id);
       for (let cn = 0; cn < nc; cn++) {
@@ -554,7 +554,7 @@ export class Table extends EventDispatcher  {
         button.isEvent = (cn === nc - 1);
         button.x = cn * dx;
         rowCont.addButton(button);
-        button.on(S.click, (evt: Object) => this.selectAction(id, button, cn), this);
+        button.on(S.click, () => this.selectAction(id, button, cn), this);
       }
       this.actionPanels[actionRow.id] = rowCont;
     });

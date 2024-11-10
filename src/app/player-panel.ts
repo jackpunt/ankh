@@ -308,7 +308,7 @@ export class PlayerPanel extends Container {
     const conf = this.confirmContainer;
     const button1 = conf.buttonYes;
     const button2 = conf.buttonCan;
-    const msgText = conf.children[4] as CenterText;
+    const msgText = conf.messageText;
     msgText.text = msg;
     const clear = (func: () => void) => {
       conf.visible = false;
