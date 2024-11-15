@@ -205,7 +205,7 @@ export class AnkhHex extends Hex2 {
 export class StableHex extends AnkhHex {
   size: number;  // TP.ankh1Rad | TP.ankh2rad; ideally would be readonly constructor arg, but newHex2()...
   usedBy: Guardian;  // gets set, but not un-set
-  override isStableHex() { return true; }
+  override isStableHex(): this is StableHex { return true; }
 
   override get meep() { return super.meep; }
   override set meep(meep: AnkhMeeple) {
