@@ -1,12 +1,12 @@
 import { Params } from "@angular/router";
 import { removeEltFromArray, selectN, uniq } from "@thegraid/common-lib";
 import { blinkAndThen, C, ChoiceItem, CycleChoice, DropdownChoice, DropdownItem, DropdownStyle, makeStage, ParamGUI, ParamItem, stime } from "@thegraid/easeljs-lib";
-import { Container, Stage } from "@thegraid/easeljs-module";
+import { Container, Stage, type DisplayObject } from "@thegraid/easeljs-module";
 import { Guardian } from "./ankh-figure";
 import { AnkhScenario } from "./ankh-scenario";
 import { EBC, PidChoice } from "./choosers";
 // import { parse as JSON5_parse } from 'json5';
-import json5 from "json5/dist/index.mjs";
+import JSON5 from "json5/dist/index.mjs";
 import { GamePlay } from "./game-play";
 import { God } from "./god";
 import { Meeple } from "./meeple";
@@ -53,8 +53,13 @@ export class GameSetup {
     this.stage.snapToPixel = TP.snapToPixel;
     this.setupToParseState();                 // restart when/if 'SetState' button is clicked
     this.setupToReadFileState();              // restart when/if 'LoadFile' button is clicked
+    this.loadImagesThenStartup(qParams);
+  }
+
+  loadImagesThenStartup(qParams = this.qParams) {
     Tile.loader.loadImages(() => this.startup(qParams));
   }
+
   _netState = " " // or "yes" or "ref"
   set netState(val: string) {
     this._netState = (val == "cnx") ? this._netState : val || " "
@@ -110,15 +115,37 @@ export class GameSetup {
   godNames: string[] = [];
   guards: GuardIdent = [undefined, undefined, undefined];
 
-  setupToParseState() {
-    const parseStateButton = document.getElementById('parseStateButton');
-    const parseStateText = document.getElementById('parseStateText') as HTMLInputElement;
-    parseStateButton.onclick = () => {
-      const stateText = parseStateText.value;
-      const state = json5.parse(stateText) as SetupElt;
-      state.Aname = state.Aname ?? `parseStateText`;
-      blinkAndThen(this.gamePlay.hexMap.mapCont.markCont, () => this.restart(state))
-    }
+  /** read & parse State from text element: parseStateButton.onClick() => blinkThenRestart() */
+  setupToParseState(): void {
+    const parseStateButton = document.getElementById('parseStateButton') as HTMLButtonElement;
+    parseStateButton.onclick = () => this.blinkThenRestart()
+  }
+
+  /** blink DisplayObject [this.table.doneButton] until parseStateAndRestart() completes */
+  blinkThenRestart(dispObj: DisplayObject = this.table.doneButton, text?: string) {
+    const psb = document.getElementById('parseStateButton') as HTMLButtonElement;
+    const bgColor = psb.style.backgroundColor;
+    psb.style.backgroundColor = 'pink';
+    blinkAndThen(dispObj ?? this.stage, () => {
+      this.parseStateTextAndRestart(text, (scenario) => {
+        this.restart(scenario)
+        psb.style.backgroundColor = bgColor
+      });
+    });
+  }
+
+  /**
+   *
+   * @param stateText [Element('parseStateText').value.replace(/,$/, '')]
+   * @param restart [(s) => this.restart(s)] process the Scenario
+   */
+  parseStateTextAndRestart(stateText?: string, restart = (setupElt: SetupElt) => this.restart(setupElt)) {
+    // JSON5 barfs on trailing ','
+    if (!stateText) stateText = (document.getElementById('parseStateText') as HTMLInputElement).value.replace(/,$/, '');
+    console.log(stime(this, `.parseStateTextAndRestart`), stateText);
+    const setupElt = JSON5.parse(stateText) as SetupElt;
+    setupElt.Aname = setupElt.Aname ?? `parseStateText`;
+    restart(setupElt);
   }
 
   fileReadPromise: Promise<File>;
@@ -133,7 +160,7 @@ export class GameSetup {
     const readFileName = readFileNameElt.value;
     const [fname, turnstr] = readFileName.split('@');
     const turn = Number.parseInt(turnstr);
-    const logArray = json5.parse(fileText) as LogElts;
+    const logArray = JSON5.parse(fileText) as LogElts;
     const [startelt, ...stateArray] = logArray;
     const state = stateArray.find(state => state.turn === turn);
     state.Aname = `${fileName}@${turn}`;
@@ -167,6 +194,7 @@ export class GameSetup {
     this.startScenario(scenario);
   }
 
+  table: Table;
   scenario: Scenario;  // last scenario loaded
   /** scenario.turn indicate a FULL/SAVED scenario */
   startScenario(scenario: Scenario) {
@@ -179,7 +207,7 @@ export class GameSetup {
     this.ngods = scenario.ngods ?? this.ngods;
     this.guards = scenario.guards ?? this.guards;
     this.godNames = scenario.godNames ?? this.godNames;
-    const table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
+    const table = this.table = new Table(this.stage)        // EventDispatcher, ScaleCont, GUI-Player
 
     const fillGodNames = (ngods: number, godNames: string[]) => {
       const uniqGods = uniq(godNames);

@@ -269,14 +269,14 @@ export class GamePlay extends GamePlay0 {
     KeyBinder.keyBinder.setKey('h', () => {this.table.textLog.visible = !this.table.textLog.visible; this.hexMap.update()});
 
     KeyBinder.keyBinder.setKey('U', { thisArg: this.gameState, func: this.gameState.undoAction, argVal: true })
-    KeyBinder.keyBinder.setKey('p', { thisArg: this, func: this.saveState, argVal: true })
-    KeyBinder.keyBinder.setKey('P', { thisArg: this, func: this.pickState, argVal: true })
-    KeyBinder.keyBinder.setKey('C-p', { thisArg: this, func: this.pickState, argVal: false }) // can't use Meta-P
     // KeyBinder.keyBinder.setKey('O', () => { this.gameState.phase('Osiris'); this.gameState.conflictRegion = this.hexMap.regions.length as RegionId; })
     KeyBinder.keyBinder.setKey('M-S', { thisArg: this, func: this.runSplitter, argVal: true })
     KeyBinder.keyBinder.setKey('C-M-S', { thisArg: this, func: this.undoSplit, argVal: true })
     // KeyBinder.keyBinder.setKey('B', () => {this.gameState.phase('Conflict')});
     KeyBinder.keyBinder.setKey('k', () => this.logWriter.showBacklog());
+    KeyBinder.keyBinder.setKey('P', () => this.selectBacklog(-1));
+    KeyBinder.keyBinder.setKey('p', () => this.selectBacklog(1));
+
     KeyBinder.keyBinder.setKey('D', () => this.fixit())
     let cardSelectorsUp = false;
     KeyBinder.keyBinder.setKey('C', () => {
@@ -290,6 +290,16 @@ export class GamePlay extends GamePlay0 {
     // diagnostics:
     table.undoShape.on(S.click, () => this.undoMove(), this)
     table.redoShape.on(S.click, () => this.redoMove(), this)
+  }
+
+  backlogIndex = 1;
+  selectBacklog(incr = -1) {
+    const parseStateText = document.getElementById('parseStateText') as HTMLInputElement;
+    const backlog = this.logWriter.backlog;
+    const ndx = Math.max(0, Math.min(backlog.length - 1, this.backlogIndex + incr));
+    this.backlogIndex = ndx;
+    const logElt = backlog[ndx]; // .replace(/,\n$/,'');
+    parseStateText.value = logElt;
   }
 
   /** enter debugger, with interesting values in local scope */
@@ -333,30 +343,6 @@ export class GamePlay extends GamePlay0 {
   //   console.log(stime(this, `.fileState: logArray =\n`), stateArray);
   //   this.gameSetup.restart(state);
   // }
-
-  backStates = [];
-  /** setNextPlayer->startTurn (or Key['p']) */
-  saveState() {
-    if (this.nstate !== 0) {
-      this.backStates = this.backStates.slice(this.nstate); // remove ejected states
-      this.nstate = 0;
-    }
-
-    const state = this.gameSetup.scenarioParser.saveState(this);
-    this.backStates.unshift(state);
-    console.log(stime(this, `.saveState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}`), state);
-  }
-  // TODO: setup undo index to go fwd and back? wire into undoCont?
-  nstate = 0;
-  /** move nstate to older(back=true, S-P) or newer(back=false, C-P) states in backStates */
-  pickState(back = true) {
-    this.nstate = back ? Math.min(this.backStates.length - 1, this.nstate + 1) : Math.max(0, this.nstate - 1);
-    const state = this.backStates[this.nstate];
-    console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
-    this.gameSetup.parseScenenario(state); // typically sets gamePlay.turnNumber
-    console.log(stime(this, `.pickState -------- #${this.nstate}:${this.backStates.length-1} turn=${state.turn}:`), state);
-    this.setNextPlayer(this.turnNumber);
-  }
 
   chooseAction(action: ActionIdent) {
     if (!this.isPhase('ChooseAction')) return;

@@ -97,12 +97,6 @@ export class NumCounterBox extends NumCounter {
   }
 }
 
-export class NoZeroCounter extends NumCounter {
-  protected override setBoxWithValue(value: string | number): void {
-    super.setBoxWithValue(value || '');
-  }
-}
-
 export class DecimalCounter extends NumCounterBox {
   decimal = 0;
   constructor(name: string, initValue?: string | number, color?: string, fontSize?: number, fontName?: string) {
