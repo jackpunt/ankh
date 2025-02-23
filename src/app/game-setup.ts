@@ -199,9 +199,11 @@ export class GameSetup {
   /** scenario.turn indicate a FULL/SAVED scenario */
   startScenario(scenario: Scenario) {
     God.byName.clear();
-    Tile.allTiles = [];
-    Meeple.allMeeples = [];
-    Player.allPlayers = [];
+    Tile.allTiles.length = 0;
+    Meeple.allMeeples.length = 0;
+    Player.allPlayers.length = 0;
+    // save all the states for redo
+    // this.logWriter.backlog.length = 0;
 
     this.scenario = scenario;
     this.ngods = scenario.ngods ?? this.ngods;
@@ -218,6 +220,7 @@ export class GameSetup {
       fullNames.length = Math.min(fullNames.length, 5);
       return fullNames;
     }
+    /** previousGuards[rank] ?? scenarioGuards[rank] ?? randomGuard(rank) */
     const fillGuardNames = (pguards: GuardIdent, sguards: GuardIdent) => {
       [0, 1, 2].forEach((rank: 0 | 1 | 2) => {
         pguards[rank] = (!!pguards?.[rank] ? pguards[rank] : undefined) ?? sguards?.[rank] ?? Guardian.randomGuard(rank);
@@ -271,6 +274,7 @@ export class GameSetup {
     gui.makeParamSpec('ngods', [2, 3, 4, 5], { fontColor: "blue" });
     gui.makeParamSpec('godNames', God.allNames, { fontColor: "blue", chooser: MultiChoice });
     gui.spec("godNames").onChange = (item: MultiItem) => {
+      if (!godNamesChange) return;
       const name = item.text; // God name
       if (this.godNames.includes(name)) {
         removeEltFromArray(name, this.godNames);
@@ -281,7 +285,7 @@ export class GameSetup {
       }
       this.ngods = Math.min(5, Math.max(2, this.godNames.length));
       const ngodsChooser = gui.findLine('ngods').chooser;
-      ngodsChooser.select(ngodsChooser.items[this.ngods - 2]);
+      ngodsChooser.select(ngodsChooser.items[this.ngods - 2]); // align ngods shown
       console.log(stime(this, `.onChange: gods=${this.godNames}, ngods=${this.ngods}`));
       return;
     };
@@ -292,7 +296,9 @@ export class GameSetup {
       gui.spec(gn).onChange = ((item: ChoiceItem) => { this.guards[n] = item.text });
     })
 
+    let godNamesChange = false;
     gui.makeLines();
+    godNamesChange = true;
     console.log(stime(this, `.makeGUI: gods=`), this.godNames);
     gui.findLine('godNames').chooser.items.forEach((item: MultiItem, n) => {
       const render = (item: MultiItem, color: string) => {
